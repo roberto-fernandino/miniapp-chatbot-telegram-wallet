@@ -60,6 +60,10 @@ services:
     depends_on:
       - telegram_app
       - backend_app
+    networks:
+      - app-network
+    container_name: nginx_proxy
+
 volumes:
   redis-data:
 
