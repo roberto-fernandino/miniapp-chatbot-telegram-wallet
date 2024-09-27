@@ -1,0 +1,28 @@
+FROM debian:buster-slim
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    gcc \
+    netcat \
+    libssl-dev \
+    pkg-config \
+    ca-certificates \
+    && apt-get clean
+
+
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+ENV PATH="/root/.cargo/bin:/scripts:${PATH}"
+
+
+COPY scripts /scripts
+RUN chmod +x /scripts/backend_app
+
+WORKDIR /backend_app
+COPY backend_app .
+
+RUN cargo build 
+
+CMD ["backend_app"]
+
+

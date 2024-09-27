@@ -1,0 +1,9 @@
+#!/bin/bash
+echo "🟡 starting backend api"
+
+/backend_app/target/debug/backend_app &
+
+echo "✅ backend api started"
+
+
+wait %1

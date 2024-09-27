@@ -1,0 +1,67 @@
+services:
+  telegram_app:
+    build:
+      context: .
+      dockerfile: Dockerfile.telegram_app
+    volumes:
+      - ./telegram_app:/telegram_app
+    networks:
+      - app-network
+    ports:
+      - "5173:5173"
+    env_file:
+      - .env
+    container_name: telegram_app
+
+  ngrok:
+    build:
+      context: .
+      dockerfile: Dockerfile.ngrok
+    volumes:
+      - ./scripts/ngrok:/usr/bin/ngrok
+    depends_on:
+      - telegram_app
+    networks:
+      - app-network
+    container_name: ngrok
+
+  redis:
+    image: redis:latest
+    container_name: telegram_app_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - app-network
+
+
+  backend_app:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend_app
+    networks:
+      - app-network
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    container_name: backend_app
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "7000:7000"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - telegram_app
+      - backend_app
+volumes:
+  redis-data:
+
+networks:
+  app-network:

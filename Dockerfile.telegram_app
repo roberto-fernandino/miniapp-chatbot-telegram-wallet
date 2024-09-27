@@ -1,0 +1,14 @@
+FROM node:lts-alpine
+
+COPY ./telegram_app ./telegram_app
+
+WORKDIR /telegram_app
+
+RUN cd /telegram_app && \
+ npm install && \
+ npm install -g vite
+
+COPY ./scripts/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+CMD ["/entrypoint.sh"]
