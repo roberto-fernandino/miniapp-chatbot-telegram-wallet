@@ -26,6 +26,8 @@ pub async fn check_user_exists(user_id: &str) -> Result<bool> {
     Ok(user_exists)
 }
 
+/// This route is used to add or update a user.
+/// It is used to add a new user or update an existing user.
 pub async fn add_or_update_user(mut req: tide::Request<()>) -> tide::Result<String> {
     let mut con = get_redis_connection().await?;
     let user: User = req.body_json().await?;
@@ -46,7 +48,7 @@ pub async fn add_or_update_user(mut req: tide::Request<()>) -> tide::Result<Stri
     // Add user ID to the set of all users
     con.sadd("users", format!("user:{}", user.id))?;
 
-    Ok("User added or updated successfully".to_string())
+    Ok("User added or updated or touched successfully".to_string())
 }
 
 pub async fn get_user(req: tide::Request<()>) -> tide::Result<String> {
