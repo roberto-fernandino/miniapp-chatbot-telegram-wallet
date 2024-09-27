@@ -82,7 +82,10 @@ const App: React.FC = () => {
     setCopyTrades(updatedCopyTrades);
   }
   async function updateUserWallets() {
-    // update user wallets with new wallets
+    // get user wallets from redis
+    let getUserWalletsResponse = await getUserWallets(
+      WebApp.initDataUnsafe.user?.id.toString() ?? ""
+    );
     const updatedWallets = await Promise.all(
       getUserWalletsResponse.data.map(async (wallet: WalletData) => {
         const { solBalance, usdtBalance } = await getWalletSolBalance(
@@ -113,11 +116,6 @@ const App: React.FC = () => {
         parseUserData(WebApp.initDataUnsafe.user)
       );
       log(`${addOrUpdateUserReponse.data}`, "success");
-
-      // get user wallets from redis
-      let getUserWalletsResponse = await getUserWallets(
-        WebApp.initDataUnsafe.user?.id.toString() ?? ""
-      );
 
       updateCopyTrades();
       updateUserWallets();
