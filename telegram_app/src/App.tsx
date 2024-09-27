@@ -1,24 +1,29 @@
 import React, { useState, useEffect } from "react";
 import WebApp from "@twa-dev/sdk";
 import capsuleClient from "./lib/capsuleClient";
-import { WalletType } from "@usecapsule/web-sdk";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
-import { addOrUpdateUser, parseUserData } from "./lib/utils";
+import { addOrUpdateUser, addWalletToUser, parseUserData, getUserWallets } from "./lib/utils";
 import { Button } from "./components/ui/button";
+import dotenv from "dotenv";
 import { Input } from "./components/ui/input";
 import { Spinner } from "./components/ui/spinner";
+import type { TurnkeyApiClient } from "@turnkey/sdk-server";
+import { Turnkey, TurnkeyActivityError } from "@turnkey/sdk-server";
+import * as crypto from "crypto";
+import path from 'path';
 import {
   clearChunkedStorage,
   ErrorHandler,
   LogFunction,
-  retrieveChunkedData,
-  storeWithChunking,
 } from "./lib/cloudStorageUtil";
+
+
+
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [walletId, setWalletId] = useState<string | null>(null);
-  const [address, setAddress] = useState<string | undefined>("");
+  const [userWallets, setUserWallets] = useState<any[]>([]);
   const [userShare, setUserShare] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [signature, setSignature] = useState("");
@@ -27,10 +32,24 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("");
   const [isStorageComplete, setIsStorageComplete] = useState(false);
+  const [walletName, setWalletName] = useState("");
+  const [isWalletInputOpen, setIsWalletInputOpen] = useState(false);
+  const [createWalletButtonActive, setCreateWalletButtonActive] = useState(true);
 
   useEffect(() => {
     initializeApp();
   }, []);
+
+
+  // Turnkey Setup
+  const turnkey = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPublicKey: import.meta.env.VITE_TURNKEY_PUBLIC!,
+    apiPrivateKey: import.meta.env.VITE_TURNKEY_PRIVATE!,
+    defaultOrganizationId: import.meta.env.VITE_TURNKEY_ORGNIZATION!,
+  });
+  const turnkeyClient = turnkey.apiClient();
+
 
   const initializeApp = async () => {
     setIsLoading(true);
@@ -38,6 +57,7 @@ const App: React.FC = () => {
 
     try {
       WebApp.ready();
+    
       
       if (!WebApp.initDataUnsafe.user) {
         throw new Error("No User found. Please open App from Telegram");
@@ -47,20 +67,15 @@ const App: React.FC = () => {
 
 
       // add user to redis or update if already exists
-      let response = await addOrUpdateUser(parseUserData(WebApp.initDataUnsafe.user));
-      log(`${response.data}`, "success");
+      let addOrUpdateUserReponse = await addOrUpdateUser(parseUserData(WebApp.initDataUnsafe.user));
+      log(`${addOrUpdateUserReponse.data}`, "success");
+
+      let getUserWalletsResponse = await getUserWallets(WebApp.initDataUnsafe.user?.id.toString() ?? "");
+      setUserWallets(getUserWalletsResponse.data);
+    
 
 
       
-      if (userShare && walletId) {
-        setUserShare(userShare);
-        setWalletId(walletId);
-        setIsStorageComplete(true);
-        log(`Wallet data found: ${walletId}`, "success");
-        await capsuleClient.setUserShare(userShare);
-      } else {
-        log(`No existing wallet data found for user ${WebApp.initDataUnsafe.user.username}`, "info");
-      }
     } catch (error) {
       handleError(`Initialization error: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -75,43 +90,59 @@ const App: React.FC = () => {
 
   const handleError: ErrorHandler = (errorMessage) => log(errorMessage, "error");
 
-  const generateWallet = async (): Promise<void> => {
+  const generateWallet = async (client: TurnkeyApiClient, walletUserName: string): Promise<void> => {
     setIsLoading(true);
     setLoadingText("Generating a new wallet...");
+    setCreateWalletButtonActive(false);
     try {
       const username = WebApp.initDataUnsafe.user?.username;
       if (!username) throw new Error("Username not found");
 
-      const pregenWallet = await capsuleClient.createWalletPreGen(
-        WalletType.EVM,
-        `${username + crypto.randomUUID().split("-")[0]}@test.usecapsule.com`
-      );
-
-      log(`Wallet created with ID: ${pregenWallet.id} and Address: ${pregenWallet.address || "N/A"}`, "success");
-
-      const share = (await capsuleClient.getUserShare()) || "";
-
-      // Update state immediately
-      setUserShare(share);
-      setAddress(pregenWallet.address);
-      setWalletId(pregenWallet.id);
-
-      // Start asynchronous storage operations
-      log("Storing the wallet data in users telegram cloud storage...", "info");
-      log("This may take a few seconds. The wallet is now usable, but please DO NOT close the mini-app while this is in progress", "info");
-
-      Promise.all([
-        storeWithChunking("userShare", share, log, handleError),
-        storeWithChunking("walletId", pregenWallet.id, log, handleError),
-      ])
-        .then(() => {
-          log("Wallet data stored successfully", "success");
-          setIsStorageComplete(true);
-        })
-        .catch((error) => {
-          handleError(`Error storing wallet data: ${error instanceof Error ? error.message : String(error)}`);
-          setIsStorageComplete(true);
+      log(`Generating wallet for user ${username}`, "success");
+      
+      const walletName = `Solana Wallet ${crypto.randomBytes(2).toString("hex")}`;
+      log(`wallet name: ${walletName}`, "success");
+      try {
+        const response = await client.createWallet({
+          walletName,
+          accounts: [
+            {
+              pathFormat: "PATH_FORMAT_BIP32",
+              // https://github.com/satoshilabs/slips/blob/master/slip-0044.md
+              path: "m/44'/501'/0'/0'",
+              curve: "CURVE_ED25519",
+              addressFormat: "ADDRESS_FORMAT_SOLANA",
+            },
+          ],
         });
+
+      log(`generated wallet: ${walletName}`, "success");
+      const walletId = response.walletId;
+      if (!walletId) {
+        throw new Error("Response doesn't contain wallet ID");
+      }
+
+      const address = response.addresses[0];
+      if (!address) {
+        throw new Error("Response doesn't contain wallet address");
+      }
+      
+      let walletAddResponse = await addWalletToUser(WebApp.initDataUnsafe.user?.id.toString() ?? "", walletId, walletName, walletUserName, address);
+      log(`wallet added to user: ${walletAddResponse.data}`, "success");
+
+      } catch (error) {
+        // If needed, you can read from `TurnkeyActivityError` to find out why the activity didn't succeed
+        if (error instanceof TurnkeyActivityError) {
+          throw error;
+        }
+
+        throw new TurnkeyActivityError({
+          message: `Failed to create a new Solana wallet: ${
+          (error as Error).message
+          }`,
+          cause: error as Error,
+        });
+      }
     } catch (error) {
       handleError(`Error generating wallet: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -169,23 +200,7 @@ const App: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="header">
-        <Button variant={"link"}>
-          <a href="https://usecapsule.com" target="_blank">Capsule</a>
-        </Button>
-        <Button variant={"link"}>
-          <a href="https://docs.usecapsule.com" target="_blank">Docs</a>
-        </Button>
-        <Button variant={"link"}>
-          <a href="https://developer.usecapsule.com" target="_blank">Get Access</a>
-        </Button>
-        <Button
-          variant={"link"}
-          onClick={logout}
-          disabled={!isStorageComplete}>
-          ❌ Close App
-        </Button>
-      </div>
+     
       <Card className="mb-4">
         <CardHeader>
           <CardTitle>{isAuthenticated ? "Wallet Manager" : "Capsule TG App Example"}</CardTitle>
@@ -195,12 +210,36 @@ const App: React.FC = () => {
             <p>Authenticating...</p>
           ) : !walletId ? (
             <div className="flex justify-between">
-              <Button
-                onClick={generateWallet}
+              {createWalletButtonActive ? (
+                <Button
+                  onClick={() => {setIsWalletInputOpen(true); setCreateWalletButtonActive(false)}}
                 disabled={isLoading}>
                 {isLoading ? <Spinner /> : "Create New Wallet"}
               </Button>
-              <p></p>
+              ) : (
+                <div>
+                {!isLoading && 
+                <Button className="mb-2"
+                  onClick={() => {setIsWalletInputOpen(false); setCreateWalletButtonActive(true)}}
+                  disabled={isLoading}>
+                {"Back"}
+                </Button>
+                }
+                <Input
+                  value={walletName}
+                  onChange={(e) => setWalletName(e.target.value)}
+                  placeholder="Enter Wallet Name"
+                  className="mb-2 bg-card"
+                />
+                <Button
+                  onClick={() => generateWallet(turnkeyClient, walletName)}
+                  className="mb-2"
+                  disabled={isLoading || !walletName}>
+                  {isLoading ? <Spinner /> : "Generate Wallet"}
+                </Button>
+
+              </div>
+              )}
             </div>
           ) : (
             <>
