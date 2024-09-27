@@ -51,7 +51,7 @@ export async function addOrUpdateUser(userData: UserData) {
   }
 }
 
-interface WalletData {
+export interface WalletData {
   user_id: string;
   wallet_id: string;
   turnkey_wallet_name: string;
