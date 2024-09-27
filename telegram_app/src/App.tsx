@@ -2,14 +2,16 @@ import React, { useState, useEffect } from "react";
 import WebApp from "@twa-dev/sdk";
 import capsuleClient from "./lib/capsuleClient";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
-import { addOrUpdateUser, addWalletToUser, parseUserData, getUserWallets } from "./lib/utils";
+import { addOrUpdateUser, addWalletToUser, parseUserData, getUserWallets, WalletData } from "./lib/utils";
 import { Button } from "./components/ui/button";
 import dotenv from "dotenv";
 import { Input } from "./components/ui/input";
 import { Spinner } from "./components/ui/spinner";
 import type { TurnkeyApiClient } from "@turnkey/sdk-server";
 import { Turnkey, TurnkeyActivityError } from "@turnkey/sdk-server";
+import CopyIcon from "./assets/copy.svg";
 import * as crypto from "crypto";
+import { getWalletSolBalance } from "./lib/solana";
 import path from 'path';
 import {
   clearChunkedStorage,
@@ -70,10 +72,15 @@ const App: React.FC = () => {
       let addOrUpdateUserReponse = await addOrUpdateUser(parseUserData(WebApp.initDataUnsafe.user));
       log(`${addOrUpdateUserReponse.data}`, "success");
 
-      let getUserWalletsResponse = await getUserWallets(WebApp.initDataUnsafe.user?.id.toString() ?? "");
-      setUserWallets(getUserWalletsResponse.data);
-    
+      // get user wallets from redis
+      let getUserWalletsResponse = await getUserWallets(WebApp.initDataUnsafe.user?.id.toString() ?? ""); 
 
+      // update user wallets with new wallets
+      const updatedWallets = await Promise.all(getUserWalletsResponse.data.map(async (wallet: WalletData) => {
+        const {solBalance, usdtBalance} = await getWalletSolBalance(wallet.sol_address);
+        return {...wallet, solBalance, usdtBalance};
+      }));
+      setUserWallets(updatedWallets);
 
       
     } catch (error) {
@@ -128,7 +135,30 @@ const App: React.FC = () => {
       }
       
       let walletAddResponse = await addWalletToUser(WebApp.initDataUnsafe.user?.id.toString() ?? "", walletId, walletName, walletUserName, address);
-      log(`wallet added to user: ${walletAddResponse.data}`, "success");
+
+      let newWallet: WalletData = {
+        user_id: WebApp.initDataUnsafe.user?.id.toString() ?? "",
+        wallet_id: walletId,
+        turnkey_wallet_name: walletName,
+        user_wallet_name: walletUserName,
+        sol_address: address
+      };
+
+      // Add new wallet to existing wallets
+      const updatedWallets = [...userWallets, newWallet];
+
+
+      // Update balances for all wallets
+      const walletsWithBalances = await Promise.all(updatedWallets.map(async (wallet) => {
+        const { solBalance, usdtBalance } = await getWalletSolBalance(wallet.sol_address);
+        return { ...wallet, solBalance, usdtBalance };
+      }));
+
+      // Update state with new wallet and updated balances
+      setUserWallets(walletsWithBalances);
+      
+
+      log(`wallet added to user: ${walletName}`, "success");
 
       } catch (error) {
         // If needed, you can read from `TurnkeyActivityError` to find out why the activity didn't succeed
@@ -208,8 +238,8 @@ const App: React.FC = () => {
         <CardContent className="overflow-hidden">
           {!isAuthenticated ? (
             <p>Authenticating...</p>
-          ) : !walletId ? (
-            <div className="flex justify-between">
+          ) : !walletId && (
+            <div className="flex flex-col justify-between">
               {createWalletButtonActive ? (
                 <Button
                   onClick={() => {setIsWalletInputOpen(true); setCreateWalletButtonActive(false)}}
@@ -237,42 +267,63 @@ const App: React.FC = () => {
                   disabled={isLoading || !walletName}>
                   {isLoading ? <Spinner /> : "Generate Wallet"}
                 </Button>
-
               </div>
               )}
+                <h3 className="text-lg font-semibold text-primary mb-2">Wallets</h3>
+              {userWallets.map((wallet) => (
+                <div className="flex flex-col justify-between">
+                  <div className="flex flex-row items-center">
+                  <p className="text-sm mr-2">{wallet.user_wallet_name}</p>
+                  <div className="flex flex-row items-center">
+                    <p className="text-sm">
+                      {`${wallet.sol_address.slice(0, 3)}...${wallet.sol_address.slice(-3)}`}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="ml-2"
+                      onClick={() => navigator.clipboard.writeText(wallet.sol_address)}
+                    >
+                      <img src={CopyIcon} alt="Copy" className="h-4 w-4" />
+                    </Button>
+                    <div className="flex flex-col items-start ml-2">
+                      <span className="text-sm font-semibold text-primary">
+                        {wallet.solBalance !== undefined ? `${wallet.solBalance.toFixed(4)} SOL` : 'Loading...'}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {wallet.usdtBalance !== undefined ? `$${wallet.usdtBalance.toFixed(2)} USD` : 'Loading...'}
+                      </span>
+                    </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          ) : (
-            <>
-              <p className="text-[12px]">{`Wallet Address: ${address}`}</p>
-              <Input
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Message to sign"
-                className="mb-2 bg-card"
-              />
-              <Button
-                variant={"outline"}
-                onClick={signMessage}
-                className="mb-2"
-                disabled={isLoading || !message}>
-                {isLoading ? <Spinner /> : "Sign Message"}
-              </Button>
-              {signature && <p className="mb-2 break-all">Signature: {signature}</p>}
-              <div>
-                <Button
-                  onClick={clearStorage}
-                  className="ml-2"
-                  disabled={isLoading}>
-                  Clear Storage
-                </Button>
-              </div>
-            </>
           )}
-          {loadingText && <p className="mt-2">{loadingText}</p>}
+        </CardContent>
+      </Card>
+      <Card className="mb-4">
+        <CardHeader className="flex justify-between flex-row">
+          <CardTitle>Copy Trade</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Input
+            placeholder="Enter wallet address"
+            className="mb-2 bg-card"
+          />
+          <Input
+            placeholder="Buy amount"
+            className="mb-2 bg-card"
+          />
+          <Button
+            disabled={isLoading}
+          >
+            {isLoading ? <Spinner /> : "Copy Trade"}
+          </Button>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="mb-4">
         <CardHeader className="flex justify-between flex-row">
           <CardTitle>App Logs</CardTitle>
           <Button
