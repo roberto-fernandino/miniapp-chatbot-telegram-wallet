@@ -124,3 +124,44 @@ pub async fn get_user_wallets(req: tide::Request<()>) -> tide::Result<String> {
     // return as json
     Ok(serde_json::to_string(&wallets)?)
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CopyTradeWalletPost {
+    pub user_id: String,
+    pub wallet_id: String,
+    pub buy_amount: String,
+    pub copy_trade_address: String,
+    pub status: String,
+    pub user_wallet_name: String,
+}
+
+pub async fn set_copy_trade_wallet(mut req: tide::Request<()>) -> tide::Result<String> {
+    let post: CopyTradeWalletPost = req.body_json().await?;
+    let mut con = get_redis_connection().await?;
+
+    let key = format!("user:{}:copy_trade_wallet:{}", &post.user_id, &post.copy_trade_address);
+    con.hset_multiple(key, &[
+        ("wallet_id", &post.wallet_id),
+        ("buy_amount", &post.buy_amount),
+        ("status", &post.status),
+        ("copy_trade_address", &post.copy_trade_address),
+        ("user_wallet_name", &post.user_wallet_name),
+    ])?;
+
+    Ok(serde_json::to_string(&post)?)
+}
+
+
+pub async fn get_copy_trades(req: tide::Request<()>) -> tide::Result<String> {
+    let user_id = req.param("user_id")?;
+    let mut con = get_redis_connection().await?;
+
+    let copy_trades_keys: Vec<String> = con.keys(format!("user:{}:copy_trade_wallet:*", user_id))?;
+    let mut copy_trades = Vec::new();
+    for key in &copy_trades_keys {
+        let copy_trade_data: HashMap<String, String> = con.hgetall(key)?;
+        copy_trades.push(copy_trade_data);
+    }
+
+    Ok(serde_json::to_string(&copy_trades)?)
+}

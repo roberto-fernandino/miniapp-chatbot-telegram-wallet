@@ -51,6 +51,7 @@ export async function addOrUpdateUser(userData: UserData) {
   }
 }
 
+
 export interface WalletData {
   user_id: string;
   wallet_id: string;
@@ -106,6 +107,67 @@ export async function getUserWallets(user_id: string) {
   try {
     const response = await axios.get(
       `https://selected-namely-panda.ngrok-free.app/api/user_wallets/${user_id}`,
+      {
+        headers: {
+          'User-Agent': 'TelegramBot/1.0',
+        },
+      }
+    );
+    return response;
+  } catch (error) {
+    throw error;
+  }
+}
+
+
+ export interface CopyTradeWalletData {
+  user_id: string;
+  wallet_id: string;
+  buy_amount: string;
+  copy_trade_address: string;
+  status: string;
+  user_wallet_name: string;
+}
+
+  function createCopyTradeWalletPayload(user_id: string, wallet_id: string, buy_amount: string, copy_trade_address: string, status: string, user_wallet_name: string): string {
+  const payload: CopyTradeWalletData = {
+    user_id,
+    wallet_id,
+    buy_amount,
+    copy_trade_address,
+    status,
+    user_wallet_name,
+  };
+  return JSON.stringify(payload);
+}
+
+export async function setCopyTradeWallet(user_id: string, wallet_id: string, buy_amount: string, copy_trade_address: string, status: string, user_wallet_name: string) {
+  try {
+    if (!wallet_id) {
+      throw new Error("Wallet ID is required");
+    }
+    const payload = createCopyTradeWalletPayload(user_id, wallet_id, buy_amount, copy_trade_address, status, user_wallet_name);
+    const response = await axios.post(
+      "https://selected-namely-panda.ngrok-free.app/api/set_copy_trade_wallet",
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'TelegramBot/1.0',
+        },
+        timeout: 5000, // 5 seconds timeout
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+export async function getCopyTrades(user_id: string) {
+  try {
+    const response = await axios.get(
+      `https://selected-namely-panda.ngrok-free.app/api/get_copy_trades/${user_id}`,
       {
         headers: {
           'User-Agent': 'TelegramBot/1.0',
