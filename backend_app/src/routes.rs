@@ -43,7 +43,6 @@ pub async fn add_or_update_user(mut req: tide::Request<()>) -> tide::Result<Stri
             ("allows_write_to_pm", &user.allows_write_to_pm.to_string()),
         ],
     )?;
-    println!("user:{} touched", user.id);    
 
     // Add user ID to the set of all users
     con.sadd("users", format!("user:{}", user.id))?;
@@ -52,11 +51,9 @@ pub async fn add_or_update_user(mut req: tide::Request<()>) -> tide::Result<Stri
 }
 
 pub async fn get_user(req: tide::Request<()>) -> tide::Result<String> {
-    println!("get_user");
     let user_id = req.param("user_id")?;
     let mut con = get_redis_connection().await?;
     let user_hash: HashMap<String, String> = con.hgetall(format!("user:{}", user_id))?;
-    println!("user_json: {:?}", user_hash);
     if user_hash.is_empty() {
         return Ok("User not found".to_string());
     }
@@ -68,7 +65,6 @@ pub async fn get_user(req: tide::Request<()>) -> tide::Result<String> {
         username: user_hash.get("username").unwrap().to_string(),
         language_code: user_hash.get("language_code").unwrap().to_string(),
         allows_write_to_pm: user_hash.get("allows_write_to_pm").unwrap().to_string().parse::<bool>().unwrap_or(false),
-        wallets_id: user_hash.get("wallets_id").map(|w| vec![w.to_string()]),
     };
 
     Ok(serde_json::to_string(&user)?)
@@ -81,7 +77,6 @@ pub async fn get_all_users(_req: tide::Request<()>) -> tide::Result<String> {
     
     // Get all user IDs from the set
     let user_ids: Vec<String> = con.smembers("users")?;
-    println!("user_ids: {}", user_ids.len());
     Ok(serde_json::to_string(&user_ids)?)
 }
 
@@ -125,8 +120,7 @@ pub async fn get_user_wallets(req: tide::Request<()>) -> tide::Result<String> {
         let wallet_data: HashMap<String, String> = con.hgetall(key)?;
         wallets.push(wallet_data);
     }
-    println!("wallets_keys: {:?}", wallets_keys);
-    println!("wallets: {:?}", wallets);
+
     // return as json
     Ok(serde_json::to_string(&wallets)?)
 }
