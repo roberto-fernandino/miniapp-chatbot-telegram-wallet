@@ -17,7 +17,6 @@ pub struct User {
     pub username: String,
     pub language_code: String,
     pub allows_write_to_pm: bool,
-    pub wallets_id: Option<Vec<String>>,
 }
 
 
@@ -40,7 +39,6 @@ pub async fn add_or_update_user(mut req: tide::Request<()>) -> tide::Result<Stri
             ("last_name", &user.last_name),
             ("language_code", &user.language_code),
             ("allows_write_to_pm", &user.allows_write_to_pm.to_string()),
-            ("wallets_id", &user.wallets_id.unwrap_or(vec![]).join(",")),
         ],
     )?;
     println!("user:{} touched", user.id);    
@@ -53,7 +51,7 @@ pub async fn add_or_update_user(mut req: tide::Request<()>) -> tide::Result<Stri
 
 pub async fn get_user(req: tide::Request<()>) -> tide::Result<String> {
     println!("get_user");
-    let user_id = req.param("id")?;
+    let user_id = req.param("user_id")?;
     let mut con = get_redis_connection().await?;
     let user_hash: HashMap<String, String> = con.hgetall(format!("user:{}", user_id))?;
     println!("user_json: {:?}", user_hash);
@@ -89,7 +87,8 @@ pub async fn get_all_users(_req: tide::Request<()>) -> tide::Result<String> {
 pub struct WalletPost {
     pub user_id: String,
     pub wallet_id: String,
-    pub wallet_name: String,
+    pub turnkey_wallet_name: String,
+    pub user_wallet_name: String,
     pub sol_address: String,
 }
 
@@ -102,9 +101,30 @@ pub async fn add_wallet_to_user(mut req: tide::Request<()>) -> tide::Result<Stri
     con.hset_multiple (key, &[
         ("wallet_id", post.wallet_id),
         ("sol_address", post.sol_address),
-        ("wallet_name", post.wallet_name),
+        ("turnkey_wallet_name", post.turnkey_wallet_name),
+        ("user_wallet_name", post.user_wallet_name),
     ])?;
 
     Ok("Wallet added to user".to_string())
 }
 
+
+pub async fn get_user_wallets(req: tide::Request<()>) -> tide::Result<String> {
+    let user_id = req.param("user_id")?;
+    let mut con = get_redis_connection().await?;
+
+
+    // get all wallets for user
+    let wallets_keys: Vec<String> = con.keys(format!("user:{}:wallet_id:*", user_id))?;
+
+    // get all data for each wallet
+    let mut wallets = Vec::new();
+    for key in &wallets_keys {
+        let wallet_data: HashMap<String, String> = con.hgetall(key)?;
+        wallets.push(wallet_data);
+    }
+    println!("wallets_keys: {:?}", wallets_keys);
+    println!("wallets: {:?}", wallets);
+    // return as json
+    Ok(serde_json::to_string(&wallets)?)
+}
