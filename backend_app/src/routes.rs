@@ -43,7 +43,7 @@ pub async fn add_or_update_user(mut req: tide::Request<()>) -> tide::Result<Stri
             ("wallets_id", &user.wallets_id.unwrap_or(vec![]).join(",")),
         ],
     )?;
-    println!("user:{} set", user.id);    
+    println!("user:{} touched", user.id);    
 
     // Add user ID to the set of all users
     con.sadd("users", format!("user:{}", user.id))?;
@@ -83,5 +83,28 @@ pub async fn get_all_users(_req: tide::Request<()>) -> tide::Result<String> {
     let user_ids: Vec<String> = con.smembers("users")?;
     println!("user_ids: {}", user_ids.len());
     Ok(serde_json::to_string(&user_ids)?)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WalletPost {
+    pub user_id: String,
+    pub wallet_id: String,
+    pub wallet_name: String,
+    pub sol_address: String,
+}
+
+pub async fn add_wallet_to_user(mut req: tide::Request<()>) -> tide::Result<String> {
+    let post: WalletPost = req.body_json().await?;
+
+    let mut con = get_redis_connection().await?;
+
+    let key = format!("user:{}:wallet_id:{}", post.user_id, post.wallet_id);
+    con.hset_multiple (key, &[
+        ("wallet_id", post.wallet_id),
+        ("sol_address", post.sol_address),
+        ("wallet_name", post.wallet_name),
+    ])?;
+
+    Ok("Wallet added to user".to_string())
 }
 
