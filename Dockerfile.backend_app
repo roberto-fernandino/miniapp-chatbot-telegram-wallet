@@ -20,6 +20,7 @@ RUN chmod +x /scripts/backend_app
 
 WORKDIR /backend_app
 COPY backend_app .
+EXPOSE 8000
 
 RUN cargo build 
 
