@@ -74,6 +74,8 @@ services:
     container_name: solana_app
     depends_on:
       - backend_app
+    ports:
+      - "4000:4000"
 
 volumes:
   redis-data:
