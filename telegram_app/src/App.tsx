@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
+import { base64urlToHex } from "./lib/utils";
 import { v4 as uuid4 } from "uuid";
 import WebApp from "@twa-dev/sdk";
+import { exportWallet } from "./lib/turnkey";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
+import { Turnkey } from "@turnkey/sdk-server";
 import {
-  addWalletToUser,
-  getUserWallets,
-  WalletData,
   setCopyTradeWallet,
   getCopyTrades,
   decryptPassword,
@@ -14,22 +14,17 @@ import {
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Spinner } from "./components/ui/spinner";
-import type { TurnkeyApiClient } from "@turnkey/sdk-server";
-import { Turnkey, TurnkeyActivityError } from "@turnkey/sdk-server";
 import CopyIcon from "./assets/copy.svg";
-import * as crypto from "crypto";
-import { getWalletSolBalance } from "./lib/solana";
 import { ErrorHandler, LogFunction } from "./lib/cloudStorageUtil";
 import { TelegramApi } from "./telegram/telegram-api";
+import crypto from "crypto";
+
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  // User Accounts array
-  // Accounts is the addresses in a wallet
-  const [userWallets, setUserWallets] = useState<any[]>([]);
+  const [userAccounts, setUserAccounts] = useState<any[]>([]);
 
   // Logs
   const [logs, setLogs] = useState<
@@ -60,13 +55,6 @@ const App: React.FC = () => {
     initializeApp();
   }, []);
 
-  useEffect(() => {
-    if (userWallets.length > 0 && !walletToBuyWithId) {
-      setWalletToBuyWithId(userWallets[0].wallet_id);
-      setWalletToBuyWithName(userWallets[0].user_wallet_name);
-    }
-  }, [userWallets]);
-
   // Turnkey Setup Client
   const turnkey = new Turnkey({
     apiBaseUrl: "https://api.turnkey.com",
@@ -75,6 +63,13 @@ const App: React.FC = () => {
     defaultOrganizationId: import.meta.env.VITE_TURNKEY_ORGNIZATION!,
   });
   const turnkeyClient = turnkey.apiClient();
+
+  async function whoAmI() {
+    const whoAmIResponse = await turnkeyClient.getWhoami({
+      organizationId: import.meta.env.VITE_TURNKEY_ORGNIZATION!,
+    });
+    return whoAmIResponse;
+  }
 
   async function updateCopyTrades() {
     const getCopyTradesResponse = await getCopyTrades(
@@ -87,19 +82,93 @@ const App: React.FC = () => {
     );
     setCopyTrades(updatedCopyTrades);
   }
+
+  function generateKeyPair(): { publicKey: string; privateKey: string } {
+    // Generate the key pair
+    const ecdh = crypto.createECDH("secp256k1");
+    ecdh.generateKeys();
+
+    // Get the public key in compressed format (33 bytes, starts with 02 or 03)
+    const publicKeyBuffer = ecdh.getPublicKey(null, "compressed");
+    const publicKey = publicKeyBuffer.toString("hex");
+
+    // Get the private key
+    const privateKey = ecdh.getPrivateKey("hex");
+
+    return { publicKey, privateKey };
+  }
+
   // USER REGISTRATION
   const handleRegister = async () => {
-    const encryptedPassword = encryptPassword(password);
-    const user = {
-      email,
-      password: encryptedPassword,
-    };
-    log(`user: ${user}`, "success");
-    TelegramApi.setItem(
-      `user_${WebApp.initDataUnsafe.user?.id}`,
-      JSON.stringify(user)
-    );
+    log("Starting registration process...", "info");
+    try {
+      log("Generating key pair...", "info");
+      const { publicKey, privateKey } = generateKeyPair();
+
+      log("Key pair generated successfully", "success");
+      log(`publicKey: ${publicKey}`, "success"); // This will be in the format you need
+
+      log("Encrypting password...", "info");
+      const encryptedPassword = encryptPassword(password);
+      log("Password encrypted", "success");
+
+      const user = {
+        email,
+        password: encryptedPassword,
+        userId: WebApp.initDataUnsafe.user?.id,
+        publicKey: publicKey,
+        privateKey: privateKey,
+      };
+      log(
+        `User object created: ${JSON.stringify({
+          ...user,
+          privateKey: "[REDACTED]",
+        })}`,
+        "success"
+      );
+
+      log("Creating user in Turnkey...", "info");
+      const createUsersResponse = await turnkeyClient.createUsers({
+        organizationId: import.meta.env.VITE_TURNKEY_ORGNIZATION!,
+        users: [
+          {
+            userName: WebApp.initDataUnsafe.user?.username ?? "",
+            userEmail: email,
+            apiKeys: [
+              {
+                apiKeyName: "telegram_app",
+                publicKey: user.publicKey,
+              },
+            ],
+            authenticators: [],
+            userTags: [],
+          },
+        ],
+      });
+      log(
+        `Turnkey createUsers response: ${JSON.stringify(createUsersResponse)}`,
+        "success"
+      );
+
+      log("Storing user in TelegramApi...", "info");
+      await TelegramApi.setItem(
+        `user_${WebApp.initDataUnsafe.user?.id}`,
+        JSON.stringify(user)
+      );
+      log("User stored in TelegramApi", "success");
+
+      setIsRegistered(true);
+      log("User registered successfully", "success");
+    } catch (error) {
+      console.error("Full error object:", error);
+      if (error instanceof Error) {
+        log(`Error during registration: ${error.message}`, "error");
+      } else {
+        log(`Unknown error during registration: ${String(error)}`, "error");
+      }
+    }
   };
+
   // USER LOGIN
   const handleLogin = async (password: string) => {
     try {
@@ -200,26 +269,8 @@ const App: React.FC = () => {
   }
   // ------------------------------
 
-  // Update user wallets
-  async function updateUserWallets() {
-    // get user wallets from redis
-    let getUserWalletsResponse = await getUserWallets(
-      WebApp.initDataUnsafe.user?.id.toString() ?? ""
-    );
-    const updatedWallets = await Promise.all(
-      getUserWalletsResponse.data.map(async (wallet: WalletData) => {
-        const { solBalance, usdtBalance } = await getWalletSolBalance(
-          wallet.sol_address
-        );
-        return { ...wallet, solBalance, usdtBalance };
-      })
-    );
-    setUserWallets(updatedWallets);
-  }
-
   // Initialize App
   const initializeApp = async () => {
-    checkSession();
     setIsLoading(true);
 
     try {
@@ -229,6 +280,7 @@ const App: React.FC = () => {
       const user = await TelegramApi.getItem(
         `user_${WebApp.initDataUnsafe.user?.id}`
       );
+
       if (user && user !== "") {
         setIsRegistered(true);
       } else {
@@ -246,7 +298,6 @@ const App: React.FC = () => {
       // log(`${addOrUpdateUserReponse.data}`, "success");
 
       updateCopyTrades();
-      updateUserWallets();
     } catch (error) {
       handleError(
         `Initialization error: ${
@@ -264,104 +315,6 @@ const App: React.FC = () => {
 
   const handleError: ErrorHandler = (errorMessage) =>
     log(errorMessage, "error");
-
-  const generateWallet = async (
-    client: TurnkeyApiClient,
-    walletUserName: string
-  ): Promise<void> => {
-    setIsLoading(true);
-    setCreateWalletButtonActive(false);
-    try {
-      const username = WebApp.initDataUnsafe.user?.username;
-      if (!username) throw new Error("Username not found");
-
-      log(`Generating wallet for user ${username}`, "success");
-
-      const walletName = `Solana Wallet ${crypto
-        .randomBytes(2)
-        .toString("hex")}`;
-      log(`wallet name: ${walletName}`, "success");
-      try {
-        const response = await client.createWallet({
-          walletName,
-          accounts: [
-            {
-              pathFormat: "PATH_FORMAT_BIP32",
-              // https://github.com/satoshilabs/slips/blob/master/slip-0044.md
-              path: "m/44'/501'/0'/0'",
-              curve: "CURVE_ED25519",
-              addressFormat: "ADDRESS_FORMAT_SOLANA",
-            },
-          ],
-        });
-
-        log(`generated wallet: ${walletName}`, "success");
-        const walletId = response.walletId;
-        if (!walletId) {
-          throw new Error("Response doesn't contain wallet ID");
-        }
-
-        const address = response.addresses[0];
-        if (!address) {
-          throw new Error("Response doesn't contain wallet address");
-        }
-
-        await addWalletToUser(
-          WebApp.initDataUnsafe.user?.id.toString() ?? "",
-          walletId,
-          walletName,
-          walletUserName,
-          address
-        );
-
-        let newWallet: WalletData = {
-          user_id: WebApp.initDataUnsafe.user?.id.toString() ?? "",
-          wallet_id: walletId,
-          turnkey_wallet_name: walletName,
-          user_wallet_name: walletUserName,
-          sol_address: address,
-        };
-
-        // Add new wallet to existing wallets
-        const updatedWallets = [...userWallets, newWallet];
-
-        // Update balances for all wallets
-        const walletsWithBalances = await Promise.all(
-          updatedWallets.map(async (wallet) => {
-            const { solBalance, usdtBalance } = await getWalletSolBalance(
-              wallet.sol_address
-            );
-            return { ...wallet, solBalance, usdtBalance };
-          })
-        );
-
-        // Update state with new wallet and updated balances
-        setUserWallets(walletsWithBalances);
-
-        log(`wallet added to user: ${walletName}`, "success");
-      } catch (error) {
-        // If needed, you can read from `TurnkeyActivityError` to find out why the activity didn't succeed
-        if (error instanceof TurnkeyActivityError) {
-          throw error;
-        }
-
-        throw new TurnkeyActivityError({
-          message: `Failed to create a new Solana wallet: ${
-            (error as Error).message
-          }`,
-          cause: error as Error,
-        });
-      }
-    } catch (error) {
-      handleError(
-        `Error generating wallet: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const logout = () => {
     log("Logging out...", "info");
@@ -395,7 +348,6 @@ const App: React.FC = () => {
         )
       );
       updateCopyTrades();
-      updateUserWallets();
 
       log("Copy trade updated successfully", "success");
     } catch (error) {
@@ -409,7 +361,7 @@ const App: React.FC = () => {
         <>
           <Card className="mb-4">
             <CardHeader>
-              <CardTitle></CardTitle>
+              <CardTitle>Wallets</CardTitle>
             </CardHeader>
             <CardContent className="overflow-hidden">
               {!isAuthenticated ? (
@@ -445,9 +397,6 @@ const App: React.FC = () => {
                         className="mb-2 bg-card"
                       />
                       <Button
-                        onClick={() =>
-                          generateWallet(turnkeyClient, walletName)
-                        }
                         className="mb-2"
                         disabled={isLoading || !walletName}
                       >
@@ -458,7 +407,7 @@ const App: React.FC = () => {
                   <h3 className="text-lg font-semibold text-primary mb-2">
                     Wallets
                   </h3>
-                  {userWallets.map((wallet) => (
+                  {userAccounts.map((wallet) => (
                     <div className="flex flex-col justify-between">
                       <div className="flex flex-row items-center">
                         <p className="text-sm mr-2">
@@ -523,13 +472,13 @@ const App: React.FC = () => {
                     );
                   }}
                 >
-                  {userWallets.map((wallet) => (
+                  {userAccounts.map((account) => (
                     <option
-                      key={wallet.wallet_id}
-                      value={wallet.wallet_id}
+                      key={account.wallet_id}
+                      value={account.wallet_id}
                       className="text-center"
                     >
-                      {wallet.user_wallet_name}
+                      {account.user_wallet_name}
                     </option>
                   ))}
                 </select>
@@ -626,7 +575,7 @@ const App: React.FC = () => {
           </CardHeader>
           <CardContent>
             {!isRegistered ? (
-              <p>Please create a password to continue</p>
+              <p>Please create a account to continue</p>
             ) : (
               <p>Please authenticate to continue</p>
             )}
