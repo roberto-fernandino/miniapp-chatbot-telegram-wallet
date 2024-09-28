@@ -9,6 +9,7 @@ interface ImportMetaEnv {
   readonly VITE_TURNKEY_PUBLIC: string;
   readonly VITE_TURNKEY_PRIVATE: string;
   readonly VITE_TURNKEY_ORGNIZATION: string;
+  readonly VITE_ENCRYPTION_KEY: string;
 }
 
 interface ImportMeta {
