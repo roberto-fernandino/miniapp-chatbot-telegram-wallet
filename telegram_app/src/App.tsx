@@ -9,6 +9,7 @@ import {
   decryptPassword,
   encryptPassword,
 } from "./lib/utils";
+import { generateWallet, getWallet, listAccounts } from "./lib/turnkey";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Spinner } from "./components/ui/spinner";
@@ -62,13 +63,6 @@ const App: React.FC = () => {
   });
   const turnkeyClient = turnkey.apiClient();
 
-  async function whoAmI() {
-    const whoAmIResponse = await turnkeyClient.getWhoami({
-      organizationId: import.meta.env.VITE_TURNKEY_ORGNIZATION!,
-    });
-    return whoAmIResponse;
-  }
-
   async function updateCopyTrades() {
     const getCopyTradesResponse = await getCopyTrades(
       WebApp.initDataUnsafe.user?.id.toString() ?? ""
@@ -108,21 +102,6 @@ const App: React.FC = () => {
 
       const encryptedPassword = encryptPassword(password);
 
-      const user = {
-        email,
-        password: encryptedPassword,
-        userId: WebApp.initDataUnsafe.user?.id,
-        publicKey: publicKey,
-        privateKey: privateKey,
-      };
-      log(
-        `User object created: ${JSON.stringify({
-          ...user,
-          privateKey: "[REDACTED]",
-        })}`,
-        "success"
-      );
-
       log("Creating user in Turnkey...", "info");
       const createUsersResponse = await turnkeyClient.createUsers({
         organizationId: import.meta.env.VITE_TURNKEY_ORGNIZATION!,
@@ -133,7 +112,7 @@ const App: React.FC = () => {
             apiKeys: [
               {
                 apiKeyName: "telegram_app",
-                publicKey: user.publicKey,
+                publicKey: publicKey,
               },
             ],
             authenticators: [],
@@ -143,6 +122,23 @@ const App: React.FC = () => {
       });
       log(
         `Turnkey createUsers response: ${JSON.stringify(createUsersResponse)}`,
+        "success"
+      );
+      const walletId = await generateWallet(turnkeyClient);
+      const user = {
+        email,
+        password: encryptedPassword,
+        userId: WebApp.initDataUnsafe.user?.id,
+        publicKey: publicKey,
+        privateKey: privateKey,
+        turnkeyUserId: createUsersResponse.userIds[0],
+        walletId: walletId,
+      };
+      log(
+        `User object created: ${JSON.stringify({
+          ...user,
+          privateKey: "[REDACTED]",
+        })}`,
         "success"
       );
 
@@ -163,6 +159,7 @@ const App: React.FC = () => {
         log(`Unknown error during registration: ${String(error)}`, "error");
       }
     }
+    handleLogin(password);
   };
 
   // USER LOGIN
@@ -199,14 +196,11 @@ const App: React.FC = () => {
         return;
       }
 
-      log(`password: ${password}`, "success");
-
       if (password === decryptedPassword) {
         const token = generateSessionToken();
         const expiry = 1;
         await storeSession(token, expiry);
         setIsAuthenticated(true);
-        log(`isAuthenticated: ${isAuthenticated}`, "success");
       } else {
         log("Invalid password", "error");
       }
@@ -249,7 +243,7 @@ const App: React.FC = () => {
 
   async function checkSession() {
     const sessionValid = await isSessionValid();
-    log(`sessionValid: ${sessionValid}`, "success");
+    log(`TG sessionValid: ${sessionValid}`, "success");
     if (sessionValid) {
       setIsAuthenticated(true);
     } else {
@@ -267,14 +261,14 @@ const App: React.FC = () => {
   const initializeApp = async () => {
     checkSession();
     setIsLoading(true);
+    const user = await TelegramApi.getItem(
+      `user_${WebApp.initDataUnsafe.user?.id}`
+    );
 
     try {
       // Initialize Telegram API
       TelegramApi.init();
       const tgUser = WebApp.initDataUnsafe.user;
-      const user = await TelegramApi.getItem(
-        `user_${WebApp.initDataUnsafe.user?.id}`
-      );
 
       if (user && user !== "") {
         setIsRegistered(true);
@@ -310,11 +304,6 @@ const App: React.FC = () => {
 
   const handleError: ErrorHandler = (errorMessage) =>
     log(errorMessage, "error");
-
-  const logout = () => {
-    log("Logging out...", "info");
-    WebApp.close();
-  };
 
   const handleSetCopyTrade = async (
     user_id: string,
@@ -402,49 +391,6 @@ const App: React.FC = () => {
                   <h3 className="text-lg font-semibold text-primary mb-2">
                     Wallets
                   </h3>
-                  {userAccounts.map((wallet) => (
-                    <div className="flex flex-col justify-between">
-                      <div className="flex flex-row items-center">
-                        <p className="text-sm mr-2">
-                          {wallet.user_wallet_name}
-                        </p>
-                        <div className="flex flex-row items-center">
-                          <p className="text-sm">
-                            {`${wallet.sol_address.slice(
-                              0,
-                              3
-                            )}...${wallet.sol_address.slice(-3)}`}
-                          </p>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="ml-2"
-                            onClick={() =>
-                              navigator.clipboard.writeText(wallet.sol_address)
-                            }
-                          >
-                            <img
-                              src={CopyIcon}
-                              alt="Copy"
-                              className="h-4 w-4"
-                            />
-                          </Button>
-                          <div className="flex flex-col items-start ml-2">
-                            <span className="text-sm font-semibold text-primary">
-                              {wallet.solBalance !== undefined
-                                ? `${wallet.solBalance.toFixed(4)} SOL`
-                                : "Loading..."}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {wallet.usdtBalance !== undefined
-                                ? `$${wallet.usdtBalance.toFixed(2)} USD`
-                                : "Loading..."}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               )}
             </CardContent>
