@@ -38,7 +38,6 @@ services:
     networks:
       - app-network
 
-
   backend_app:
     build:
       context: .
@@ -63,6 +62,18 @@ services:
     networks:
       - app-network
     container_name: nginx_proxy
+
+  solana_app:
+    build:
+      context: .
+      dockerfile: Dockerfile.solana_app
+    env_file:
+      - .env
+    networks:
+      - app-network
+    container_name: solana_app
+    depends_on:
+      - backend_app
 
 volumes:
   redis-data:
