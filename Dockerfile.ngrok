@@ -13,6 +13,6 @@ RUN curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
 	&&  apt update \
 	&&  apt install ngrok
 
-RUN ngrok config add-authtoken 2jKXVGtRRI9EUFpMdQ96qTUtSWV_5S5mA557uHwG3ss8qNhPY
+RUN ngrok config add-authtoken 2mglHyHviBOtWVU8ntIQxoyaIuU_2Wqk14snxv9CHbhBmX98W
 
 CMD ["/scripts/ngrok"]
