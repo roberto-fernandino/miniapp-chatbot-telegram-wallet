@@ -317,16 +317,22 @@ const App: React.FC = () => {
       log("User not found in TelegramApi", "error");
       return;
     }
-    json_user.sessionApiKeys.map((sessionApiKey: any) => {
+
+    for (const sessionApiKey of json_user.sessionApiKeys) {
       if (new Date(sessionApiKey.expirationDate) < new Date()) {
         setSessionActive(false);
         setSessionEndTime(0);
         setCreateSessionButtonActive(true);
-        json_user.sessionApiKeys = [];
+        json_user.sessionApiKeys = "";
+        await TelegramApi.setItem(
+          `user_${WebApp.initDataUnsafe.user?.id}`,
+          JSON.stringify(json_user)
+        );
         log("Session expired", "info");
+      } else {
+        log("Session active", "info");
       }
-      log("Session active", "info");
-    });
+    }
   };
 
   const initializeApp = async () => {
@@ -463,8 +469,11 @@ const App: React.FC = () => {
                           value={sessionDuration || ""}
                           onChange={(e) => {
                             const value = parseInt(e.target.value);
-                            setSessionDuration(isNaN(value) ? "" : value);
+                            setSessionDuration(
+                              isNaN(value) ? "" : value.toString()
+                            );
                           }}
+                          type="number"
                         />
 
                         <Button
