@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { base64urlToHex } from "./lib/utils";
 import { v4 as uuid4 } from "uuid";
 import WebApp from "@twa-dev/sdk";
-import { exportWallet } from "./lib/turnkey";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Turnkey } from "@turnkey/sdk-server";
 import {
@@ -108,9 +106,7 @@ const App: React.FC = () => {
       log("Key pair generated successfully", "success");
       log(`publicKey: ${publicKey}`, "success"); // This will be in the format you need
 
-      log("Encrypting password...", "info");
       const encryptedPassword = encryptPassword(password);
-      log("Password encrypted", "success");
 
       const user = {
         email,
@@ -176,7 +172,6 @@ const App: React.FC = () => {
       const user = await TelegramApi.getItem(
         `user_${WebApp.initDataUnsafe.user?.id}`
       );
-      log(`user: ${user}`, "success");
 
       if (!user) {
         log("User data not found", "error");
@@ -199,7 +194,6 @@ const App: React.FC = () => {
       let decryptedPassword;
       try {
         decryptedPassword = decryptPassword(json_user.password);
-        log(`decryptedPassword: ${decryptedPassword}`, "success");
       } catch (error) {
         log(`Error decrypting password: ${error}`, "error");
         return;
@@ -271,6 +265,7 @@ const App: React.FC = () => {
 
   // Initialize App
   const initializeApp = async () => {
+    checkSession();
     setIsLoading(true);
 
     try {
