@@ -21,7 +21,7 @@ RUN chmod +x /scripts/solana_app
 ENV PATH="/root/.cargo/bin:/scripts:${PATH}"
 
 WORKDIR /app
-
+EXPOSE 4000
 COPY solana_app .
 
 RUN cargo build --release
