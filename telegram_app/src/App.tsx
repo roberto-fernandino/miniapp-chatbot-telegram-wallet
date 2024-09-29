@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { generateKeyPair } from "./lib/utils";
+import {
+  deleteCopyTradeWallet,
+  generateKeyPair,
+  setUserSession,
+} from "./lib/utils";
 import WebApp from "@twa-dev/sdk";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Turnkey } from "@turnkey/sdk-server";
@@ -57,6 +61,8 @@ const App: React.FC = () => {
   // Balance information
   const [solBalance, setSolBalance] = useState<string>("0");
   const [usdBalance, setUsdBalance] = useState<string>("0");
+
+  const [remainingTime, setRemainingTime] = useState<string>("");
 
   useEffect(() => {
     initializeApp();
@@ -298,6 +304,11 @@ const App: React.FC = () => {
       setCreateSessionButtonActive(false);
       setSessionActive(true);
       setSessionEndTime(Date.now() + parseInt(sessionDuration) * 60 * 1000);
+      let responseSetUserSession = await setUserSession(json_user.tgUserId);
+      log(
+        `Response setUserSession: ${JSON.stringify(responseSetUserSession)}`,
+        "success"
+      );
     } catch (error) {
       log(`Failed to create session: ${error}`, "error");
     } finally {
@@ -318,21 +329,47 @@ const App: React.FC = () => {
       return;
     }
 
-    for (const sessionApiKey of json_user.sessionApiKeys) {
-      if (new Date(sessionApiKey.expirationDate) < new Date()) {
+    const sessionApiKey = json_user.sessionApiKeys;
+    if (sessionApiKey) {
+      const expirationDate = new Date(sessionApiKey.expirationDate);
+      const now = new Date();
+      if (expirationDate < now) {
         setSessionActive(false);
         setSessionEndTime(0);
         setCreateSessionButtonActive(true);
-        json_user.sessionApiKeys = "";
+        setRemainingTime("");
+        json_user.sessionApiKeys = ""; // Set sessionApiKeys to an empty string
         await TelegramApi.setItem(
           `user_${WebApp.initDataUnsafe.user?.id}`,
           JSON.stringify(json_user)
         );
+        await setUserSession(json_user.tgUserId);
         log("Session expired", "info");
       } else {
-        log("Session active", "info");
+        const timeLeft = expirationDate.getTime() - now.getTime();
+        const minutes = Math.floor(timeLeft / 60000);
+        const seconds = Math.floor((timeLeft % 60000) / 1000);
+        setRemainingTime(`${minutes}m ${seconds}s`);
       }
+    } else {
+      setSessionActive(false);
+      setSessionEndTime(0);
+      setRemainingTime("");
     }
+  };
+
+  useEffect(() => {
+    const intervalId = setInterval(checkSessionApiKeys, 1000); // Run every second
+
+    return () => clearInterval(intervalId); // Cleanup interval on component unmount
+  }, []);
+
+  const handleDeleteCopyTrade = async (copy_trade_address: string) => {
+    await deleteCopyTradeWallet(
+      WebApp.initDataUnsafe.user?.id.toString() ?? "",
+      copy_trade_address
+    );
+    updateCopyTrades();
   };
 
   const initializeApp = async () => {
@@ -405,12 +442,29 @@ const App: React.FC = () => {
 
           const solPrice = await getSOLPrice();
           const usdValue = (parseFloat(balance) * solPrice).toFixed(2);
+
           setUsdBalance(usdValue);
         }
       } catch (error) {
         log(`Failed to update balance: ${error}`, "error");
       }
     }
+  };
+
+  const handleEndSession = async () => {
+    setSessionActive(false);
+    setSessionEndTime(0);
+    setRemainingTime("");
+    let user = await TelegramApi.getItem(
+      `user_${WebApp.initDataUnsafe.user?.id}`
+    );
+    let json_user = JSON.parse(user);
+    json_user.sessionApiKeys = ""; // Set sessionApiKeys to an empty string
+    await TelegramApi.setItem(
+      `user_${WebApp.initDataUnsafe.user?.id}`,
+      JSON.stringify(json_user)
+    );
+    await setUserSession(json_user.tgUserId);
   };
 
   // update the balance when userAccounts changes
@@ -424,7 +478,19 @@ const App: React.FC = () => {
         <>
           <Card className="mb-4">
             <CardHeader>
-              <CardTitle>Hi, {WebApp.initDataUnsafe.user?.username}</CardTitle>
+              <CardTitle>
+                Hi, {WebApp.initDataUnsafe.user?.username}
+                {sessionActive && (
+                  <button
+                    className="text-red-500 text-xs font-thin ml-2 bg-slate-200 p-2 rounded-md hover:bg-slate-300 transition-colors duration-200 shadow-sm"
+                    onClick={() => {
+                      handleEndSession();
+                    }}
+                  >
+                    End Session
+                  </button>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent className="overflow-hidden">
               {!isAuthenticated ? (
@@ -439,7 +505,7 @@ const App: React.FC = () => {
                       disabled={isLoading || sessionActive}
                     >
                       {sessionActive ? (
-                        "Session Active"
+                        `Session Active (${remainingTime})`
                       ) : isLoading ? (
                         <Spinner />
                       ) : (
@@ -621,6 +687,14 @@ const App: React.FC = () => {
                           {copyTrade.status === "active"
                             ? "Cancel"
                             : "Activate"}
+                        </Button>
+                        <Button
+                          className="bg-red-500 hover:bg-red-600 text-white rounded-full"
+                          onClick={() => {
+                            handleDeleteCopyTrade(copyTrade.copy_trade_address);
+                          }}
+                        >
+                          Delete
                         </Button>
                       </div>
                     </div>

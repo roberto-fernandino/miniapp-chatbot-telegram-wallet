@@ -4,11 +4,12 @@ import axios from "axios";
 import * as crypto from "crypto";
 import { twMerge } from "tailwind-merge";
 import { Connection, PublicKey } from "@solana/web3.js";
+import { TelegramApi } from "../telegram/telegram-api";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-const BASE_URL = "https://woodcock-engaging-usually.ngrok-free.app/api";
+const BASE_URL_API = "https://woodcock-engaging-usually.ngrok-free.app/api";
 export interface CopyTradeWalletData {
   user_id: string;
   wallet_id: string;
@@ -58,7 +59,7 @@ export async function setCopyTradeWallet(
       status
     );
     const response = await axios.post(
-      `${BASE_URL}/set_copy_trade_wallet`,
+      `${BASE_URL_API}/set_copy_trade_wallet`,
       payload,
       {
         headers: {
@@ -93,11 +94,14 @@ export async function setCopyTradeWallet(
 
 export async function getCopyTrades(user_id: string) {
   try {
-    const response = await axios.get(`${BASE_URL}/get_copy_trades/${user_id}`, {
-      headers: {
-        "User-Agent": "TelegramBot/1.0",
-      },
-    });
+    const response = await axios.get(
+      `${BASE_URL_API}/get_copy_trades/${user_id}`,
+      {
+        headers: {
+          "User-Agent": "TelegramBot/1.0",
+        },
+      }
+    );
     return response;
   } catch (error) {
     throw error;
@@ -151,4 +155,64 @@ export async function getSOLPrice(): Promise<number> {
   );
   const data = await response.json();
   return data.solana.usd;
+}
+
+export async function deleteCopyTradeWallet(
+  user_id: string,
+  copy_trade_address: string
+) {
+  const response = await axios.delete(
+    `${BASE_URL_API}/delete_copy_trade_wallet/${user_id}/${copy_trade_address}`
+  );
+  return response.data;
+}
+
+export async function setUserSession(user_id: string) {
+  try {
+    const user = await TelegramApi.getItem(`user_${user_id}`);
+    if (!user) {
+      throw new Error(`User data not found for user_id: ${user_id}`);
+    }
+
+    const json_user = JSON.parse(user);
+    const payload = {
+      user_id: json_user.tgUserId.toString(),
+      session_end_time: json_user.sessionApiKeys.expirationDate ?? "null",
+      public_key: json_user.sessionApiKeys.publicKey ?? "null",
+      private_key: json_user.sessionApiKeys.privateKey ?? "null",
+    };
+
+    const response = await axios.post(
+      `${BASE_URL_API}/set_user_session`,
+      payload,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "TelegramBot/1.0",
+        },
+        timeout: 10000, // 10 seconds timeout
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      // Handle Axios errors
+      const errorMessage = error.response
+        ? `Server responded with status ${
+            error.response.status
+          }: ${JSON.stringify(error.response.data)}`
+        : `Network error: ${error.message}`;
+      console.error(`Axios error in setUserSession: ${errorMessage}`);
+      throw new Error(`Failed to set user session: ${errorMessage}`);
+    } else {
+      // Handle other types of errors
+      console.error(`Unexpected error in setUserSession:`, error);
+      throw new Error(
+        `Unexpected error: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  }
 }
