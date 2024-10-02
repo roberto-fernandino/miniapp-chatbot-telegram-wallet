@@ -1,6 +1,8 @@
 {
   "dependencies": {
     "@types/crypto-js": "^4.2.2",
-    "crypto-js": "^4.2.0"
+    "bs58": "^6.0.0",
+    "crypto-js": "^4.2.0",
+    "tweetnacl": "^1.0.3"
   }
 }
