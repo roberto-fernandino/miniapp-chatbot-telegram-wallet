@@ -75,7 +75,10 @@ services:
     depends_on:
       - backend_app
     ports:
+      # http
       - "3030:3030"
+      # websocket
+      - "4040:4040"
 
 volumes:
   redis-data:
