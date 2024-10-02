@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from "react";
+import bs58 from "bs58";
+import nacl from "tweetnacl";
 import {
   deleteCopyTradeWallet,
   generateKeyPair,
   setUserSession,
 } from "./lib/utils";
+import { TurnkeySigner } from "@turnkey/solana";
 import WebApp from "@twa-dev/sdk";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Turnkey } from "@turnkey/sdk-server";
@@ -14,6 +17,7 @@ import {
   encryptPassword,
   getBalance,
   getSOLPrice,
+  transferSOL,
 } from "./lib/utils";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
@@ -21,6 +25,12 @@ import { Spinner } from "./components/ui/spinner";
 import CopyIcon from "./assets/copy.svg";
 import { ErrorHandler, LogFunction } from "./lib/cloudStorageUtil";
 import { TelegramApi } from "./telegram/telegram-api";
+import {
+  Connection,
+  PublicKey,
+  VersionedTransaction,
+  SendTransactionError,
+} from "@solana/web3.js";
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
@@ -30,7 +40,6 @@ const App: React.FC = () => {
   const [walletId, setWalletId] = useState<string>("");
 
   // Session information
-  const [sessionEndTime, setSessionEndTime] = useState<number | null>(null);
   const [sessionActive, setSessionActive] = useState<boolean>(false);
   const [sessionDuration, setSessionDuration] = useState<string>("");
 
@@ -42,10 +51,6 @@ const App: React.FC = () => {
 
   // loading state
   const [isLoading, setIsLoading] = useState(false);
-
-  // Currently selected wallet to buy with (Copy Trade)
-  const [accountAddresToBuyWith, setAccountAddresToBuyWith] =
-    useState<string>("");
 
   // Account/Address to copy trade
   const [walletToCopyTrade, setWalletToCopyTrade] = useState<string>("");
@@ -60,9 +65,17 @@ const App: React.FC = () => {
 
   // Balance information
   const [solBalance, setSolBalance] = useState<string>("0");
-  const [usdBalance, setUsdBalance] = useState<string>("0");
+  const [usdSolBalance, setUsdSolBalance] = useState<string>("0.00");
 
   const [remainingTime, setRemainingTime] = useState<string>("");
+
+  const [transferSolActive, setTransferSolActive] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [recipient, setRecipient] = useState("");
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000; // 2 seconds
 
   useEffect(() => {
     initializeApp();
@@ -90,9 +103,7 @@ const App: React.FC = () => {
 
   // USER REGISTRATION
   const handleRegister = async () => {
-    log("Starting registration process...", "info");
     try {
-      log("Generating key pair...", "info");
       const { publicKey, privateKey } = generateKeyPair();
 
       const encryptedPassword = encryptPassword(password);
@@ -255,6 +266,7 @@ const App: React.FC = () => {
     }
   };
   const handleCreateSession = async (sessionDuration: string) => {
+    setIsLoading(true);
     const user = await TelegramApi.getItem(
       `user_${WebApp.initDataUnsafe.user?.id}`
     );
@@ -286,7 +298,6 @@ const App: React.FC = () => {
         userId: json_user.userId,
         organizationId: json_user.subOrgId,
       });
-      log(`Session API keys created: ${JSON.stringify(response)}`, "success");
 
       json_user.sessionApiKeys = {
         expirationDate: new Date(
@@ -303,12 +314,7 @@ const App: React.FC = () => {
 
       setCreateSessionButtonActive(false);
       setSessionActive(true);
-      setSessionEndTime(Date.now() + parseInt(sessionDuration) * 60 * 1000);
-      let responseSetUserSession = await setUserSession(json_user.tgUserId);
-      log(
-        `Response setUserSession: ${JSON.stringify(responseSetUserSession)}`,
-        "success"
-      );
+      await setUserSession(json_user.tgUserId);
     } catch (error) {
       log(`Failed to create session: ${error}`, "error");
     } finally {
@@ -324,38 +330,43 @@ const App: React.FC = () => {
     let json_user;
     try {
       json_user = JSON.parse(user);
+      if (json_user.sessionApiKeys && json_user.sessionApiKeys !== "") {
+        const expirationDate = new Date(
+          json_user.sessionApiKeys.expirationDate
+        );
+        const now = new Date();
+        const timeLeft = expirationDate.getTime() - now.getTime();
+
+        if (timeLeft > 0) {
+          setSessionActive(true);
+          const minutes = Math.floor(timeLeft / 60000);
+          const seconds = Math.floor((timeLeft % 60000) / 1000);
+          setRemainingTime(`${minutes}m ${seconds}s`);
+        } else {
+          // Session has expired
+          await handleSessionExpiration(json_user);
+        }
+      } else {
+        setSessionActive(false);
+        setRemainingTime("");
+      }
     } catch (error) {
       log("User not found in TelegramApi", "error");
       return;
     }
+  };
 
-    const sessionApiKey = json_user.sessionApiKeys;
-    if (sessionApiKey) {
-      const expirationDate = new Date(sessionApiKey.expirationDate);
-      const now = new Date();
-      if (expirationDate < now) {
-        setSessionActive(false);
-        setSessionEndTime(0);
-        setCreateSessionButtonActive(true);
-        setRemainingTime("");
-        json_user.sessionApiKeys = ""; // Set sessionApiKeys to an empty string
-        await TelegramApi.setItem(
-          `user_${WebApp.initDataUnsafe.user?.id}`,
-          JSON.stringify(json_user)
-        );
-        await setUserSession(json_user.tgUserId);
-        log("Session expired", "info");
-      } else {
-        const timeLeft = expirationDate.getTime() - now.getTime();
-        const minutes = Math.floor(timeLeft / 60000);
-        const seconds = Math.floor((timeLeft % 60000) / 1000);
-        setRemainingTime(`${minutes}m ${seconds}s`);
-      }
-    } else {
-      setSessionActive(false);
-      setSessionEndTime(0);
-      setRemainingTime("");
-    }
+  const handleSessionExpiration = async (json_user: any) => {
+    setSessionActive(false);
+    setRemainingTime("");
+    setCreateSessionButtonActive(true);
+
+    json_user.sessionApiKeys = "";
+    await TelegramApi.setItem(
+      `user_${WebApp.initDataUnsafe.user?.id}`,
+      JSON.stringify(json_user)
+    );
+    await setUserSession(json_user.tgUserId);
   };
 
   useEffect(() => {
@@ -382,8 +393,6 @@ const App: React.FC = () => {
       `user_${WebApp.initDataUnsafe.user?.id}`
     );
     let json_user;
-    log(`user: ${user}`, "success");
-
     try {
       json_user = JSON.parse(user);
     } catch (error) {
@@ -407,6 +416,11 @@ const App: React.FC = () => {
       const accounts = await turnkeyClient.getWalletAccounts({
         walletId: json_user.walletId,
       });
+      json_user.accounts = accounts.accounts;
+      await TelegramApi.setItem(
+        `user_${WebApp.initDataUnsafe.user?.id}`,
+        JSON.stringify(json_user)
+      );
       setUserAccounts(accounts.accounts);
       setWalletId(json_user.walletId);
 
@@ -443,7 +457,7 @@ const App: React.FC = () => {
           const solPrice = await getSOLPrice();
           const usdValue = (parseFloat(balance) * solPrice).toFixed(2);
 
-          setUsdBalance(usdValue);
+          setUsdSolBalance(usdValue);
         }
       } catch (error) {
         log(`Failed to update balance: ${error}`, "error");
@@ -453,19 +467,196 @@ const App: React.FC = () => {
 
   const handleEndSession = async () => {
     setSessionActive(false);
-    setSessionEndTime(0);
     setRemainingTime("");
     let user = await TelegramApi.getItem(
       `user_${WebApp.initDataUnsafe.user?.id}`
     );
     let json_user = JSON.parse(user);
-    json_user.sessionApiKeys = ""; // Set sessionApiKeys to an empty string
+    json_user.sessionApiKeys = "";
     await TelegramApi.setItem(
       `user_${WebApp.initDataUnsafe.user?.id}`,
       JSON.stringify(json_user)
     );
     await setUserSession(json_user.tgUserId);
   };
+
+  const handleTransferSol = async (amount: string, recipient: string) => {
+    setIsLoading(true);
+    try {
+      let user = await TelegramApi.getItem(
+        `user_${WebApp.initDataUnsafe.user?.id}`
+      );
+      let json_user = JSON.parse(user);
+      const { success, signature, confirmation, transferredAmount } =
+        await transferSOL(
+          json_user.accounts[0].address,
+          recipient,
+          parseFloat(amount),
+          user
+        );
+      if (success) {
+        log(
+          `Transferred ${amount} SOL to ${recipient} ${confirmation}`,
+          "success"
+        );
+        log(`check tx: https://solscan.io/tx/${signature}`, "success");
+      }
+      if (!success) {
+        log(`Failed to transfer SOL: ${confirmation}`, "error");
+      }
+    } catch (error) {
+      log(`Failed to transfer SOL: ${error}`, "error");
+    } finally {
+      setIsLoading(false);
+      setTransferSolActive(false);
+      updateBalance();
+      setAmount("");
+      setRecipient("");
+    }
+  };
+
+  useEffect(() => {
+    let newSocket = new WebSocket(
+      "wss://woodcock-engaging-usually.ngrok-free.app/solana_ws"
+    );
+
+    // Establish connection handshake
+    newSocket.onopen = function () {
+      log("WebSocket connection established", "success");
+    };
+
+    newSocket.onmessage = function (event) {
+      log(`Event received: ${event.data}`, "success");
+      const data = JSON.parse(event.data);
+      const checkUserSessionAndCopyTrade = async () => {
+        try {
+          let user = await TelegramApi.getItem(
+            `user_${WebApp.initDataUnsafe.user?.id}`
+          );
+          let json_user = JSON.parse(user);
+          json_user.tgUserId = data.tgUserId;
+
+          if (json_user.sessionApiKeys !== "") {
+            log("Session active", "success");
+            // Get turnkey client
+            const turnkey = new Turnkey({
+              apiBaseUrl: "https://api.turnkey.com",
+              apiPublicKey: json_user.sessionApiKeys.publicKey,
+              apiPrivateKey: json_user.sessionApiKeys.privateKey,
+              defaultOrganizationId: json_user.subOrgId,
+            });
+            let turnkeyClient = turnkey.apiClient();
+
+            // Get turnkey signer
+            const turnkeySigner = new TurnkeySigner({
+              organizationId: json_user.subOrgId,
+              client: turnkeyClient,
+            });
+
+            let connection = new Connection(import.meta.env.VITE_RPC_URL);
+            // Create a buffer from the transaction
+            const transactionBuffer = Buffer.from(
+              data.swapTransaction,
+              "base64"
+            );
+
+            // Create a transaction obj from the buffer
+            let transaction =
+              VersionedTransaction.deserialize(transactionBuffer);
+            log(`Transaction deserialized`, "success");
+            // Sign the transaction with the turnkey signer
+            await turnkeySigner.addSignature(
+              transaction,
+              json_user.accounts[0].address
+            );
+            log(`Transaction signed by turnkey`, "success");
+
+            let retries = 0;
+            let success = false;
+
+            while (retries < MAX_RETRIES && !success) {
+              try {
+                log(`Sending transaction (attempt ${retries + 1})`, "info");
+                const signature = await connection.sendRawTransaction(
+                  transaction.serialize()
+                );
+                log(`Transaction sent to jupiter`, "success");
+                log(`Waiting for blockchain validation`, "info");
+                const latestBlockHash = await connection.getLatestBlockhash();
+                const confirmation = await connection.confirmTransaction({
+                  signature,
+                  ...latestBlockHash,
+                });
+                log(`RPC Response: ${JSON.stringify(confirmation)}`, "success");
+                log(
+                  `Confirmed tx, check:\n https://solscan.io/tx/${signature}`,
+                  "success"
+                );
+                success = true;
+                updateBalance();
+              } catch (error) {
+                retries++;
+                if (retries < MAX_RETRIES) {
+                  log(
+                    `Transaction failed. Retrying in ${
+                      RETRY_DELAY / 1000
+                    } seconds...`,
+                    "info"
+                  );
+                  await new Promise((resolve) =>
+                    setTimeout(resolve, RETRY_DELAY)
+                  );
+                } else {
+                  if (error instanceof SendTransactionError) {
+                    log(
+                      `Transaction failed after ${MAX_RETRIES} attempts: ${error.message}`,
+                      "error"
+                    );
+                    let logs = log(
+                      `Error: ${error.getLogs(connection)}`,
+                      "error"
+                    );
+                    log(`Logs: ${JSON.stringify(logs)}`, "error");
+                  } else {
+                    log(
+                      `Transaction failed after ${MAX_RETRIES} attempts: ${error}`,
+                      "error"
+                    );
+                  }
+                }
+              }
+            }
+
+            if (!success) {
+              log(
+                "Failed to send transaction after multiple attempts",
+                "error"
+              );
+            }
+          } else {
+            log("Session not active", "error");
+          }
+        } catch (error) {
+          log(`Error in checkUserSessionAndCopyTrade: ${error}`, "error");
+        }
+      };
+
+      checkUserSessionAndCopyTrade().catch((error) => {
+        log(
+          `Unhandled error in checkUserSessionAndCopyTrade: ${error.message}`,
+          "error"
+        );
+      });
+    };
+
+    setSocket(newSocket);
+
+    // Clean up the socket on component unmount
+    return () => {
+      newSocket.close();
+      log("WebSocket connection closed", "info");
+    };
+  }, []);
 
   // update the balance when userAccounts changes
   useEffect(() => {
@@ -554,6 +745,72 @@ const App: React.FC = () => {
                       </div>
                     </div>
                   )}
+                  <Button
+                    className="mb-2 mt-2"
+                    onClick={() => {
+                      setTransferSolActive(true);
+                    }}
+                  >
+                    Transfer SOL
+                  </Button>
+                  {transferSolActive && (
+                    <>
+                      <Button
+                        variant={"ghost"}
+                        className="mb-2"
+                        onClick={() => {
+                          setTransferSolActive(false);
+                        }}
+                      >
+                        Back
+                      </Button>
+                      <Input
+                        placeholder="Enter amount to transfer"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                      />
+                      <Button
+                        className="mb-2 mt-2"
+                        size="sm"
+                        onClick={() => setAmount(solBalance)}
+                      >
+                        {isLoading ? <Spinner /> : "Max"}
+                      </Button>
+                      <Input
+                        placeholder="Enter recipient address"
+                        value={recipient}
+                        onChange={(e) => setRecipient(e.target.value)}
+                        className="mb-2 text-[9px]"
+                      />
+                      <Button
+                        className="mb-2 mt-2"
+                        onClick={() => {
+                          navigator.clipboard
+                            .readText()
+                            .then((text) => {
+                              setRecipient(text);
+                            })
+                            .catch((err) => {
+                              console.error(
+                                "Failed to read clipboard contents: ",
+                                err
+                              );
+                            });
+                        }}
+                      >
+                        {isLoading ? <Spinner /> : "Paste"}
+                      </Button>
+
+                      <Button
+                        className="mb-2 mt-2"
+                        onClick={() => {
+                          handleTransferSol(amount, recipient);
+                        }}
+                      >
+                        {isLoading ? <Spinner /> : "Send"}
+                      </Button>
+                    </>
+                  )}
                   <h3 className="text-lg font-semibold text-primary mb-2">
                     Wallets
                   </h3>
@@ -587,7 +844,7 @@ const App: React.FC = () => {
                             SOL {solBalance}
                           </span>
                           <span className="text-sm text-[#ff4d35]">
-                            ${usdBalance}
+                            ${usdSolBalance}
                           </span>
                         </div>
                       </div>
@@ -635,7 +892,7 @@ const App: React.FC = () => {
                   handleSetCopyTrade(
                     WebApp.initDataUnsafe.user?.id.toString() ?? "",
                     walletId,
-                    accountAddresToBuyWith,
+                    userAccounts[0].address,
                     amountToBuyCopyTrade,
                     walletToCopyTrade,
                     "active"
@@ -670,7 +927,7 @@ const App: React.FC = () => {
                             handleSetCopyTrade(
                               WebApp.initDataUnsafe.user?.id.toString() ?? "",
                               walletId,
-                              copyTrade.wallet_id,
+                              userAccounts[0].address,
                               copyTrade.buy_amount,
                               copyTrade.copy_trade_address,
                               copyTrade.status === "active"
