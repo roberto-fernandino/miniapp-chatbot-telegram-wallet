@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crate::routes::{index, add_or_update_user, get_all_users, get_user, add_wallet_to_user, get_user_wallets, set_copy_trade_wallet, get_copy_trades};
+use crate::routes::{index, set_copy_trade_wallet, get_copy_trades, delete_copy_trade_wallet, set_user_session};
 mod routes;
 mod utils;
 
@@ -9,13 +9,10 @@ async fn main() -> Result<()> {
     println!("Listening on port 8000");
 
     app.at("/").get(index);
-    app.at("/add_or_update_user").post(add_or_update_user);
-    app.at("/all_users").get(get_all_users);
-    app.at("/user/:user_id").get(get_user);
-    app.at("/add_wallet_to_user").post(add_wallet_to_user);
-    app.at("/user_wallets/:user_id").get(get_user_wallets);
     app.at("/set_copy_trade_wallet").post(set_copy_trade_wallet);
+    app.at("/delete_copy_trade_wallet/:user_id/:copy_trade_address").delete(delete_copy_trade_wallet);
     app.at("/get_copy_trades/:user_id").get(get_copy_trades);
+    app.at("/set_user_session").post(set_user_session);
     app.listen("0.0.0.0:8000").await?;
 
     Ok(())
