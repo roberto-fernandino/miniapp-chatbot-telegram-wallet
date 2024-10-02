@@ -3,9 +3,22 @@ import { type ClassValue, clsx } from "clsx";
 import axios from "axios";
 import * as crypto from "crypto";
 import { twMerge } from "tailwind-merge";
-import { Connection, PublicKey } from "@solana/web3.js";
-import { TelegramApi } from "../telegram/telegram-api";
+import { Turnkey } from "@turnkey/sdk-server";
+import { TurnkeySigner } from "@turnkey/solana";
+import {
+  SendTransactionError,
+  LAMPORTS_PER_SOL,
+  sendAndConfirmTransaction,
+} from "@solana/web3.js";
 
+import {
+  Connection,
+  PublicKey,
+  Transaction,
+  SystemProgram,
+  TransactionMessage,
+} from "@solana/web3.js";
+import { TelegramApi } from "../telegram/telegram-api";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -215,4 +228,156 @@ export async function setUserSession(user_id: string) {
       );
     }
   }
+}
+
+export async function transferSOL(
+  from: string,
+  to: string,
+  amount: number,
+  user_json_string: string
+) {
+  let user: any;
+  try {
+    user = JSON.parse(user_json_string);
+  } catch (parseError) {
+    throw new Error("Invalid user data provided.");
+  }
+  // Initialize connection to the Solana cluster
+  const connection = new Connection(import.meta.env.VITE_RPC_URL, "confirmed");
+  try {
+    // turnkey client
+    const turnkeyClient = new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com",
+      apiPrivateKey: user.privateKey,
+      apiPublicKey: user.publicKey,
+      defaultOrganizationId: user.subOrgId,
+    });
+    const turnkeySigner = new TurnkeySigner({
+      organizationId: user.subOrgId,
+      client: turnkeyClient.apiClient(),
+    });
+
+    const fromPublicKey = new PublicKey(from);
+    const toPublicKey = new PublicKey(to);
+
+    // Fetch the sender's balance
+    const balance = await connection.getBalance(fromPublicKey);
+
+    // Get the recent blockhash
+    const { blockhash, lastValidBlockHeight } =
+      await connection.getLatestBlockhash();
+
+    // Create a dummy transaction to calculate the fee
+    const transaction = new Transaction({
+      recentBlockhash: blockhash,
+      feePayer: fromPublicKey,
+    }).add(
+      SystemProgram.transfer({
+        fromPubkey: fromPublicKey,
+        toPubkey: toPublicKey,
+        lamports: 1,
+      })
+    );
+
+    // Estimate the fee
+    const feeCalculator = await connection.getFeeForMessage(
+      transaction.compileMessage()
+    );
+    const fee = feeCalculator.value;
+
+    if (fee === null) {
+      throw new Error("Failed to calculate transaction fee.");
+    }
+
+    // Convert SOL to lamports
+    let lamportsAmount = Math.round(amount * 1e9);
+
+    // Check if the sender has enough balance
+    if (lamportsAmount + fee > balance) {
+      // Adjust the transfer amount
+      const maxTransferableLamports = balance - fee;
+      if (maxTransferableLamports <= 0) {
+        return {
+          success: false,
+          error: "Insufficient balance to cover the transaction fee.",
+        };
+      }
+
+      lamportsAmount = maxTransferableLamports;
+    }
+
+    // Create the actual transfer transaction
+    const transferTransaction = new Transaction({
+      recentBlockhash: blockhash,
+      feePayer: fromPublicKey,
+    }).add(
+      SystemProgram.transfer({
+        fromPubkey: fromPublicKey,
+        toPubkey: toPublicKey,
+        lamports: lamportsAmount,
+      })
+    );
+
+    // Sign the transaction with Turnkey
+    await turnkeySigner.addSignature(
+      transferTransaction,
+      fromPublicKey.toString()
+    );
+
+    // Send and confirm the transaction
+    const signature = await connection.sendRawTransaction(
+      transferTransaction.serialize()
+    );
+
+    // Confirm the transaction
+    const confirmation = await connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight,
+    });
+
+    if (confirmation.value.err) {
+      throw new Error(
+        `Transaction failed: ${JSON.stringify(confirmation.value.err)}`
+      );
+    }
+
+    return {
+      success: true,
+      signature,
+      confirmation,
+      transferredAmount: amount,
+    };
+  } catch (error) {
+    if (error instanceof SendTransactionError) {
+      // Handle SendTransactionError and log details
+      const logs = (await error.getLogs(connection)) ?? ["No logs available"];
+      throw new Error(`Failed to transfer SOL: ${logs}`);
+    } else if (axios.isAxiosError(error)) {
+      // Handle Axios errors
+      const errorMessage = error.response
+        ? `Server responded with status ${
+            error.response.status
+          }: ${JSON.stringify(error.response.data)}`
+        : `Network error: ${error.message}`;
+      throw new Error(`Failed to transfer SOL: ${errorMessage}`);
+    } else {
+      // Handle other types of errors
+      throw new Error(
+        `Unexpected error: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  }
+}
+
+export async function getAllTokensBalance(user_json_string: string) {
+  let user = JSON.parse(user_json_string);
+  const connection = new Connection(import.meta.env.VITE_RPC_URL);
+  const publicKey = new PublicKey(user.account_address);
+  const tokens = await connection.getParsedTokenAccountsByOwner(publicKey, {
+    programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
+  });
+  return tokens;
 }
