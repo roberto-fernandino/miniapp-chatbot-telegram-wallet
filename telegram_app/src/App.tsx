@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import bs58 from "bs58";
 import nacl from "tweetnacl";
+import SolanaIcon from "./assets/sol.png";
 import {
   deleteCopyTradeWallet,
   generateKeyPair,
@@ -829,9 +830,11 @@ const App: React.FC = () => {
                                 : "inherit",
                           }}
                         >
-                          {account.addressFormat === "ADDRESS_FORMAT_SOLANA"
-                            ? "SOL"
-                            : "Unknown"}
+                          {account.addressFormat === "ADDRESS_FORMAT_SOLANA" ? (
+                            <img src={SolanaIcon} className="w-8 h-4" />
+                          ) : (
+                            "Unknown"
+                          )}
                         </span>
                         <span className="text-sm text-[#ff4d35] mr-5">
                           {`${account.address.slice(
