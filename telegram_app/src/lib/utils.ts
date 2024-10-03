@@ -17,11 +17,17 @@ import {
   Transaction,
   SystemProgram,
   TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import { TelegramApi } from "../telegram/telegram-api";
+import { log } from "console";
+import WebApp from "@twa-dev/sdk";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 2000; // 2 seconds
 const BASE_URL_API = "https://woodcock-engaging-usually.ngrok-free.app/api";
 export interface CopyTradeWalletData {
   user_id: string;
@@ -380,4 +386,104 @@ export async function getAllTokensBalance(user_json_string: string) {
     programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
   });
   return tokens;
+}
+
+export async function copyTrade(data: any) {
+  try {
+    let user = await TelegramApi.getItem(
+      `user_${WebApp.initDataUnsafe.user?.id}`
+    );
+    let json_user = JSON.parse(user);
+    json_user.tgUserId = data.tgUserId;
+
+    if (json_user.sessionApiKeys !== "") {
+      log("Session active", "success");
+      // Get turnkey client
+      const turnkey = new Turnkey({
+        apiBaseUrl: "https://api.turnkey.com",
+        apiPublicKey: json_user.sessionApiKeys.publicKey,
+        apiPrivateKey: json_user.sessionApiKeys.privateKey,
+        defaultOrganizationId: json_user.subOrgId,
+      });
+      let turnkeyClient = turnkey.apiClient();
+
+      // Get turnkey signer
+      const turnkeySigner = new TurnkeySigner({
+        organizationId: json_user.subOrgId,
+        client: turnkeyClient,
+      });
+
+      let connection = new Connection(import.meta.env.VITE_RPC_URL);
+      // Create a buffer from the transaction
+      const transactionBuffer = Buffer.from(data.swapTransaction, "base64");
+
+      // Create a transaction obj from the buffer
+      let transaction = VersionedTransaction.deserialize(transactionBuffer);
+      log(`Transaction deserialized`, "success");
+      // Sign the transaction with the turnkey signer
+      await turnkeySigner.addSignature(
+        transaction,
+        json_user.accounts[0].address
+      );
+      log(`Transaction signed by turnkey`, "success");
+
+      let retries = 0;
+      let success = false;
+
+      while (retries < MAX_RETRIES && !success) {
+        try {
+          log(`Sending transaction (attempt ${retries + 1})`, "info");
+          const signature = await connection.sendRawTransaction(
+            transaction.serialize()
+          );
+          log(`Transaction sent to jupiter`, "success");
+          log(`Waiting for blockchain validation`, "info");
+          const latestBlockHash = await connection.getLatestBlockhash();
+          const confirmation = await connection.confirmTransaction({
+            signature,
+            ...latestBlockHash,
+          });
+          log(`RPC Response: ${JSON.stringify(confirmation)}`, "success");
+          log(
+            `Confirmed tx, check:\n https://solscan.io/tx/${signature}`,
+            "success"
+          );
+          success = true;
+        } catch (error) {
+          retries++;
+          if (retries < MAX_RETRIES) {
+            log(
+              `Transaction failed. Retrying in ${
+                RETRY_DELAY / 1000
+              } seconds...`,
+              "info"
+            );
+            await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+          } else {
+            if (error instanceof SendTransactionError) {
+              log(
+                `Transaction failed after ${MAX_RETRIES} attempts: ${error.message}`,
+                "error"
+              );
+              let logs = log(`Error: ${error.getLogs(connection)}`, "error");
+              log(`Logs: ${JSON.stringify(logs)}`, "error");
+            } else {
+              log(
+                `Transaction failed after ${MAX_RETRIES} attempts: ${error}`,
+                "error"
+              );
+            }
+          }
+        }
+      }
+
+      if (!success) {
+        log("Failed to send transaction after multiple attempts", "error");
+      }
+    } else {
+      log("Session not active", "error");
+    }
+  } catch (error) {
+    log(`Error in checkUserSessionAndCopyTrade: ${error}`, "error");
+  }
 }
