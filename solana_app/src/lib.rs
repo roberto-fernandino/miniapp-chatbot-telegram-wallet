@@ -183,7 +183,7 @@ pub async fn handle_incoming_messages(
                 }
             }
             None => {
-                println!("WebSocket stream ended");
+                println!("Node WebSocket stream ended");
             }
             Some(Err(e)) => {
                 eprintln!("WebSocket error: {:?}", e);
