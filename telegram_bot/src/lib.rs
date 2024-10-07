@@ -126,12 +126,14 @@ pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value
     let token_symbol = data["pair"]["token1Symbol"].as_str().unwrap_or("N/A").to_uppercase();
     let token_usd_price = format!("{:.8}", data["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0)).parse::<f64>().unwrap_or(0.0);
     let age = time_ago(data["pair"]["pairCreatedAt"].as_str().unwrap_or(""));
+    let circulating_supply = data["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+
 
     // Stats
     let fdv = format_number(data["pair"]["fdv"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
 
     // Ath 
-    let ath = ath_response["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    let ath = format_number(ath_response["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * circulating_supply);
     let ath_date = time_ago(ath_response["athTimestamp"].as_str().unwrap_or(""));
 
     // Liq
@@ -170,23 +172,25 @@ pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value
     let username = username.unwrap_or("Not found".to_string());
     let verified = if data["pair"]["isVerified"].as_bool().unwrap_or(false) { "🟢" } else { "🔴" };
     let mut holders_str = String::new();
-    let mut count = 1;
+    let mut count = 0;
     for holder in holders_response["holders"].as_array().unwrap_or(&Vec::new()).iter() {
         if count == 6 {
             break;
         }
         let holder_address = holder["holderAddress"].as_str().unwrap_or("");
         let percent = holder["percent"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * 100.0;
-        log::info!("percent: {:?}", percent);
         let percent_str = format!("{:.2}", percent);
-        log::info!("percent_str: {:?}", percent_str);
         let token_balance = holder["balanceFormatted"].as_f64().unwrap_or(0.0);
         let usd_amount = token_balance * token_usd_price;
         let usd_amount_str = format_number(usd_amount);
         if count == 1 {
-            holders_str.push_str(&format!("👥 TH: <a href=\"https://solscan.io/account/{holder_address}\">{percent_str}%⋅</a> <code>${usd_amount_str}</code>|"));
-        } else {
-            holders_str.push_str(&format!("<a href=\"https://solscan.io/account/{holder_address}\">{percent_str}%</a>⋅<code>${usd_amount_str}</code>|"));
+            holders_str.push_str(&format!("👥 TH: <a href=\"https://solscan.io/account/{holder_address}\">{percent_str}⋅</a>"));
+        } 
+        if count > 1{
+            holders_str.push_str(&format!("<a href=\"https://solscan.io/account/{holder_address}\">{percent_str}</a>⋅"));
+        }
+        if count == 4 {
+            holders_str.push_str(&format!("<a href=\"https://solscan.io/account/{holder_address}\">{percent_str}</a>"));
         }
         count += 1;
     }
@@ -216,10 +220,10 @@ pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value
         "🟢 <a href=\"https://app.dexcelerate.com/terminal/SOL/{pair_address}\">{token_symbol}</a> [{mkt_cap}/{twenty_four_hour_change_str}%] 🔼\n\
         🌐 Solana @ Raydium Age: <code>{age}</code>\n\
         💰 USD: <code>${token_usd_price}</code>\n\
-        🏆 ATH: <code>${ath}</code> {ath_date}\n\
         💶 MCAP: <code>${mkt_cap}</code> \n\
         💎 FDV: <code>${fdv}</code>\n\
         💦 Liq: <code>${liquidity}</code>\n\
+        ⛰️  ATH: <code>${ath}</code> {ath_date}\n\
         📊 Vol: <code>${volume}</code>\n\
         📉 1H: <code>{one_hour_change_str}%</code> . <code>${buy_volume}</code> 🅑 {buys} 🅢 {sells}\n\
         LP: {lp} Mint:{verified}\n\n\
@@ -367,7 +371,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                 let user_id_str = user_id.as_str();
                 let user = db::get_user(&con, user_id_str);
                 if user.is_none() {
-                    match db::add_user(&con, user_id_str, msg.from.clone().unwrap().username.clone().unwrap_or("".to_string()).to_string().as_str()) {
+                    match db::add_user(&con, user_id_str, msg.from.clone().unwrap().username.clone().unwrap_or("Unknown".to_string()).to_string().as_str()) {
                         Ok(_) => {
                             log::info!("User added to database");
                         }
@@ -436,10 +440,11 @@ pub fn is_ranking_command(message: &str) -> bool {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CallWithAth {
     pub call: Call,
     pub ath_after_call: f64,
+    pub multiplier: f64,
 }
 
 pub async fn time_to_timestamp(time: &str) -> i64 {
@@ -470,7 +475,7 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot) ->
     let mut lb = Vec::new();
     let mut unique_tokens = std::collections::HashSet::new();
 
-    let calls_last_x_days = db::get_calls_last_x_days(&con, chat_id.as_str(), days as i32);
+    let calls_last_x_days = db::get_channel_calls_last_x_days(&con, chat_id.as_str(), days as i32);
     for call in calls_last_x_days {
         // Check if the token is already in the unique_tokens set
         if unique_tokens.insert(call.token_address.clone()) {
@@ -478,47 +483,119 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot) ->
             let ath = get_ath(time_to_timestamp(call.time.as_str()).await, call.token_address.as_str()).await?;
             log::info!("ath: {:?}", ath);
             let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+            let multiplier = ath_after_call / call.price.parse::<f64>().unwrap_or(0.0);
             let call_with_ath = CallWithAth {
                 call: call,
                 ath_after_call: ath_after_call,
+                multiplier: multiplier,
             };
-            lb.push(call_with_ath);
+            lb.push(call_with_ath.clone());
         }
     }
 
-    // Sort by ath_after_call in descending order
-    lb.sort_by(|a, b| b.ath_after_call.partial_cmp(&a.ath_after_call).unwrap());
+    // Sort by multiplier in descending order
+    lb.sort_by(|a, b| b.multiplier.partial_cmp(&a.multiplier).unwrap_or(std::cmp::Ordering::Equal));
 
-    bot.send_message(msg.chat.id, leaderboard_message(lb, days)).parse_mode(teloxide::types::ParseMode::Html).await?;
+
+    bot.send_message(msg.chat.id, leaderboard_message(lb, days, msg.chat.first_name().unwrap_or(""))).parse_mode(teloxide::types::ParseMode::Html).await?;
 
     Ok(())
 }
 
+fn get_user_call_count_for_user(lb: &[CallWithAth], user_id: &str) -> usize {
+    lb.iter()
+        .filter(|call| call.call.user_tg_id == user_id)
+        .count()
+}
 
-pub fn leaderboard_message(lb: Vec<CallWithAth>, days: u32) -> String {
+fn get_user_average_multiplier(lb: &[CallWithAth], user_tg_id: String) -> f64 {
+    let mut count = 0;
+    for call in lb {
+        if call.call.user_tg_id == user_tg_id {
+            count += 1;
+        }
+    }
+
+    if count == 0 {
+        return 0.0;
+    }
+
+    let total_multiplier: f64 = lb.iter()
+        .map(|call| call.ath_after_call / call.call.price.parse::<f64>().unwrap_or(0.0))
+        .sum();
+    total_multiplier / count as f64
+}
+
+
+pub fn leaderboard_message(lb: Vec<CallWithAth>, days: u32, channel_name: &str) -> String {
     let con = db::get_connection();
     let mut learderboard_string = String::new();
     let mut count = 1;
-    for call in lb {
+    let mut mvp_string = String::new();
+    for call in &lb {
         let multiplier = call.ath_after_call / call.call.price.parse::<f64>().unwrap_or(0.0);
         let user = db::get_user(&con, call.call.user_tg_id.as_str()).expect("User not found");
+        let username = user.username;
+        let calls_count = get_user_call_count_for_user(&lb, call.call.user_tg_id.as_str());
         if count == 1 {
-            learderboard_string.push_str(&format!("👑 {}. {} {:.2}x\n", count, user.username, multiplier));
+            let mvp_average_multiplier = get_user_average_multiplier(&lb, call.call.user_tg_id.to_string());
+            mvp_string.push_str(&format!("👑 {}\n", channel_name));
+            mvp_string.push_str(&format!("├ <code>MVP:</code>               <b>@{}</b>\n", username));
+            mvp_string.push_str(&format!("├ <code>Period:</code>         <b>{}d</b>\n", days));
+            mvp_string.push_str(&format!("├ <code>Calls:</code>           <b>{}</b>\n", calls_count));
+            mvp_string.push_str(&format!("└ <code>Return:</code>         <b>{:.2}x</b>\n", mvp_average_multiplier));
+        }
+        if count == 1 {
+            learderboard_string.push_str(&format!("👑🟣 <b>{}</b>:<i><b>{username}</b></i> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if count == 2 {
-            learderboard_string.push_str(&format!("🥈 {}. {} {:.2}x\n", count, user.username, multiplier));
+            learderboard_string.push_str(&format!("🥈🟣 <b>{}</b>:<i><b>{username}</b></i> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if count == 3 {
-            learderboard_string.push_str(&format!("🥉 {}. {} {:.2}x\n", count, user.username, multiplier));
-        } else {
-            learderboard_string.push_str(&format!("🟣 {}. {} {:.2}x\n", count, user.username, multiplier));
+            learderboard_string.push_str(&format!("🥉🟣 <b>{}</b>:<i><b>{username}</b></i> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+        } else if multiplier < 1.2 {
+            learderboard_string.push_str(&format!("😭🟣 <b>{}</b>:<i><b>{username}</b></i> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+        } else if count > 3 {
+            learderboard_string.push_str(&format!("😎 🟣 <b>{}</b>:<i><b>{username}</b></i> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         }
         count += 1;
     }
     format!("
-    👑 Leaderboard 👑\n\
-    ⌚️ {days}d\n\n\
-    <pre>\n\
-    {learderboard_string}\n\
-    </pre>\n\n\
+    {mvp_string}\n\
+    <blockquote>\
+    {learderboard_string}\
+    </blockquote>\n\n\
+    • TOKEN PNL » /pnl <i>token_address</i>\n\
+    • LEADERBOARD » /lb <i>days</i>\n\n\
     🏆 <a href=\"https://app.dexcelerate.com/scanner\">Watch and trade automatically with #1 dex</a>\n
     ")
+}
+
+
+pub async fn best_call_user(user_tg_id: &str) -> Result<Option<CallWithAth>> {
+    let con = db::get_connection();
+    let user_calls = db::get_all_calls_user_tg_id(&con, user_tg_id);
+    let mut best_call: Option<CallWithAth> = None;
+    let mut count = 0;
+    for call in user_calls {
+        let ath = get_ath(time_to_timestamp(call.time.as_str()).await, call.token_address.as_str()).await?;
+        let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+        let multiplier = ath_after_call / call.price.parse::<f64>().unwrap_or(0.0);
+        
+        if count == 0 {
+            best_call = Some(CallWithAth {
+                call: call.clone(),
+                ath_after_call: ath_after_call,
+                multiplier: multiplier,
+            });
+        } else if let Some(ref current_best) = best_call {
+            if multiplier > current_best.multiplier {
+                best_call = Some(CallWithAth {
+                    call: call,
+                    ath_after_call: ath_after_call,
+                    multiplier: multiplier,
+                });
+            }
+        }
+        count += 1;
+    }
+    Ok(best_call)
 }
