@@ -9,11 +9,29 @@ use serde_json::Value;
 mod db;
 use db::Call;
 
+/// Check if there's a valid solana address in a text
+/// 
+/// # Arguments
+/// 
+/// * `address` - The address to check
+/// 
+/// # Returns
+/// 
+/// A boolean indicating if the address is a valid solana address
 pub fn there_is_valid_solana_address(address: &str) -> bool {
     let re = Regex::new(r"[1-9A-HJ-NP-Za-km-z]{32,44}").unwrap();
     re.is_match(address)
 }
 
+/// Get the valid solana address from a text
+/// 
+/// # Arguments
+/// 
+/// * `text` - The text to get the valid solana address from
+/// 
+/// # Returns
+/// 
+/// An Option containing the valid solana address
 pub fn get_valid_solana_address(text: &str) -> Option<String> {
     let re = Regex::new(r"[1-9A-HJ-NP-Za-km-z]{32,44}").unwrap();
     if let Some(mat) = re.find(text) {
@@ -23,11 +41,28 @@ pub fn get_valid_solana_address(text: &str) -> Option<String> {
     }
 }
 
+/// Check if the message is a pnl command
+/// 
+/// # Arguments
+/// 
+/// * `message` - The message to check
+/// 
+/// # Returns
+/// 
+/// A boolean indicating if the message is a pnl command
 pub fn is_pnl_command(message: &str) -> bool {
     message.starts_with("/pnl")
 }
 
-
+/// Get the pair address and token address
+/// 
+/// # Arguments
+/// 
+/// * `address` - The address to get the pair address and token address for
+/// 
+/// # Returns
+/// 
+/// A JSON object containing the pair address and token address
 pub async fn get_pair_token_pair_and_token_address(address: &str) -> Result<Value> {
     let client = Client::new();
     let response = client.get(format!("https://api-rs.dexcelerate.com/pair/{}/pair-and-token", address))
@@ -38,6 +73,16 @@ pub async fn get_pair_token_pair_and_token_address(address: &str) -> Result<Valu
     Ok(json)
 }
 
+/// Get the scanner search
+/// 
+/// # Arguments
+/// 
+/// * `pair_address` - The pair address
+/// * `token_address` - The token address
+/// 
+/// # Returns
+/// 
+/// A JSON object containing the scanner search
 pub async fn get_scanner_search(pair_address: &str, token_address: &str) -> Result<Value> {
     let client = Client::new();
     let url = format!("https://api-rs.dexcelerate.com/scanner/SOL/{}/{}/pair-stats", pair_address, token_address);
@@ -64,6 +109,16 @@ pub async fn get_scanner_search(pair_address: &str, token_address: &str) -> Resu
     Ok(json)
 }
 
+/// Get the ATH of a token
+/// 
+/// # Arguments
+/// 
+/// * `timestamp` - The timestamp to get the ATH for
+/// * `token_address` - The address of the token
+/// 
+/// # Returns
+/// 
+/// A JSON object containing the ATH
 pub async fn get_ath(timestamp: i64, token_address: &str) -> Result<Value> {
     let url = format!("https://api-rs.dexcelerate.com/token/SOL/{}/ath?timestamp={}", token_address, timestamp);
     let client = Client::new();
@@ -75,7 +130,16 @@ pub async fn get_ath(timestamp: i64, token_address: &str) -> Result<Value> {
     Ok(json)
 }
 
- fn format_number(num: f64) -> String {
+/// Format the number to a more readable format
+/// 
+/// # Arguments
+/// 
+/// * `num` - The number to format
+/// 
+/// # Returns
+/// 
+/// A string containing the formatted number
+fn format_number(num: f64) -> String {
     if num >= 1_000_000.0 {
         format!("{:.1}M", num / 1_000_000.0)
     } else if num >= 1_000.0 {
@@ -85,10 +149,28 @@ pub async fn get_ath(timestamp: i64, token_address: &str) -> Result<Value> {
     }
 }
 
+/// Calculate the liquidity of a pair
+/// 
+/// # Arguments
+/// 
+/// * `pair0_reserve_usd` - The reserve of the first token in USD
+/// * `pair1_reserve_usd` - The reserve of the second token in USD
+/// 
+/// # Returns
+/// 
 fn calculate_liquidity(pair0_reserve_usd: f64, pair1_reserve_usd: f64) -> f64 {
     pair0_reserve_usd + pair1_reserve_usd
 }
 
+/// Format the time ago of a datetime
+/// 
+/// # Arguments
+/// 
+/// * `datetime_str` - The datetime string to format
+/// 
+/// # Returns
+/// 
+/// A string containing the time ago
 fn time_ago(datetime_str: &str) -> String {
     // Parse the input string into a DateTime<Utc> object
     let datetime = match DateTime::parse_from_rfc3339(datetime_str) {
@@ -105,6 +187,16 @@ fn time_ago(datetime_str: &str) -> String {
     // Format the duration into a human-readable string
     format_duration(duration)
 }
+
+/// Format the age of a token
+/// 
+/// # Arguments
+/// 
+/// * `datetime_str` - The datetime string to format
+/// 
+/// # Returns
+/// 
+/// A string containing the age
 fn age_token(datetime_str: &str) -> String {
     // Parse the input string into a DateTime<Utc> object
     let datetime = match DateTime::parse_from_rfc3339(datetime_str) {
@@ -122,6 +214,15 @@ fn age_token(datetime_str: &str) -> String {
     format_age(duration)
 }
 
+/// Format the duration of anything that can be represented  as a Duration
+/// 
+/// # Arguments
+/// 
+/// * `duration` - The duration of the object
+/// 
+/// # Returns
+/// 
+/// A string containing the formatted duration
 fn format_duration(duration: Duration) -> String {
     if duration.num_seconds() < 60 {
         format!("{}s ago", duration.num_seconds())
@@ -135,6 +236,16 @@ fn format_duration(duration: Duration) -> String {
         format!("️{}y ago", duration.num_days() / 365)
     }
 }
+
+/// Format the age of a token
+/// 
+/// # Arguments
+/// 
+/// * `duration` - The duration of the token
+/// 
+/// # Returns
+/// 
+/// A string containing the formatted age
 fn format_age(duration: Duration) -> String {
     if duration.num_seconds() < 60 {
         format!("{}s", duration.num_seconds())
@@ -149,6 +260,18 @@ fn format_age(duration: Duration) -> String {
     }
 }
 
+/// Generate the message for a call
+/// 
+/// # Arguments
+/// 
+/// * `ath_response` - The response from the API call to get the ATH
+/// * `holders_response` - The response from the API call to get the holders
+/// * `data` - The response from the API call to get the data
+/// * `username` - The username of the user who made the call
+/// 
+/// # Returns
+/// 
+/// A string containing the formatted message
 pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value, username: Option<String>) -> String {
     // Main info
     let pair_address = data["pair"]["pairAddress"].as_str().unwrap_or("");
@@ -210,8 +333,8 @@ pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value
         let percent = holder["percent"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * 100.0;
         let percent_str = format!("{:.2}", percent);
         let token_balance = holder["balanceFormatted"].as_f64().unwrap_or(0.0);
-        let usd_amount = token_balance * token_usd_price;
-        let usd_amount_str = format_number(usd_amount);
+        // let usd_amount = token_balance * token_usd_price;
+        // let usd_amount_str = format_number(usd_amount);
         if count == 1 {
             holders_str.push_str(&format!("👥 TH: <a href=\"https://solscan.io/account/{holder_address}\">{percent_str}⋅</a>"));
         } 
@@ -265,6 +388,7 @@ pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value
     )
 }
 
+/// Struct to hold the PNL call information
 #[derive(Debug)]
 pub struct PnlCall {
     pub percent: String,
@@ -273,7 +397,19 @@ pub struct PnlCall {
     pub call_id: u64,
 }
 
- pub fn check_pnl_call(connection: &Connection, mkt_cap: &str, token_address: &str, chat_id: &str) -> Result<PnlCall> {
+/// Check the PNL call
+/// 
+/// # Arguments
+/// 
+/// * `connection` - The database connection
+/// * `mkt_cap` - The market cap of the token
+/// * `token_address` - The address of the token
+/// * `chat_id` - The chat ID of the user who made the call
+/// 
+/// # Returns
+/// 
+/// A Result containing the PNL call or an error
+pub fn check_pnl_call(connection: &Connection, mkt_cap: &str, token_address: &str, chat_id: &str) -> Result<PnlCall> {
      let call: Option<Call> = db::get_call(connection, token_address, chat_id);
      if let Some(call) = call {
         let mkt_cap_i = call.mkt_cap.parse::<f64>().unwrap_or(0.0);
@@ -298,6 +434,18 @@ pub struct PnlCall {
 }
 
 
+/// Generate the PNL message
+/// 
+/// # Arguments
+/// 
+/// * `connection` - The database connection
+/// * `pnl_call` - The PNL call information
+/// * `symbol` - The symbol of the token
+/// * `pair_address` - The address of the pair
+/// 
+/// # Returns
+/// 
+/// A string containing the formatted PNL message
 pub fn pnl_message(connection: &Connection, pnl_call: PnlCall, symbol: &str, pair_address: &str) -> String {
     let call = db::get_call_by_id(connection, pnl_call.call_id).expect("Call not found");
     let user = db::get_user(connection, call.user_tg_id.as_str()).expect("User not found");
@@ -337,22 +485,39 @@ pub fn pnl_message(connection: &Connection, pnl_call: PnlCall, symbol: &str, pai
     
 }
 
+
+/// Check the PNL call
+/// 
+/// # Arguments
+/// 
+/// * `msg` - The message to check
+/// * `bot` - The bot to send the message to
+/// 
+/// # Returns  
+/// 
+/// An Ok result
 pub async fn pnl(msg: &teloxide::types::Message, bot: &teloxide::Bot) -> Result<()> {
     let con = db::get_connection();
     let chat_id = msg.chat.id.to_string();
-    let text = msg.text().unwrap().to_string(); // Clone the text
+    let text = msg.text().unwrap().to_string(); 
     let token_address = text.split(" ").nth(1).unwrap_or("");
+    // Check if the token address is valid
     if there_is_valid_solana_address(token_address) {
+        // Get the pair address and token address
         match get_pair_token_pair_and_token_address(token_address).await {
             Ok(token_pair_and_token) => {
             let pair_address = token_pair_and_token["pairAddress"].as_str().unwrap_or("");
             let token_address = token_pair_and_token["tokenAddress"].as_str().unwrap_or("");
+            // scan the pair address and token address 
             match get_scanner_search(pair_address, token_address).await {
+                // if the scanner search is ok, get the mkt cap and symbol
                 Ok(scanner_search) => {
                     let mkt_cap = scanner_search["pair"]["fdv"].as_str().unwrap_or("0");
                     let symbol = scanner_search["pair"]["token1Symbol"].as_str().unwrap_or("");
+                    // check the pnl call
                     match check_pnl_call(&con, mkt_cap, token_address, chat_id.as_str()) {
                         Ok(pnl_call) => {
+                            // send the pnl message
                             bot.send_message(msg.chat.id, pnl_message(&con, pnl_call, symbol, pair_address)).parse_mode(teloxide::types::ParseMode::Html).await?;
                         }
                         Err(e) => {
@@ -374,6 +539,15 @@ pub async fn pnl(msg: &teloxide::types::Message, bot: &teloxide::Bot) -> Result<
     Ok(())
 }
 
+/// Get the holders of a token
+/// 
+/// # Arguments
+/// 
+/// * `address` - The address of the token
+/// 
+/// # Returns
+///
+/// A Result containing the holders or an error
 pub async fn get_holders(address: &str) -> Result<Value> {
     let client = Client::new();
     let url = format!("https://api-rs.dexcelerate.com/token/SOL/{}/holders", address);
@@ -384,21 +558,36 @@ pub async fn get_holders(address: &str) -> Result<Value> {
     Ok(json)
 }
 
+/// Make a call
+/// 
+/// # Arguments
+/// 
+/// * `address` - The address of the token
+/// * `bot` - The bot to send the message to
+/// * `msg` - The message to send
+/// 
+/// # Returns
+/// 
+/// An Ok result
 pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message) -> Result<()> {
     let con = db::get_connection();
     db::configure_db(&con);
+    // Get the pair address and token address
     match get_pair_token_pair_and_token_address(address).await {
         Ok(token_pair_and_token) => {
             let pair_address = token_pair_and_token["pairAddress"].as_str().unwrap_or("");
             let token_address = token_pair_and_token["tokenAddress"].as_str().unwrap_or("");
-            
+            // Check if the pair address and token address are valid
             if pair_address.is_empty() || token_address.is_empty() {
                 log::error!("Invalid pair or token address");
                 bot.send_message(msg.chat.id, "Invalid pair or token address").await?;
             } else {
+                // Get the user ID
                 let user_id = msg.clone().from.unwrap().id.to_string();
                 let user_id_str = user_id.as_str();
+                // Get the user
                 let user = db::get_user(&con, user_id_str);
+                // If the user is not in the database, add them
                 if user.is_none() {
                     match db::add_user(&con, user_id_str, msg.from.clone().unwrap().username.clone().unwrap_or("Unknown".to_string()).to_string().as_str()) {
                         Ok(_) => {
@@ -409,6 +598,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                         }
                     }
                 }
+                // Get the scanner search
                 match get_scanner_search(pair_address, token_address).await {
                     Ok(scanner_search) => {
                         // Parse datetime
@@ -420,6 +610,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                         let holders_response = get_holders(address).await?;
 
                         let chat_id = msg.clone().chat.id.to_string();
+                        // Add the call to the database
                         match db::add_call(
                             &con, 
                             user_id_str, 
@@ -436,6 +627,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                                 log::error!("Failed to add call to database: {:?}", e);
                             }
                         }
+                        // Send the call message
                         bot.send_message(
                             msg.chat.id,
                             call_message(
@@ -463,12 +655,27 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
     Ok(())
 }
 
-
+/// Check if the message is a ranking command
+/// 
+/// # Arguments
+/// 
+/// * `message` - The message to check
+/// 
+/// # Returns
+/// 
+/// A boolean indicating if the message is a ranking command
 pub fn is_ranking_command(message: &str) -> bool {
     message.starts_with("/ranking")
 }
 
 
+/// Struct to hold the call with the ATH after the call
+/// 
+/// # Fields
+/// 
+/// * `call` - The call
+/// * `ath_after_call` - The ATH after the call
+/// * `multiplier` - The multiplier
 #[derive(Debug, Clone)]
 pub struct CallWithAth {
     pub call: Call,
@@ -476,6 +683,15 @@ pub struct CallWithAth {
     pub multiplier: f64,
 }
 
+/// Convert a time string to a timestamp
+/// 
+/// # Arguments
+/// 
+/// * `time` - The time string
+/// 
+/// # Returns
+/// 
+/// An i64 timestamp
 pub async fn time_to_timestamp(time: &str) -> i64 {
     log::info!("time: {:?}", time);
     let format = "%Y-%m-%d %H:%M:%S";
@@ -485,6 +701,15 @@ pub async fn time_to_timestamp(time: &str) -> i64 {
     datetime.timestamp_millis()
 }
 
+/// Extract the days from a ranking command
+/// 
+/// # Arguments
+/// 
+/// * `command` - The command to extract the days from
+/// 
+/// # Returns
+/// 
+/// An Option containing the days or None
 fn extract_days(command: &str) -> Option<u32> {
     let re = regex::Regex::new(r"/lb (\d+)d").unwrap();
     re.captures(command)
@@ -492,11 +717,29 @@ fn extract_days(command: &str) -> Option<u32> {
         .flatten()
 }
 
+/// Check if the message is a ranking command
+/// 
+/// # Arguments
+/// 
+/// * `message` - The message to check
+/// 
+/// # Returns
+/// 
+/// A boolean indicating if the message is a ranking command
 pub fn is_lb_command(message: &str) -> bool {
     message.starts_with("/lb")
 }
 
-
+/// Get the leaderboard
+/// 
+/// # Arguments
+/// 
+/// * `msg` - The message to get the leaderboard from
+/// * `bot` - The bot to send the message to
+/// 
+/// # Returns
+/// 
+/// An Ok result
 pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot) -> Result<()> {
     let days = extract_days(msg.text().unwrap()).ok_or_else(|| anyhow::anyhow!("Failed to extract days"))?;
     let con = db::get_connection();
@@ -531,12 +774,32 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot) ->
     Ok(())
 }
 
+/// Get the user call count for a user
+/// 
+/// # Arguments
+/// 
+/// * `lb` - The leaderboard
+/// * `user_id` - The user ID
+/// 
+/// # Returns
+/// 
+/// A usize representing the user call count
 fn get_user_call_count_for_user(lb: &[CallWithAth], user_id: &str) -> usize {
     lb.iter()
         .filter(|call| call.call.user_tg_id == user_id)
         .count()
 }
 
+/// Get the user calls average multiplier
+/// 
+/// # Arguments
+/// 
+/// * `lb` - The leaderboard
+/// * `user_tg_id` - The user Telegram ID
+/// 
+/// # Returns
+/// 
+/// A f64 representing the user calls average multiplier
 fn get_user_average_multiplier(lb: &[CallWithAth], user_tg_id: String) -> f64 {
     let mut count = 0;
     for call in lb {
@@ -555,7 +818,17 @@ fn get_user_average_multiplier(lb: &[CallWithAth], user_tg_id: String) -> f64 {
     total_multiplier / count as f64
 }
 
-
+/// Create the leaderboard message
+/// 
+/// # Arguments
+/// 
+/// * `lb` - The leaderboard, as a vector of CallWithAth structs
+/// * `days` - The number of days
+/// * `channel_name` - The channel name
+/// 
+/// # Returns
+/// 
+/// A String representing the leaderboard message
 pub fn leaderboard_message(lb: Vec<CallWithAth>, days: u32, channel_name: &str) -> String {
     let con = db::get_connection();
     let mut learderboard_string = String::new();
@@ -599,7 +872,15 @@ pub fn leaderboard_message(lb: Vec<CallWithAth>, days: u32, channel_name: &str) 
     ")
 }
 
-
+/// Get the best call for a user
+/// 
+/// # Arguments
+/// 
+/// * `user_tg_id` - The user Telegram ID
+/// 
+/// # Returns
+/// 
+/// An Option containing the best call as a CallWithAth struct
 pub async fn best_call_user(user_tg_id: &str) -> Result<Option<CallWithAth>> {
     let con = db::get_connection();
     let user_calls = db::get_all_calls_user_tg_id(&con, user_tg_id);
@@ -630,6 +911,17 @@ pub async fn best_call_user(user_tg_id: &str) -> Result<Option<CallWithAth>> {
     Ok(best_call)
 }
 
+/// Get the user stats
+/// 
+/// # Arguments
+/// 
+/// * `user_tg_id` - The user Telegram ID
+/// * `bot` - The bot to send the message to
+/// * `msg` - The message to send the stats to
+/// 
+/// # Returns
+/// 
+/// An Ok result
 pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message) -> Result<()> {
     let con = db::get_connection();
     let user_calls = db::get_all_calls_user_tg_id(&con, user_tg_id);
@@ -644,7 +936,6 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
     let username = user.username;
     let calls_count = user_calls.len();
     let best_call_multiplier = best_call.clone().unwrap().multiplier;
-    let user_calls_string = String::new();
     let mut call_lb = Vec::new();   
     let mut seen_tokens = std::collections::HashSet::new(); // Track seen tokens
 
@@ -669,6 +960,7 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
 
     let mut learderboard_string = String::new();
     let mut count = 1;
+    // Create the user leaderboard string
     for call in call_lb {
         let multiplier = call.multiplier;
         if count == 1 {
@@ -689,6 +981,18 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
     Ok(())
 }
 
+/// Create the user stats message
+/// 
+/// # Arguments
+/// 
+/// * `username` - The username
+/// * `calls_count` - The number of calls
+/// * `best_call_multiplier` - The best call multiplier
+/// * `learderboard_string` - The leaderboard string
+/// 
+/// # Returns
+/// 
+/// A String representing the user stats message
 pub fn user_stats_message(username: String, calls_count: usize, best_call_multiplier: f64, learderboard_string: String) -> String {
     format!("
     🥷 @{username}\n\
