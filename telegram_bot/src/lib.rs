@@ -120,11 +120,11 @@ fn format_duration(duration: Duration) -> String {
     }
 }
 
-pub fn call_message(ath_response: &Value, data: &Value, username: Option<String>) -> String {
+pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value, username: Option<String>) -> String {
     // Main info
     let pair_address = data["pair"]["pairAddress"].as_str().unwrap_or("");
     let token_symbol = data["pair"]["token1Symbol"].as_str().unwrap_or("N/A").to_uppercase();
-    let usd_price = format!("{:.8}", data["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
+    let token_usd_price = format!("{:.8}", data["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0)).parse::<f64>().unwrap_or(0.0);
     let age = time_ago(data["pair"]["pairCreatedAt"].as_str().unwrap_or(""));
 
     // Stats
@@ -169,10 +169,30 @@ pub fn call_message(ath_response: &Value, data: &Value, username: Option<String>
     let token_address = data["pair"]["token1Address"].as_str().unwrap_or("");
     let username = username.unwrap_or("Not found".to_string());
     let verified = if data["pair"]["isVerified"].as_bool().unwrap_or(false) { "🟢" } else { "🔴" };
-
+    let mut holders_str = String::new();
+    let mut count = 1;
+    for holder in holders_response["holders"].as_array().unwrap_or(&Vec::new()).iter() {
+        if count == 6 {
+            break;
+        }
+        let holder_address = holder["holderAddress"].as_str().unwrap_or("");
+        let percent = holder["percent"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * 100.0;
+        log::info!("percent: {:?}", percent);
+        let percent_str = format!("{:.2}", percent);
+        log::info!("percent_str: {:?}", percent_str);
+        let token_balance = holder["balanceFormatted"].as_f64().unwrap_or(0.0);
+        let usd_amount = token_balance * token_usd_price;
+        let usd_amount_str = format_number(usd_amount);
+        if count == 1 {
+            holders_str.push_str(&format!("👥 TH: <a href=\"https://solscan.io/account/{holder_address}\">{percent_str}%⋅</a> <code>${usd_amount_str}</code>|"));
+        } else {
+            holders_str.push_str(&format!("<a href=\"https://solscan.io/account/{holder_address}\">{percent_str}%</a>⋅<code>${usd_amount_str}</code>|"));
+        }
+        count += 1;
+    }
     // links
     let twitter = data["pair"]["linkTwitter"].as_str().unwrap_or("");
-    let website = data["pair"]["linkWebsite"].as_str().unwrap_or("");
+    let website = data["pair"]["linkWebsite"].as_str().unwrap_or("");   
     let telegram = data["pair"]["linkTelegram"].as_str().unwrap_or("");
 
     let mut links = String::new();
@@ -187,7 +207,7 @@ pub fn call_message(ath_response: &Value, data: &Value, username: Option<String>
     }
 
     let links_section = if links.len() > 0 {
-        format!("🧰 More: {links}\n\n")
+        format!("🧰 More {links}\n\n")
     } else {
         String::new()
     };
@@ -195,7 +215,7 @@ pub fn call_message(ath_response: &Value, data: &Value, username: Option<String>
     format!(
         "🟢 <a href=\"https://app.dexcelerate.com/terminal/SOL/{pair_address}\">{token_symbol}</a> [{mkt_cap}/{twenty_four_hour_change_str}%] 🔼\n\
         🌐 Solana @ Raydium Age: <code>{age}</code>\n\
-        💰 USD: <code>${usd_price}</code>\n\
+        💰 USD: <code>${token_usd_price}</code>\n\
         🏆 ATH: <code>${ath}</code> {ath_date}\n\
         💶 MCAP: <code>${mkt_cap}</code> \n\
         💎 FDV: <code>${fdv}</code>\n\
@@ -203,6 +223,7 @@ pub fn call_message(ath_response: &Value, data: &Value, username: Option<String>
         📊 Vol: <code>${volume}</code>\n\
         📉 1H: <code>{one_hour_change_str}%</code> . <code>${buy_volume}</code> 🅑 {buys} 🅢 {sells}\n\
         LP: {lp} Mint:{verified}\n\n\
+        {holders_str}\n\
         {links_section}\
         🪙 <code>{token_address}</code>\n\n\
         👨‍💼 @{username}\n\
@@ -320,6 +341,15 @@ pub async fn pnl(msg: &teloxide::types::Message, bot: &teloxide::Bot) -> Result<
     Ok(())
 }
 
+pub async fn get_holders(address: &str) -> Result<Value> {
+    let client = Client::new();
+    let url = format!("https://api-rs.dexcelerate.com/token/SOL/{}/holders", address);
+    let response = client.get(url)
+        .send()
+        .await?;
+    let json: Value = response.json().await?;
+    Ok(json)
+}
 
 pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message) -> Result<()> {
     let con = db::get_connection();
@@ -354,6 +384,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                         let unix_timestamp_milis = datetime.timestamp_millis();
 
                         let ath_response = get_ath(unix_timestamp_milis, address).await?;
+                        let holders_response = get_holders(address).await?;
 
                         let chat_id = msg.clone().chat.id.to_string();
                         match db::add_call(
@@ -376,6 +407,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                             msg.chat.id,
                             call_message(
                                 &ath_response,
+                                &holders_response,
                                 &scanner_search,
                                 Some(msg.from.clone().unwrap().username.clone().unwrap_or("".to_string()))
                             )
