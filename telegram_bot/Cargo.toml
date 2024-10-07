@@ -1,0 +1,16 @@
+[package]
+name = "telegram_bot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+teloxide = { version = "0.13", features = ["macros"] }
+log = "0.4"
+pretty_env_logger = "0.5"
+tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }
+regex = "1.11.0"
+anyhow = "1.0.89"
+serde_json = "1.0.128"
+reqwest = { version = "0.12.8", features = ["json"] }
+sqlite = "0.36.1"
+chrono = "0.4.38"
