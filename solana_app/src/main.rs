@@ -124,7 +124,9 @@ async fn start_websocket_server(tx: Arc<broadcast::Sender<String>>) {
 async fn handle_connection(stream: TcpStream, tx: Arc<broadcast::Sender<String>>) {
     // Establish the WebSocket handshake
     let ws_stream = tokio_tungstenite::accept_async(stream).await.expect("Error during WS handshake");
-    println!("New connection");
+    let addr = ws_stream.get_ref().peer_addr().unwrap();
+    println!("Telegram Connection opened from {}", addr);
+
 
     // Split the WebSocket stream into a write and read half
     let (mut write, mut read) = ws_stream.split();
@@ -157,7 +159,7 @@ async fn handle_connection(stream: TcpStream, tx: Arc<broadcast::Sender<String>>
             }
         }
     }
-    println!("Websocket Connection closed");
+    println!("Telegram Connection closed from {}", addr);
 }
 
 // State for the Tide server to subscribe changes to the Solana node
