@@ -153,7 +153,7 @@ pub fn get_all_calls_chat_id(connection: &Connection, chat_id: &str) -> Vec<Call
     calls
 }
 
-pub fn get_calls_last_x_days(connection: &Connection, chat_id: &str, days: i32) -> Vec<Call> {
+pub fn get_channel_calls_last_x_days(connection: &Connection, chat_id: &str, days: i32) -> Vec<Call> {
     let query = format!("
         SELECT * FROM calls 
         WHERE time >= datetime('now', '-{days} day') AND chat_id = ?
@@ -176,3 +176,23 @@ pub fn get_calls_last_x_days(connection: &Connection, chat_id: &str, days: i32) 
     calls
 }
 
+
+pub fn get_all_calls_user_tg_id(connection: &Connection, user_tg_id: &str) -> Vec<Call> {
+    let query = "SELECT * FROM calls WHERE user_tg_id = ?";
+    let mut stmt = connection.prepare(query).unwrap();
+    stmt.bind((1, user_tg_id)).unwrap();
+    let mut calls = Vec::new();
+    while let Ok(State::Row) = stmt.next() {
+        calls.push(Call {
+            id: stmt.read::<i64, _>("id").unwrap() as u64,
+            time: stmt.read::<String, _>("time").unwrap(),
+            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
+            price: stmt.read::<String, _>("price").unwrap(),
+            token_address: stmt.read::<String, _>("token_address").unwrap(),
+            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
+            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
+            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
+        });
+    }
+    calls
+}
