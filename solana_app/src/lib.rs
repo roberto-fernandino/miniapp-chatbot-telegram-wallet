@@ -1,4 +1,6 @@
 use anyhow::Result;
+use serde::Serialize;
+use crate::modules::matis::SwapTransaction;
 use tokio_tungstenite::connect_async;
 use futures::stream::SplitSink;
 use solana_transaction_status::EncodedConfirmedTransactionWithStatusMeta;
@@ -145,15 +147,12 @@ pub async fn handle_incoming_messages(
     loop {
         match read.next().await {
             Some(Ok(message)) => {
-                println!("Received message: {:?}", message);
                 match message {
                     Message::Ping(payload) => {
                         // Respond to Ping with a Pong
                         if let Some(write_guard) = write.lock().await.as_mut() {
                             if let Err(e) = write_guard.send(Message::Pong(payload)).await {
                                 eprintln!("Error sending Pong: {:?}", e);
-                            } else {
-                                println!("Sent Pong response");
                             }
                         } else {
                             eprintln!("Write sink is not available");
@@ -291,7 +290,6 @@ async fn fetch_and_process_transaction(
     // Process the transaction
     match get_account_involved_in_transaction(&tx) {
         Ok(account_involved) => {
-            println!("Account involved: {}", account_involved.to_string());
             if let Some(_) = &transaction.transaction.meta {
             let transaction_type = determine_transaction_type(&transaction)?;
             println!("Transaction type: {}", transaction_type);
@@ -300,23 +298,25 @@ async fn fetch_and_process_transaction(
                 "Transfer" => {
                     let transfer = handle_transfer_transaction(&tx)?;
                     println!("{:?}\n\n", transfer);
+                    return Ok(());
                 }
                 "Raydium Swap" => {
                     let (token_ca, side) = info_raydium_swap(&transaction.transaction, &account_involved)?;
                     handle_send_copy_trade_swap(client.clone(), token_ca, account_involved, side, tx_ws.clone()).await?;
+                    return Ok(());
                 }
                 "Jupiter Swap" => {
                     let (token_ca, side) = info_jupiter_swap(&transaction.transaction, &account_involved)?;
                     handle_send_copy_trade_swap(client.clone(), token_ca, account_involved, side, tx_ws.clone()).await?;
+                    return Ok(());
                 }
                 "Pump Swap" => {
                     let (token_ca, side) = info_pump_swap(&transaction.transaction, &account_involved)?;
                     handle_send_copy_trade_swap(client.clone(), token_ca, account_involved, side, tx_ws.clone()).await?;
+                    return Ok(());
                 }
                 _ => {}
             }
-
-
         }
     }
     Err(e) => {
@@ -421,17 +421,36 @@ async fn handle_send_copy_trade_swap(
             let account_pubkey = Pubkey::from_str(&copy_trade.account_address).unwrap();
             if copy_trade.status {
                 if side == "buy" {
-                    let result = get_and_send_buy_transaction(&account_pubkey, &token_ca, copy_trade.buy_amount, &tx).await;
-                    handle_transaction_result(result, "buy", &token_ca, copy_trade.buy_amount)?;
+                    match get_and_send_buy_transaction(&account_pubkey, &token_ca, copy_trade.buy_amount, &tx).await {
+                        Ok(_) => {
+                            println!("Buy transaction sent successfully");
+                        }
+                        Err(e) => {
+                            println!("Error sending buy transaction: {:?}", e);
+                        }
+                    }
                 }
                 if side == "sell" {
-                    let result = get_and_send_sell_transaction(client.clone(), &account_pubkey, &token_ca, &tx).await;
-                    handle_transaction_result(result, "sell", &token_ca, 0.0)?;
+                    match get_and_send_sell_transaction(client.clone(), &account_pubkey, &token_ca, &tx).await {
+                        Ok(_) => {
+                            println!("Sell transaction sent successfully");
+                        }
+                        Err(e) => {
+                            println!("Error sending sell transaction: {:?}", e);
+                        }
+                    }
                 }
             }
         }
     }
     Ok(())
+}
+
+
+#[derive(Debug, Serialize)]
+pub struct Payload {
+    pub event_type: String,
+    pub data: SwapTransaction,
 }
 
 async fn get_and_send_buy_transaction(
@@ -451,10 +470,15 @@ async fn get_and_send_buy_transaction(
         token_ca.to_string(),
         sol_to_lamports(buy_amount),
     ).await?;
-
-    let tx_string = serde_json::to_string(&transaction)
+    let payload = Payload {
+        event_type: "copy_trade".to_string(),
+        data: transaction,
+    };
+    println!("Payload: {:?}", payload);
+    let tx_string = serde_json::to_string(&payload)
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
     tx.send(tx_string).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+    println!("Buy transaction sent to telegram successfully");
     Ok(())
 }
 
@@ -465,11 +489,11 @@ async fn get_and_send_sell_transaction(
     tx: &Arc<broadcast::Sender<String>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let tokens_balance = get_tokens_balance(client.clone(), account_pubkey)?;
-    println!("Sending buy transaction");
-    println!("Token CA: {}", token_ca);
-    println!("Account pubkey: {}", account_pubkey.to_string()); 
-    println!("Tokens balance: {:?}", tokens_balance);
     if let Some(token_to_sell_balance) = tokens_balance.token_balance.iter().find(|token| token.mint == token_ca) {
+        println!("Sending sell transaction");
+        println!("Token CA: {}", token_ca);
+        println!("Account pubkey: {}", account_pubkey.to_string()); 
+        println!("Token amount: {:?}", token_to_sell_balance.token_ui_amount);
         let transaction = get_swap_transaction(
         account_pubkey,
         sol_to_lamports(0.005),
@@ -485,32 +509,5 @@ async fn get_and_send_sell_transaction(
     } else {
         tx.send("Token not found in balance.".to_string())?;
         Ok(())
-    }
-}
-
-fn handle_transaction_result(
-    result: Result<(), Box<dyn std::error::Error>>,
-    action: &str,
-    token_ca: &str,
-    amount: f64,
-) -> Result<()> {
-    match result {
-        Ok(_) => {
-            println!("Tx to {} ({}) {} sent to telegram", action, amount, token_ca);
-            Ok(())
-        }
-        Err(e) => {
-            if let Some(json_err) = e.downcast_ref::<JsonError>() {
-                if json_err.to_string().contains("missing field `inputMint`") {
-                    println!("Error sending transaction: missing inputMint. This might be due to an API change or temporary issue.");
-                    // Here you could implement a fallback method or retry with different parameters
-                } else {
-                    println!("JSON error when sending transaction: {:?}", json_err);
-                }
-            } else {
-                println!("Error sending {} transaction: {:?}", action, e);
-            }
-            Err(anyhow::anyhow!("Failed to send transaction"))
-        }
     }
 }
