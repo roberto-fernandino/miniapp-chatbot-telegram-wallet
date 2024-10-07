@@ -1,11 +1,11 @@
 use teloxide::prelude::*;
 use teloxide::types::MessageKind;
-use telegram_bot::{call, get_valid_solana_address, is_pnl_command, is_lb_command, pnl, leaderboard, there_is_valid_solana_address};
+use telegram_bot::{call, get_valid_solana_address, is_pnl_command, is_lb_command, pnl, leaderboard, there_is_valid_solana_address, user_stats};
 mod db;
 #[tokio::main]
 async fn main() {
     pretty_env_logger::init();
-    log::info!("Starting throw dice bot...");
+    log::info!("Starting bot...");
 
     let bot = Bot::from_env();
     
@@ -14,10 +14,8 @@ async fn main() {
         let con = db::get_connection();
         db::configure_db(&con);
         if let MessageKind::Common(ref common) = msg.kind {
-            if msg.chat.is_group() || msg.chat.is_supergroup() || msg.chat.is_private() || msg.chat.is_channel() {
+            if msg.chat.is_group() || msg.chat.is_supergroup()  || msg.chat.is_channel() {
                 if let Some(text) = msg.text() {
-                    log::info!("Received a message in a chat: {:?}", text);
-                    log::info!("is valid solana address: {:?}", there_is_valid_solana_address(text));
                     if is_pnl_command(text) {
                         match pnl(&msg, &bot).await {
                             Ok(_) => (),
@@ -40,6 +38,18 @@ async fn main() {
                                 }
                             }
                             None => {}
+                        }
+                    }
+                }
+            }
+            if msg.chat.is_chat() {
+                if let Some(text) = msg.text() {
+                    if text.starts_with("/start user_") {
+                        if let Some(user_tg_id) = text.strip_prefix("/start user_") {
+                            match user_stats(user_tg_id, &bot, &msg).await {
+                                Ok(_) => (),
+                                Err(e) => log::error!("Failed to user_stats: {:?}", e),
+                            }
                         }
                     }
                 }

@@ -1,6 +1,6 @@
 use regex::Regex;
 use chrono::Duration;
-use chrono::{DateTime,Utc, TimeZone, NaiveDateTime};
+use chrono::{DateTime,Utc, NaiveDateTime};
 use teloxide::prelude::*;
 use sqlite::Connection;
 use reqwest::Client;
@@ -105,18 +105,47 @@ fn time_ago(datetime_str: &str) -> String {
     // Format the duration into a human-readable string
     format_duration(duration)
 }
+fn age_token(datetime_str: &str) -> String {
+    // Parse the input string into a DateTime<Utc> object
+    let datetime = match DateTime::parse_from_rfc3339(datetime_str) {
+        Ok(dt) => dt.with_timezone(&Utc),
+        Err(_) => return "Invalid datetime format".to_string(),
+    };
+
+    // Get the current time in UTC
+    let now = Utc::now();
+
+    // Calculate the duration between the current time and the input time
+    let duration = now.signed_duration_since(datetime);
+
+    // Format the duration into a human-readable string
+    format_age(duration)
+}
 
 fn format_duration(duration: Duration) -> String {
     if duration.num_seconds() < 60 {
-        format!("🕰️ {}s ago", duration.num_seconds())
+        format!("{}s ago", duration.num_seconds())
     } else if duration.num_minutes() < 60 {
-        format!("🕰️ {}m ago", duration.num_minutes())
+        format!("{}m ago", duration.num_minutes())
     } else if duration.num_hours() < 24 {
-        format!("🕰️ {}h ago", duration.num_hours())
+        format!("️{}h ago", duration.num_hours())
     } else if duration.num_days() < 365 {
-        format!("🕰️ {}d ago", duration.num_days())
+        format!("️{}d ago", duration.num_days())
     } else {
-        format!("🕰️ {}y ago", duration.num_days() / 365)
+        format!("️{}y ago", duration.num_days() / 365)
+    }
+}
+fn format_age(duration: Duration) -> String {
+    if duration.num_seconds() < 60 {
+        format!("{}s", duration.num_seconds())
+    } else if duration.num_minutes() < 60 {
+        format!("{}m", duration.num_minutes())
+    } else if duration.num_hours() < 24 {
+        format!("{}h", duration.num_hours())
+    } else if duration.num_days() < 365 {
+        format!("{}d", duration.num_days())
+    } else {
+        format!("{}y", duration.num_days() / 365)
     }
 }
 
@@ -125,7 +154,7 @@ pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value
     let pair_address = data["pair"]["pairAddress"].as_str().unwrap_or("");
     let token_symbol = data["pair"]["token1Symbol"].as_str().unwrap_or("N/A").to_uppercase();
     let token_usd_price = format!("{:.8}", data["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0)).parse::<f64>().unwrap_or(0.0);
-    let age = time_ago(data["pair"]["pairCreatedAt"].as_str().unwrap_or(""));
+    let age = age_token(data["pair"]["pairCreatedAt"].as_str().unwrap_or(""));
     let circulating_supply = data["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
 
 
@@ -174,7 +203,7 @@ pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value
     let mut holders_str = String::new();
     let mut count = 0;
     for holder in holders_response["holders"].as_array().unwrap_or(&Vec::new()).iter() {
-        if count == 6 {
+        if count == 5 {
             break;
         }
         let holder_address = holder["holderAddress"].as_str().unwrap_or("");
@@ -218,16 +247,16 @@ pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value
 
     format!(
         "🟢 <a href=\"https://app.dexcelerate.com/terminal/SOL/{pair_address}\">{token_symbol}</a> [{mkt_cap}/{twenty_four_hour_change_str}%] 🔼\n\
-        🌐 Solana @ Raydium Age: <code>{age}</code>\n\
+        🌐 Solana @ Raydium\n\
         💰 USD: <code>${token_usd_price}</code>\n\
         💶 MCAP: <code>${mkt_cap}</code> \n\
         💎 FDV: <code>${fdv}</code>\n\
         💦 Liq: <code>${liquidity}</code>\n\
-        ⛰️  ATH: <code>${ath}</code> {ath_date}\n\
-        📊 Vol: <code>${volume}</code>\n\
+        📊 Vol: <code>${volume}</code> 🕰️ Age: {age} \n\
+        ⛰️  ATH: <code>${ath}</code> <code>[{ath_date}]</code>\n\
         📉 1H: <code>{one_hour_change_str}%</code> . <code>${buy_volume}</code> 🅑 {buys} 🅢 {sells}\n\
-        LP: {lp} Mint:{verified}\n\n\
         {holders_str}\n\
+        LP: {lp} Mint:{verified}\n\
         {links_section}\
         🪙 <code>{token_address}</code>\n\n\
         👨‍💼 @{username}\n\
@@ -535,6 +564,7 @@ pub fn leaderboard_message(lb: Vec<CallWithAth>, days: u32, channel_name: &str) 
     for call in &lb {
         let multiplier = call.ath_after_call / call.call.price.parse::<f64>().unwrap_or(0.0);
         let user = db::get_user(&con, call.call.user_tg_id.as_str()).expect("User not found");
+        let user_tg_id = user.tg_id;
         let username = user.username;
         let calls_count = get_user_call_count_for_user(&lb, call.call.user_tg_id.as_str());
         if count == 1 {
@@ -546,15 +576,15 @@ pub fn leaderboard_message(lb: Vec<CallWithAth>, days: u32, channel_name: &str) 
             mvp_string.push_str(&format!("└ <code>Return:</code>         <b>{:.2}x</b>\n", mvp_average_multiplier));
         }
         if count == 1 {
-            learderboard_string.push_str(&format!("👑🟣 <b>{}</b>:<i><b>{username}</b></i> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("👑🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if count == 2 {
-            learderboard_string.push_str(&format!("🥈🟣 <b>{}</b>:<i><b>{username}</b></i> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("🥈🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if count == 3 {
-            learderboard_string.push_str(&format!("🥉🟣 <b>{}</b>:<i><b>{username}</b></i> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("🥉🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if multiplier < 1.2 {
-            learderboard_string.push_str(&format!("😭🟣 <b>{}</b>:<i><b>{username}</b></i> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("😭🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if count > 3 {
-            learderboard_string.push_str(&format!("😎 🟣 <b>{}</b>:<i><b>{username}</b></i> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("😎 🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         }
         count += 1;
     }
@@ -598,4 +628,74 @@ pub async fn best_call_user(user_tg_id: &str) -> Result<Option<CallWithAth>> {
         count += 1;
     }
     Ok(best_call)
+}
+
+pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message) -> Result<()> {
+    let con = db::get_connection();
+    let user_calls = db::get_all_calls_user_tg_id(&con, user_tg_id);
+    let best_call = match best_call_user(user_tg_id).await {
+        Ok(call) => call,
+        Err(e) => return Err(anyhow::Error::msg("No best call found")),
+    };
+    let user = match db::get_user(&con, user_tg_id) {
+        Some(user) => user,
+        None => return Err(anyhow::Error::msg("User not found")),
+    };
+    let username = user.username;
+    let calls_count = user_calls.len();
+    let best_call_multiplier = best_call.clone().unwrap().multiplier;
+    let user_calls_string = String::new();
+    let mut call_lb = Vec::new();   
+    let mut seen_tokens = std::collections::HashSet::new(); // Track seen tokens
+
+    for call in user_calls {
+        if seen_tokens.contains(&call.token_symbol) {
+            continue; // Skip if token has already been processed
+        }
+        seen_tokens.insert(call.token_symbol.clone()); // Mark token as seen
+
+        let ath = get_ath(time_to_timestamp(call.time.as_str()).await, call.token_address.as_str()).await?;
+        let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+        let multiplier = ath_after_call / call.price.parse::<f64>().unwrap_or(0.0);
+        call_lb.push(CallWithAth {
+            call: call,
+            ath_after_call: ath_after_call,
+            multiplier: multiplier,
+        });
+    }
+
+    // Sort descending multiplier
+    call_lb.sort_by(|a, b| b.multiplier.partial_cmp(&a.multiplier).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut learderboard_string = String::new();
+    let mut count = 1;
+    for call in call_lb {
+        let multiplier = call.multiplier;
+        if count == 1 {
+            learderboard_string.push_str(&format!("👑🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+        } else if count == 2 {
+            learderboard_string.push_str(&format!("🥈🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+        } else if count == 3 {
+            learderboard_string.push_str(&format!("🥉🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+        } else if multiplier < 1.2 {
+            learderboard_string.push_str(&format!("😭🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+        } else if count > 3 {
+            learderboard_string.push_str(&format!("😎 🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+        }
+        count += 1;
+    }
+
+    bot.send_message(msg.chat.id,user_stats_message(username, calls_count, best_call_multiplier, learderboard_string)).parse_mode(teloxide::types::ParseMode::Html).await?;
+    Ok(())
+}
+
+pub fn user_stats_message(username: String, calls_count: usize, best_call_multiplier: f64, learderboard_string: String) -> String {
+    format!("
+    🥷 @{username}\n\
+    ├ Calls: <code>{calls_count}</code>\n\
+    └ Return: <code>{best_call_multiplier:.2}x</code>\n\n\
+    <blockquote>\
+    {learderboard_string}
+    </blockquote>\n\
+    ")
 }
