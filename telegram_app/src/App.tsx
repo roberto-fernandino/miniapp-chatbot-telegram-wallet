@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
 import SolanaIcon from "./assets/sol.png";
+import SwapSheet from "./components/ui/SwapSheet";
 import {
   deleteCopyTradeWallet,
   generateKeyPair,
+  getTokenData,
   setUserSession,
+  signAndSendTransaction,
 } from "./lib/utils";
-import { TurnkeySigner } from "@turnkey/solana";
 import WebApp from "@twa-dev/sdk";
+import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Turnkey } from "@turnkey/sdk-server";
 import {
@@ -25,6 +28,9 @@ import { Spinner } from "./components/ui/spinner";
 import CopyIcon from "./assets/copy.svg";
 import { ErrorHandler, LogFunction } from "./lib/cloudStorageUtil";
 import { TelegramApi } from "./telegram/telegram-api";
+import TokensBalances from "./components/ui/tokenBalances";
+import TokensBalancesSwap from "./components/ui/tokensBalancesSwap";
+import SwapInterface from "./components/ui/swap";
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -33,6 +39,7 @@ const App: React.FC = () => {
   const [password, setPassword] = useState("");
   const [userAccounts, setUserAccounts] = useState<any[]>([]);
   const [walletId, setWalletId] = useState<string>("");
+  const [solAddress, setSolAddress] = useState<string>("");
 
   // Session information
   const [sessionActive, setSessionActive] = useState<boolean>(false);
@@ -62,12 +69,21 @@ const App: React.FC = () => {
   const [solBalance, setSolBalance] = useState<string>("0");
   const [usdSolBalance, setUsdSolBalance] = useState<string>("0.00");
 
+  // Session
   const [remainingTime, setRemainingTime] = useState<string>("");
 
+  // Tranfer
   const [transferSolActive, setTransferSolActive] = useState(false);
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
+
+  // WebSocket
   const [socket, setSocket] = useState<WebSocket | null>(null);
+
+  // Swap
+  const [swapSheetOpen, setSwapSheetOpen] = useState(false);
+  const [tokenCa, setTokenCa] = useState("");
+  const [tokenData, setTokenData] = useState<any>(null);
 
   useEffect(() => {
     initializeApp();
@@ -257,6 +273,7 @@ const App: React.FC = () => {
       log(`Failed to update copy trade: ${error}`, "error");
     }
   };
+
   const handleCreateSession = async (sessionDuration: string) => {
     setIsLoading(true);
     const user = await TelegramApi.getItem(
@@ -367,6 +384,11 @@ const App: React.FC = () => {
     return () => clearInterval(intervalId); // Cleanup interval on component unmount
   }, []);
 
+  const handleGetTokenData = async (tokenCa: string) => {
+    const data = await getTokenData(tokenCa);
+    setTokenData(data);
+  };
+
   const handleDeleteCopyTrade = async (copy_trade_address: string) => {
     await deleteCopyTradeWallet(
       WebApp.initDataUnsafe.user?.id.toString() ?? "",
@@ -457,6 +479,67 @@ const App: React.FC = () => {
     }
   };
 
+  interface Token {
+    symbol: string;
+    name: string;
+    logoURI: string;
+    balance: string;
+    address: string;
+  }
+
+  const swapTokens = async (
+    userPublicKey: string,
+    toToken: Token,
+    fromToken: Token,
+    fromAmount: number,
+    slippage: number
+  ) => {
+    const slippageBps = slippage * 100;
+    log(`Slippage: ${slippageBps}`, "info");
+    log(`From Token: ${fromToken.address}`, "info");
+    log(`To Token: ${JSON.stringify(toToken.address)}`, "info");
+    log(`From Amount: ${fromAmount}`, "info");
+
+    // convert fromAmount to integer
+    let integerAmount;
+    if (fromToken.symbol === "SOL") {
+      integerAmount = fromAmount * 1e9;
+    } else {
+      integerAmount = fromAmount * 10 ** 6;
+    }
+
+    // get quote
+    let urlQuote = `https://public.jupiterapi.com/quote?inputMint=${fromToken.address}&outputMint=${toToken.address}&amount=${integerAmount}&slippageBps=${slippageBps}`;
+
+    const quoteResponse = await axios.get(urlQuote);
+
+    // get swap
+    const urlSwap = `https://public.jupiterapi.com/swap`;
+    const payload = {
+      userPublicKey: userPublicKey,
+      quoteResponse: quoteResponse.data,
+    };
+    const swapResponse = await axios.post(urlSwap, payload, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    log("Swap built", "success");
+    let tx = swapResponse.data.swapTransaction;
+    if (!tx || typeof tx !== "string") {
+      return;
+    }
+    // Verify that tx is a valid base64 string
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(tx)) {
+      throw new Error("Swap transaction is not a valid base64 string");
+    }
+    log("Swap transaction is valid", "success");
+    log("Signing and sending transaction", "info");
+    let result = await signAndSendTransaction(tx);
+    log(`Transaction result: ${JSON.stringify(result)}`, "success");
+    return result;
+  };
+
   const handleEndSession = async () => {
     setSessionActive(false);
     setRemainingTime("");
@@ -487,10 +570,7 @@ const App: React.FC = () => {
           user
         );
       if (success) {
-        log(
-          `Transferred ${amount} SOL to ${recipient} ${confirmation}`,
-          "success"
-        );
+        log(`Transferred ${amount} SOL to ${recipient}`, "success");
         log(`check tx: https://solscan.io/tx/${signature}`, "success");
       }
       if (!success) {
@@ -521,23 +601,38 @@ const App: React.FC = () => {
       log(`Event received: ${event.data}`, "success");
       const data = JSON.parse(event.data);
       if (data.event_type === "copy_trade") {
-        log("copy_trade event received", "success");
-        try {
-          copyTrade(data);
-        } catch (error) {
-          log(`copyTrade: ${error}`, "error");
-        }
-      } else {
-        log(`Unknown event type: ${data.event_type}`, "error");
+        const handleCopyTrade = async () => {
+          log("copy_trade event received", "success");
+          try {
+            let result:
+              | {
+                  success: boolean;
+                  signature: string;
+                  blockHash: string;
+                }
+              | undefined = await copyTrade(data.data);
+            if (result && result.success) {
+              log(
+                `Confirmed tx, check:\n https://solscan.io/tx/${result.signature}`,
+                "success"
+              );
+            } else {
+              log(`Failed to send transaction`, "error");
+            }
+          } catch (error) {
+            log(`copyTrade: ${error}`, "error");
+          }
+        };
+        handleCopyTrade();
       }
-    };
 
-    setSocket(newSocket);
+      setSocket(newSocket);
 
-    // Clean up the socket on component unmount
-    return () => {
-      newSocket.close();
-      log("WebSocket connection closed", "info");
+      // Clean up the socket on component unmount
+      return () => {
+        newSocket.close();
+        log("WebSocket connection closed", "info");
+      };
     };
   }, []);
 
@@ -694,7 +789,49 @@ const App: React.FC = () => {
                       </Button>
                     </>
                   )}
-                  <h3 className="text-lg font-semibold text-primary mb-2">
+                  <Button onClick={() => setSwapSheetOpen(true)}>Swap</Button>
+                  <SwapSheet
+                    isOpen={swapSheetOpen}
+                    onClose={() => setSwapSheetOpen(false)}
+                  >
+                    <h2 className="text-2xl font-bold text-center mb-4 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 text-transparent bg-clip-text">
+                      Buy/Sell Tokens
+                    </h2>
+
+                    <div className="flex flex-row items-center justify-between">
+                      <Input
+                        type="text"
+                        placeholder="token ca"
+                        onChange={(e) => {
+                          setTokenCa(e.target.value);
+                          setTokenData(null);
+                        }}
+                      />
+                      <Button onClick={() => handleGetTokenData(tokenCa)}>
+                        Get Token Data
+                      </Button>
+                    </div>
+                    {tokenData && (
+                      <>
+                        <SwapInterface
+                          tokenData={tokenData}
+                          solBalance={solBalance}
+                          address={userAccounts[0].address}
+                          swapTokens={swapTokens}
+                        />
+                      </>
+                    )}
+
+                    <div className="flex flex-col items-center justify-center w-full mt-3">
+                      <TokensBalancesSwap
+                        address={userAccounts[0].address}
+                        setTokenData={setTokenData}
+                        setTokenCa={setTokenCa}
+                      />
+                    </div>
+                  </SwapSheet>
+
+                  <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 text-transparent bg-clip-text">
                     Wallets
                   </h3>
                   {userAccounts.map((account) => (
@@ -702,47 +839,54 @@ const App: React.FC = () => {
                       key={account.walletId}
                       className="flex items-center justify-between mb-2 p-2 bg-gray-50 rounded"
                     >
-                      <div className="flex items-center">
-                        <span
-                          className="mr-2 text-sm font-medium"
-                          style={{
-                            color:
-                              account.addressFormat === "ADDRESS_FORMAT_SOLANA"
-                                ? "purple"
-                                : "inherit",
-                          }}
-                        >
-                          {account.addressFormat === "ADDRESS_FORMAT_SOLANA" ? (
-                            <img src={SolanaIcon} className="w-8 h-4" />
-                          ) : (
-                            "Unknown"
-                          )}
-                        </span>
-                        <span className="text-sm text-[#ff4d35] mr-5">
-                          {`${account.address.slice(
-                            0,
-                            3
-                          )}...${account.address.slice(-3)}`}
-                        </span>
+                      <div className="flex flex-col items-center justify-between w-full">
+                        <div className="flex items-center">
+                          <span
+                            className="mr-2 text-sm font-medium"
+                            style={{
+                              color:
+                                account.addressFormat ===
+                                "ADDRESS_FORMAT_SOLANA"
+                                  ? "purple"
+                                  : "inherit",
+                            }}
+                          >
+                            {account.addressFormat ===
+                            "ADDRESS_FORMAT_SOLANA" ? (
+                              <img src={SolanaIcon} className="w-8 h-4" />
+                            ) : (
+                              "Unknown"
+                            )}
+                          </span>
+                          <span className="text-sm text-[#ff4d35] mr-5">
+                            {`${account.address.slice(
+                              0,
+                              3
+                            )}...${account.address.slice(-3)}`}
+                          </span>
+                          <div className="flex flex-col items-center justify-center">
+                            <span className="text-sm text-[#ff4d35]">
+                              SOL {solBalance}
+                            </span>
+                            <span className="text-sm text-[#ff4d35]">
+                              ${usdSolBalance}
+                            </span>
+                          </div>{" "}
+                          <button
+                            className="p-2 hover:bg-gray-100 rounded"
+                            onClick={() => {
+                              navigator.clipboard.writeText(account.address);
+                              // Optionally, you can add a toast or alert here to confirm the copy action
+                              alert("Address copied to clipboard!");
+                            }}
+                          >
+                            <img src={CopyIcon} className="w-4 h-4" />
+                          </button>
+                        </div>
                         <div className="flex flex-col items-center justify-center">
-                          <span className="text-sm text-[#ff4d35]">
-                            SOL {solBalance}
-                          </span>
-                          <span className="text-sm text-[#ff4d35]">
-                            ${usdSolBalance}
-                          </span>
+                          <TokensBalances address={account.address} />
                         </div>
                       </div>
-                      <button
-                        className="p-2 hover:bg-gray-100 rounded"
-                        onClick={() => {
-                          navigator.clipboard.writeText(account.address);
-                          // Optionally, you can add a toast or alert here to confirm the copy action
-                          alert("Address copied to clipboard!");
-                        }}
-                      >
-                        <img src={CopyIcon} className="w-4 h-4" />
-                      </button>
                     </div>
                   ))}
                 </div>
@@ -822,7 +966,7 @@ const App: React.FC = () => {
                           }
                           className={`px-4 py-2 rounded-full ${
                             copyTrade.status === "active"
-                              ? "bg-red-500 hover:bg-red-600 text-white"
+                              ? "bg-[#ffbaba]/ hover:bg-red-600 text-purple-950 hover:text-white"
                               : "bg-green-500 hover:bg-green-600 text-white"
                           }`}
                         >
@@ -831,7 +975,7 @@ const App: React.FC = () => {
                             : "Activate"}
                         </Button>
                         <Button
-                          className="bg-red-500 hover:bg-red-600 text-white rounded-full"
+                          className="bg-red-700 hover:bg-red-600 text-white rounded-full"
                           onClick={() => {
                             handleDeleteCopyTrade(copyTrade.copy_trade_address);
                           }}

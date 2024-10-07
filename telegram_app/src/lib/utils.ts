@@ -5,18 +5,13 @@ import * as crypto from "crypto";
 import { twMerge } from "tailwind-merge";
 import { Turnkey } from "@turnkey/sdk-server";
 import { TurnkeySigner } from "@turnkey/solana";
-import {
-  SendTransactionError,
-  LAMPORTS_PER_SOL,
-  sendAndConfirmTransaction,
-} from "@solana/web3.js";
+import { SendTransactionError } from "@solana/web3.js";
 
 import {
   Connection,
   PublicKey,
   Transaction,
   SystemProgram,
-  TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
 import { TelegramApi } from "../telegram/telegram-api";
@@ -378,10 +373,9 @@ export async function transferSOL(
   }
 }
 
-export async function getAllTokensBalance(user_json_string: string) {
-  let user = JSON.parse(user_json_string);
+export async function getAllSolanaTokensBalance(address: string) {
   const connection = new Connection(import.meta.env.VITE_RPC_URL);
-  const publicKey = new PublicKey(user.account_address);
+  const publicKey = new PublicKey(address);
   const tokens = await connection.getParsedTokenAccountsByOwner(publicKey, {
     programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
   });
@@ -394,10 +388,7 @@ export async function copyTrade(data: any) {
       `user_${WebApp.initDataUnsafe.user?.id}`
     );
     let json_user = JSON.parse(user);
-    json_user.tgUserId = data.tgUserId;
-
     if (json_user.sessionApiKeys !== "") {
-      log("Session active", "success");
       // Get turnkey client
       const turnkey = new Turnkey({
         apiBaseUrl: "https://api.turnkey.com",
@@ -419,13 +410,11 @@ export async function copyTrade(data: any) {
 
       // Create a transaction obj from the buffer
       let transaction = VersionedTransaction.deserialize(transactionBuffer);
-      log(`Transaction deserialized`, "success");
       // Sign the transaction with the turnkey signer
       await turnkeySigner.addSignature(
         transaction,
         json_user.accounts[0].address
       );
-      log(`Transaction signed by turnkey`, "success");
 
       let retries = 0;
       let success = false;
@@ -449,6 +438,11 @@ export async function copyTrade(data: any) {
             "success"
           );
           success = true;
+          return {
+            success: success,
+            signature: signature,
+            blockHash: latestBlockHash.blockhash,
+          };
         } catch (error) {
           retries++;
           if (retries < MAX_RETRIES) {
@@ -467,11 +461,21 @@ export async function copyTrade(data: any) {
               );
               let logs = log(`Error: ${error.getLogs(connection)}`, "error");
               log(`Logs: ${JSON.stringify(logs)}`, "error");
+              return {
+                success: false,
+                signature: "",
+                blockHash: "",
+              };
             } else {
               log(
                 `Transaction failed after ${MAX_RETRIES} attempts: ${error}`,
                 "error"
               );
+              return {
+                success: false,
+                signature: "",
+                blockHash: "",
+              };
             }
           }
         }
@@ -485,5 +489,135 @@ export async function copyTrade(data: any) {
     }
   } catch (error) {
     log(`Error in checkUserSessionAndCopyTrade: ${error}`, "error");
+  }
+}
+
+export async function fetchTokenPrice(tokenMint: string) {
+  try {
+    const response = await axios.get(
+      `https://api-v3.raydium.io/mint/price?mints=${tokenMint}`
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+export async function getTokenInfo(tokenMint: string) {
+  try {
+    const response = await axios.get(
+      `https://api-v3.raydium.io/mint/ids?mints=${tokenMint}`
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+export async function getTokenData(tokenMint: string) {
+  try {
+    const info_response = await axios.get(
+      `https://api-v3.raydium.io/mint/ids?mints=${tokenMint}`
+    );
+    const price_response = await axios.get(
+      `https://api-v3.raydium.io/mint/price?mints=${tokenMint}`
+    );
+    return {
+      info: info_response.data,
+      price: price_response.data,
+    };
+  } catch (error) {
+    throw error;
+  }
+}
+
+interface Token {
+  symbol: string;
+  name: string;
+  logoURI: string;
+  balance: string;
+  address: string;
+}
+
+export async function signAndSendTransaction(swapTransaction: string) {
+  try {
+    const user = await TelegramApi.getItem(
+      `user_${WebApp.initDataUnsafe.user?.id}`
+    );
+    const json_user = JSON.parse(user);
+    const turnkey = new Turnkey({
+      apiBaseUrl: "https://api.turnkey.com",
+      apiPrivateKey: json_user.privateKey,
+      apiPublicKey: json_user.publicKey,
+      defaultOrganizationId: json_user.subOrgId,
+    });
+    const turnkeyClient = turnkey.apiClient();
+    const turnkeySigner = new TurnkeySigner({
+      organizationId: json_user.subOrgId,
+      client: turnkeyClient,
+    });
+
+    let connection = new Connection(import.meta.env.VITE_RPC_URL);
+
+    const transactionBuffer = Buffer.from(swapTransaction, "base64");
+
+    let transaction = VersionedTransaction.deserialize(transactionBuffer);
+    await turnkeySigner.addSignature(
+      transaction,
+      json_user.accounts[0].address
+    );
+
+    let retries = 0;
+    let success = false;
+
+    while (retries < MAX_RETRIES && !success) {
+      try {
+        log(`Sending transaction (attempt ${retries + 1})`, "info");
+        const signature = await connection.sendRawTransaction(
+          transaction.serialize()
+        );
+        const latestBlockHash = await connection.getLatestBlockhash();
+        const confirmation = await connection.confirmTransaction({
+          signature,
+          ...latestBlockHash,
+        });
+        log(`RPC Response: ${JSON.stringify(confirmation)}`, "success");
+        log(
+          `Confirmed tx, check:\n https://solscan.io/tx/${signature}`,
+          "success"
+        );
+        return {
+          success: true,
+          signature: signature,
+          blockHash: latestBlockHash.blockhash,
+          error: "",
+        };
+      } catch (error) {
+        retries++;
+        if (retries < MAX_RETRIES) {
+          log(
+            `Transaction failed. Retrying in ${RETRY_DELAY / 1000} seconds...`,
+            "info"
+          );
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+        } else {
+          log(`Transaction failed after ${MAX_RETRIES} attempts`, "error");
+          return {
+            success: false,
+            signature: "",
+            blockHash: "",
+            error: `Transaction failed after ${MAX_RETRIES} attempts`,
+          };
+        }
+      }
+    }
+  } catch (error) {
+    log(`Error in signAndSendTransaction: ${error}`, "error");
+    return {
+      success: false,
+      signature: "",
+      blockHash: "",
+      error: `Error in signAndSendTransaction: ${error}`,
+    };
   }
 }
