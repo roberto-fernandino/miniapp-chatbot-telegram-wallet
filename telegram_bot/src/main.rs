@@ -1,77 +1,130 @@
 use teloxide::prelude::*;
-use teloxide::types::MessageKind;
-use telegram_bot::{call, get_valid_solana_address, is_pnl_command, is_lb_command, pnl, leaderboard, there_is_valid_solana_address, user_stats};
+use teloxide::types::{CallbackQuery, Message};
+use teloxide::{dispatching::UpdateFilterExt, Bot};
+mod utils;
 mod db;
+use telegram_bot::*;
+use telegram_bot::format_number;
+
 #[tokio::main]
 async fn main() {
     pretty_env_logger::init();
     log::info!("Starting bot...");
 
     let bot = Bot::from_env();
-    
-    // Start the telegram bot
-    teloxide::repl(bot, |bot: Bot, msg: Message| async move {
-        // Get the database connection
-        let con = db::get_connection();
-        // Configure the database
-        db::configure_db(&con);
 
-        // Check if the message is a common message
-        if let MessageKind::Common(ref common) = msg.kind {
-            // Check if the message is in a group, supergroup, or channel
-            if msg.chat.is_group() || msg.chat.is_supergroup()  || msg.chat.is_channel() {
-                // Check if the message has text
-                if let Some(text) = msg.text() {
-                    // Check if the message is a pnl command
-                    if is_pnl_command(text) {
-                        // Get the pnl
-                        match pnl(&msg, &bot).await {
-                            Ok(_) => (),
-                            Err(e) => log::error!("Failed to pnl: {:?}", e),
-                        }
-                    }
-                    // Check if the message is a leaderboard command
-                    else if is_lb_command(text) {
-                        // Get the leaderboard
-                        match leaderboard(&msg, &bot).await {
-                            Ok(_) => (),
-                            Err(e) => log::error!("Failed to leaderboard: {:?}", e),
-                        }
-                    }
-                    // Check if there's a valid solana address in the message
-                    else if there_is_valid_solana_address(text) {
-                        // Get the valid solana address
-                        let address = get_valid_solana_address(text);
-                        match address {
-                            Some(address) => {
-                                // Call the address
-                                match call(&address, &bot, &msg).await {
-                                    Ok(_) => (),
-                                    Err(e) => log::error!("Failed to call: {:?}", e),
-                                }
-                            }
-                            None => {}
-                        }
-                    }
-                }
+    let handler = dptree::entry()
+        .branch(Update::filter_message().endpoint(handle_message))
+        .branch(Update::filter_callback_query().endpoint(handle_callback_query));
+
+    Dispatcher::builder(bot, handler)
+        .enable_ctrlc_handler()
+        .build()
+        .dispatch()
+        .await;
+}
+
+async fn handle_message(bot: Bot, msg: Message) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Check if the message is a pnl command
+    let con = db::get_connection();
+    if let Some(text) = msg.text() {
+        if is_pnl_command(text) {
+            // Get the pnl
+        match pnl(&msg, &bot).await {
+            Ok(_) => (),
+            Err(e) => log::error!("Failed to pnl: {:?}", e),
             }
-            // Check if the message is a user stats command
-            if msg.chat.is_chat() {
-                if let Some(text) = msg.text() {
-                    if text.starts_with("/start user_") {
-                        // Get the user tg id
-                        if let Some(user_tg_id) = text.strip_prefix("/start user_") {
-                            // Send the user stats
-                            match user_stats(user_tg_id, &bot, &msg).await {
-                                Ok(_) => (),
-                                Err(e) => log::error!("Failed to user_stats: {:?}", e),
-                            }
+        }
+        // Check if the message is a leaderboard command
+        else if is_lb_command(text) {
+            // Get the leaderboard
+            match leaderboard(&msg, &bot).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to leaderboard: {:?}", e),
+            }
+        }
+        else if msg.chat.is_chat() {
+            if let Some(text) = msg.text() {
+                if text.starts_with("/start user_") {
+                    // get the user id
+                    if let Some(user_id) = text.strip_prefix("/start user_") {
+                        // get the user stats
+                        match user_stats(user_id, &bot, &msg).await {
+                            Ok(_) => (),
+                            Err(e) => log::error!("Failed to user stats: {:?}", e),
                         }
                     }
                 }
             }
         }
-        Ok(())
-    })
-    .await;
+        // Check if there's a valid solana address in the message
+        else if there_is_valid_solana_address(text) {
+            // Get the valid solana address
+            let address = get_valid_solana_address(text);
+            // First call info
+            let mut call_info_str = String::new();
+            let is_first_call = db::is_first_call(&con,address.as_ref().unwrap(), msg.chat.id.to_string().as_str());
+            if !is_first_call {
+                let first_call = db::get_first_call_token_chat(&con, address.as_ref().unwrap(), msg.chat.id.to_string().as_str());
+                if let Some(first_call) = first_call{
+                    let user_called_first = db::get_user(&con, first_call.user_tg_id.as_str()).expect("User not found");
+                    call_info_str.push_str(&format!("😈 <a href=\"https://t.me/sj_copyTradebot?start=user_{}\"><i><b>{}</b></i></a> @ {}", first_call.user_tg_id,  user_called_first.username, format_number(first_call.mkt_cap.parse::<f64>().unwrap_or(0.0))));
+                }
+            } 
+            match address {
+                Some(address) => {
+                    // Call the address
+                    match call(&address, &bot, &msg, call_info_str).await {
+                        Ok(_) => (),
+                        Err(e) => log::error!("Failed to call: {:?}", e),
+                    }
+                }
+                None => {}
+            }
+        }   
+
+    }
+    Ok(())
+}
+
+async fn handle_callback_query(bot: Bot, query: CallbackQuery) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    
+    if let Some(data) = query.data.as_ref() {
+        if data.starts_with("del_call:") {
+            log::info!("Deleting call...");
+            // Extract the call ID
+            let call_id = data.strip_prefix("del_call:").unwrap_or_default();
+            if let Ok(call_id_num) = call_id.parse::<u64>() {
+                // Get the database connection
+                let con = db::get_connection();
+                
+                // Attempt to delete the call
+                match db::delete_call(&con, call_id_num) {
+                    Ok(_) => {
+                        log::info!("Call deleted successfully: {}", call_id_num);
+                        bot.answer_callback_query(query.id)
+                            .text("Call deleted successfully!")
+                            .await?;
+                    },
+                    Err(e) => {
+                        log::error!("Failed to delete call {}: {:?}", call_id_num, e);
+                        bot.answer_callback_query(query.id)
+                            .text("Failed to delete call.")
+                            .await?;
+                    },
+                }
+            } else {
+                log::error!("Invalid call ID: {}", call_id);
+                bot.answer_callback_query(query.id)
+                    .text("Invalid call ID.")
+                    .await?;
+            }
+        } else {
+            log::info!("Unrecognized callback query data: {}", data);
+        }
+    } else {
+        log::info!("Callback query without data");
+    }
+    
+    Ok(())
 }
