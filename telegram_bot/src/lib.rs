@@ -1,4 +1,5 @@
-use regex::Regex;
+
+use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 use chrono::Duration;
 use chrono::{DateTime,Utc, NaiveDateTime};
 use teloxide::prelude::*;
@@ -6,9 +7,10 @@ use sqlite::Connection;
 use reqwest::Client;
 use anyhow::Result;
 use serde_json::Value;
+mod utils;
 mod db;
-use db::Call;
-
+use db::{Call, User};
+use regex::Regex;
 /// Check if there's a valid solana address in a text
 /// 
 /// # Arguments
@@ -139,7 +141,7 @@ pub async fn get_ath(timestamp: i64, token_address: &str) -> Result<Value> {
 /// # Returns
 /// 
 /// A string containing the formatted number
-fn format_number(num: f64) -> String {
+pub fn format_number(num: f64) -> String {
     if num >= 1_000_000.0 {
         format!("{:.1}M", num / 1_000_000.0)
     } else if num >= 1_000.0 {
@@ -272,33 +274,38 @@ fn format_age(duration: Duration) -> String {
 /// # Returns
 /// 
 /// A string containing the formatted message
-pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value, username: Option<String>) -> String {
+pub fn call_message(con: &Connection, ath_response: &Value, holders_response: &Value, scanner_response: &Value,  mut call_info_str: String, user: User) -> String {
     // Main info
-    let pair_address = data["pair"]["pairAddress"].as_str().unwrap_or("");
-    let token_symbol = data["pair"]["token1Symbol"].as_str().unwrap_or("N/A").to_uppercase();
-    let token_usd_price = format!("{:.8}", data["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0)).parse::<f64>().unwrap_or(0.0);
-    let age = age_token(data["pair"]["pairCreatedAt"].as_str().unwrap_or(""));
-    let circulating_supply = data["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
-
-
+    let pair_address = scanner_response["pair"]["pairAddress"].as_str().unwrap_or("");
+    let token_symbol = scanner_response["pair"]["token1Symbol"].as_str().unwrap_or("N/A").to_uppercase();
+    let token_usd_price = format!("{:.8}", scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0)).parse::<f64>().unwrap_or(0.0);
+    let age = age_token(scanner_response["pair"]["pairCreatedAt"].as_str().unwrap_or(""));
+    let circulating_supply = scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    
     // Stats
-    let fdv = format_number(data["pair"]["fdv"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
+    let fdv = format_number(scanner_response["pair"]["fdv"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
 
     // Ath 
     let ath = format_number(ath_response["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * circulating_supply);
     let ath_date = time_ago(ath_response["athTimestamp"].as_str().unwrap_or(""));
-
+    
     // Liq
-    let pair_reserves0 = data["pair"]["pairReserves0Usd"].as_str().unwrap_or("0");
-    let pair_reserves1 = data["pair"]["pairReserves1Usd"].as_str().unwrap_or("0");
+    let pair_reserves0 = scanner_response["pair"]["pairReserves0Usd"].as_str().unwrap_or("0");
+    let pair_reserves1 = scanner_response["pair"]["pairReserves1Usd"].as_str().unwrap_or("0");
     let liquidity = format_number(calculate_liquidity(pair_reserves0.parse::<f64>().unwrap_or(0.0), pair_reserves1.parse::<f64>().unwrap_or(0.0)));
+    
+    let volume = format_number(scanner_response["pairStats"]["twentyFourHour"]["volume"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
+    let mkt_cap = format_number(scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
+    log::info!("mkt_cap: {}", mkt_cap);
 
-    let volume = format_number(data["pairStats"]["twentyFourHour"]["volume"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
-    let mkt_cap = format_number(data["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * data["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
-
+   //  If is first call, call_info_str com empty from @call function, so we need to add the first call info
+    if call_info_str == "" {
+        call_info_str = format!("🔥 First Call <a href=\"https://t.me/sj_copyTradebot?start=user_{}\"><i><b>{}</b></i></a> @ {}\n",user.id,  user.username, mkt_cap);
+        call_info_str.push_str(&format!("└ Calls today: {} 🎉", db::get_qtd_calls_user_made_in_24hrs(&con, user.tg_id.as_str())));
+    }   
     // One hour change
-    let one_hour_first = data["pairStats"]["oneHour"]["first"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
-    let one_hour_last = data["pairStats"]["oneHour"]["last"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    let one_hour_first = scanner_response["pairStats"]["oneHour"]["first"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    let one_hour_last = scanner_response["pairStats"]["oneHour"]["last"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
     let one_hour_change = if one_hour_first != 0.0 {
         ((one_hour_last / one_hour_first) - 1.0) * 100.0
     } else {
@@ -306,23 +313,22 @@ pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value
     };
     let one_hour_change_str = format!("{:.2}", one_hour_change);
     // 24 hour change
-    let twenty_four_hour_first = data["pairStats"]["twentyFourHour"]["first"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
-    let twenty_four_hour_last = data["pairStats"]["twentyFourHour"]["last"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    let twenty_four_hour_first = scanner_response["pairStats"]["twentyFourHour"]["first"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    let twenty_four_hour_last = scanner_response["pairStats"]["twentyFourHour"]["last"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
     let twenty_four_hour_change = if twenty_four_hour_first != 0.0 {
         ((twenty_four_hour_last / twenty_four_hour_first) - 1.0) * 100.0
     } else {
         0.0
     };
-    let twenty_four_hour_change_str = format!("{:.2}", twenty_four_hour_change);
-
+    let twenty_four_hour_change_str = format_number(twenty_four_hour_change);
+    
     // Info
-    let buy_volume = format_number(data["pairStats"]["oneHour"]["buyVolume"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
-    let buys = data["pairStats"]["oneHour"]["buys"].as_i64().unwrap_or(0);
-    let sells = data["pairStats"]["oneHour"]["sells"].as_i64().unwrap_or(0);
-    let lp = if data["pair"]["totalLockedRatio"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) > 0.0 { "🔥" } else { "🔴" };
-    let token_address = data["pair"]["token1Address"].as_str().unwrap_or("");
-    let username = username.unwrap_or("Not found".to_string());
-    let verified = if data["pair"]["isVerified"].as_bool().unwrap_or(false) { "🟢" } else { "🔴" };
+    let buy_volume = format_number(scanner_response["pairStats"]["oneHour"]["buyVolume"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
+    let buys = scanner_response["pairStats"]["oneHour"]["buys"].as_i64().unwrap_or(0);
+    let sells = scanner_response["pairStats"]["oneHour"]["sells"].as_i64().unwrap_or(0);
+    let lp = if scanner_response["pair"]["totalLockedRatio"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) > 0.0 { "🔥" } else { "🔴" };
+    let token_address = scanner_response["pair"]["token1Address"].as_str().unwrap_or("");
+    let verified = if scanner_response["pair"]["isVerified"].as_bool().unwrap_or(false) { "🟢" } else { "🔴" };
     let mut holders_str = String::new();
     let mut count = 0;
     for holder in holders_response["holders"].as_array().unwrap_or(&Vec::new()).iter() {
@@ -332,13 +338,10 @@ pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value
         let holder_address = holder["holderAddress"].as_str().unwrap_or("");
         let percent = holder["percent"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * 100.0;
         let percent_str = format!("{:.2}", percent);
-        let token_balance = holder["balanceFormatted"].as_f64().unwrap_or(0.0);
-        // let usd_amount = token_balance * token_usd_price;
-        // let usd_amount_str = format_number(usd_amount);
         if count == 1 {
             holders_str.push_str(&format!("👥 TH: <a href=\"https://solscan.io/account/{holder_address}\">{percent_str}⋅</a>"));
         } 
-        if count > 1{
+        if count > 1 {
             holders_str.push_str(&format!("<a href=\"https://solscan.io/account/{holder_address}\">{percent_str}</a>⋅"));
         }
         if count == 4 {
@@ -347,9 +350,9 @@ pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value
         count += 1;
     }
     // links
-    let twitter = data["pair"]["linkTwitter"].as_str().unwrap_or("");
-    let website = data["pair"]["linkWebsite"].as_str().unwrap_or("");   
-    let telegram = data["pair"]["linkTelegram"].as_str().unwrap_or("");
+    let twitter = scanner_response["pair"]["linkTwitter"].as_str().unwrap_or("");
+    let website = scanner_response["pair"]["linkWebsite"].as_str().unwrap_or("");   
+    let telegram = scanner_response["pair"]["linkTelegram"].as_str().unwrap_or("");
 
     let mut links = String::new();
     if !twitter.is_empty() {
@@ -381,11 +384,11 @@ pub fn call_message(ath_response: &Value, holders_response: &Value, data: &Value
         {holders_str}\n\
         LP: {lp} Mint:{verified}\n\
         {links_section}\
-        🪙 <code>{token_address}</code>\n\n\
-        👨‍💼 @{username}\n\
+        <code>{token_address}</code>\n\n\
+        👨‍💼 @{}\n\
+        {call_info_str}\n\
         🏆 <a href=\"https://app.dexcelerate.com/terminal/SOL/{token_address}\">See on #1 dex</a>\n\
-        "
-    )
+        ", user.username)
 }
 
 /// Struct to hold the PNL call information
@@ -450,10 +453,8 @@ pub fn pnl_message(connection: &Connection, pnl_call: PnlCall, symbol: &str, pai
     let call = db::get_call_by_id(connection, pnl_call.call_id).expect("Call not found");
     let user = db::get_user(connection, call.user_tg_id.as_str()).expect("User not found");
     let mkt_cap_called = format_number(call.mkt_cap.parse::<f64>().unwrap_or(0.0));
-    let mkt_cap_now = format_number(pnl_call.mkt_cap.parse::<f64>().unwrap_or(0.0));
     let win_loss;
     let percent = pnl_call.percent.parse::<f64>().unwrap_or(0.0);
-    let percent_str = format!("{:.2}", percent);
     let multiplier = if percent >= 0.0 {
         1.0 + (percent / 100.0)
     } else {
@@ -474,14 +475,11 @@ pub fn pnl_message(connection: &Connection, pnl_call: PnlCall, symbol: &str, pai
     
     format!("
     <a href=\"https://app.dexcelerate.com/terminal/SOL/{pair_address}\">${uppercase_symbol}</a>\n\
-    {win_loss} {percent_str}% | {multiplier_str}x\n\
-    🪙 <code>{}</code>\n\n\
-    💰 Mkt Cap called: <code>{}</code>\n\
-    💰 Mkt Cap now: <code>{}</code>\n\n\
-    🔥 Called by: @{}\n\
-    ⏰ Time: {} UTC\n\n\
+    {win_loss}  {multiplier_str}x\n\
+    💰 Called at: <code>{}</code>\n\
+    Called by: @{}\n\
     🏆 <a href=\"https://app.dexcelerate.com/terminal/SOL/{pair_address}\">See on #1 dex</a>\n\
-    ",  pnl_call.token_address, mkt_cap_called, mkt_cap_now, user.username, call.time)
+    ",  mkt_cap_called, user.username)
     
 }
 
@@ -569,7 +567,7 @@ pub async fn get_holders(address: &str) -> Result<Value> {
 /// # Returns
 /// 
 /// An Ok result
-pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message) -> Result<()> {
+pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message, call_info_str: String) -> Result<()> {
     let con = db::get_connection();
     db::configure_db(&con);
     // Get the pair address and token address
@@ -608,10 +606,9 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
 
                         let ath_response = get_ath(unix_timestamp_milis, address).await?;
                         let holders_response = get_holders(address).await?;
-
                         let chat_id = msg.clone().chat.id.to_string();
                         // Add the call to the database
-                        match db::add_call(
+                        let call_id = match db::add_call(
                             &con, 
                             user_id_str, 
                             &scanner_search["pair"]["fdv"].as_str().unwrap_or("0"), 
@@ -620,23 +617,39 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                             &scanner_search["pair"]["pairPrice1Usd"].as_str().unwrap_or("0"),
                             chat_id.as_str(),
                         ) {
-                            Ok(_) => {
-                                log::info!("Call added to database");
+                            Ok(id) => {
+                                id
                             }
                             Err(e) => {
                                 log::error!("Failed to add call to database: {:?}", e);
+                                0
                             }
-                        }
+                        };
+
+                        let keyboard =  InlineKeyboardMarkup::new(vec![vec![
+                            InlineKeyboardButton::callback("🔭 Just Scanning", format!("del_call:{}", call_id))
+                        ]]);
+                        
                         // Send the call message
                         bot.send_message(
                             msg.chat.id,
                             call_message(
+                                &con,
                                 &ath_response,
                                 &holders_response,
                                 &scanner_search,
-                                Some(msg.from.clone().unwrap().username.clone().unwrap_or("".to_string()))
+                                call_info_str,
+                                user.unwrap()
                             )
                         )
+                        .reply_markup(keyboard)
+                        .link_preview_options(teloxide::types::LinkPreviewOptions {
+                            is_disabled: true,
+                            url: None,
+                            prefer_small_media: false,
+                            prefer_large_media: false,
+                            show_above_text: false,
+                        })
                         .parse_mode(teloxide::types::ParseMode::Html)
                         .await?;
                     }
@@ -923,6 +936,7 @@ pub async fn best_call_user(user_tg_id: &str) -> Result<Option<CallWithAth>> {
 /// 
 /// An Ok result
 pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message) -> Result<()> {
+    log::info!("User stats called");
     let con = db::get_connection();
     let user_calls = db::get_all_calls_user_tg_id(&con, user_tg_id);
     let best_call = match best_call_user(user_tg_id).await {
@@ -961,8 +975,10 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
     let mut learderboard_string = String::new();
     let mut count = 1;
     // Create the user leaderboard string
+    let mut multipliers_sum: f64 = 0.0;
     for call in call_lb {
         let multiplier = call.multiplier;
+        multipliers_sum += multiplier;
         if count == 1 {
             learderboard_string.push_str(&format!("👑🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if count == 2 {
@@ -976,8 +992,9 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
         }
         count += 1;
     }
+    let multipliers_avg = multipliers_sum / count as f64;
 
-    bot.send_message(msg.chat.id,user_stats_message(username, calls_count, best_call_multiplier, learderboard_string)).parse_mode(teloxide::types::ParseMode::Html).await?;
+    bot.send_message(msg.chat.id,user_stats_message(username, calls_count, multipliers_sum, multipliers_avg, learderboard_string)).parse_mode(teloxide::types::ParseMode::Html).await?;
     Ok(())
 }
 
@@ -993,11 +1010,11 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
 /// # Returns
 /// 
 /// A String representing the user stats message
-pub fn user_stats_message(username: String, calls_count: usize, best_call_multiplier: f64, learderboard_string: String) -> String {
+pub fn user_stats_message(username: String, calls_count: usize, multipliers_sum: f64, multipliers_avg: f64, learderboard_string: String) -> String {
     format!("
     🥷 @{username}\n\
     ├ Calls: <code>{calls_count}</code>\n\
-    └ Return: <code>{best_call_multiplier:.2}x</code>\n\n\
+    └ Return: <code>{multipliers_sum:.2}x</code> ({multipliers_avg:.2}% avg)\n\n\
     <blockquote>\
     {learderboard_string}
     </blockquote>\n\
