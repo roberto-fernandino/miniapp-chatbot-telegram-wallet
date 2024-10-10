@@ -1,4 +1,4 @@
-
+use crate::utils::helpers::check_period;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 use chrono::Duration;
 use chrono::{DateTime,Utc, NaiveDateTime};
@@ -11,18 +11,20 @@ mod utils;
 mod db;
 use db::{Call, User};
 use regex::Regex;
+
 /// Check if there's a valid solana address in a text
 /// 
 /// # Arguments
 /// 
-/// * `address` - The address to check
+/// * `message` - The message to check
 /// 
 /// # Returns
 /// 
 /// A boolean indicating if the address is a valid solana address
-pub fn there_is_valid_solana_address(address: &str) -> bool {
+pub fn there_is_valid_solana_address(message: &str) -> bool {
     let re = Regex::new(r"[1-9A-HJ-NP-Za-km-z]{32,44}").unwrap();
-    re.is_match(address)
+    re.is_match(message)
+
 }
 
 /// Get the valid solana address from a text
@@ -568,6 +570,7 @@ pub async fn get_holders(address: &str) -> Result<Value> {
 /// 
 /// An Ok result
 pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message, call_info_str: String) -> Result<()> {
+    log::info!("Calling address: {:?}", address);
     let con = db::get_connection();
     db::configure_db(&con);
     // Get the pair address and token address
@@ -696,52 +699,7 @@ pub struct CallWithAth {
     pub multiplier: f64,
 }
 
-/// Convert a time string to a timestamp
-/// 
-/// # Arguments
-/// 
-/// * `time` - The time string
-/// 
-/// # Returns
-/// 
-/// An i64 timestamp
-pub async fn time_to_timestamp(time: &str) -> i64 {
-    log::info!("time: {:?}", time);
-    let format = "%Y-%m-%d %H:%M:%S";
-    let naive_datetime = NaiveDateTime::parse_from_str(time, format)
-        .expect("Failed to parse datetime.");
-    let datetime: DateTime<Utc> = DateTime::from_naive_utc_and_offset(naive_datetime, Utc);
-    datetime.timestamp_millis()
-}
 
-/// Extract the days from a ranking command
-/// 
-/// # Arguments
-/// 
-/// * `command` - The command to extract the days from
-/// 
-/// # Returns
-/// 
-/// An Option containing the days or None
-fn extract_days(command: &str) -> Option<u32> {
-    let re = regex::Regex::new(r"/lb (\d+)d").unwrap();
-    re.captures(command)
-        .and_then(|cap| cap.get(1).map(|m| m.as_str().parse::<u32>().ok()))
-        .flatten()
-}
-
-/// Check if the message is a ranking command
-/// 
-/// # Arguments
-/// 
-/// * `message` - The message to check
-/// 
-/// # Returns
-/// 
-/// A boolean indicating if the message is a ranking command
-pub fn is_lb_command(message: &str) -> bool {
-    message.starts_with("/lb")
-}
 
 /// Get the leaderboard
 /// 
@@ -754,21 +712,54 @@ pub fn is_lb_command(message: &str) -> bool {
 /// 
 /// An Ok result
 pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot) -> Result<()> {
-    let days = extract_days(msg.text().unwrap()).ok_or_else(|| anyhow::anyhow!("Failed to extract days"))?;
+    let period = check_period(msg.text().unwrap());
     let con = db::get_connection();
     let chat_id = msg.chat.id.to_string();
+    let mut calls: Vec<Call> = vec![];
+    let mut period_str: String = String::new();
+    match period {
+        Some(period) => {
+           if period == "Hours" {
+                let hours = utils::helpers::extract_hours(msg.text().unwrap()).unwrap_or(0);
+                period_str = format!("{hours}h");
+                calls = db::get_channel_calls_last_x_hours(&con, chat_id.as_str(), hours);
+                log::info!("Calls: {:?}", calls.len());
+           }
+           if period == "Days"  {
+                let days = utils::helpers::extract_days(msg.text().unwrap()).unwrap_or(0);
+                period_str = format!("{days}d");
+                calls = db::get_channel_calls_last_x_days(&con, chat_id.as_str(), days);
+           }
+           if period == "Months" {
+                let months = utils::helpers::extract_months(msg.text().unwrap()).unwrap_or(0);
+                period_str = format!("{months}m");
+                calls = db::get_channel_calls_last_x_months(&con, chat_id.as_str(), months);
+            }
+            if period == "Years"{
+                let years = utils::helpers::extract_years(msg.text().unwrap()).unwrap_or(0);
+                period_str = format!("{years}y");
+                calls = db::get_channel_calls_last_x_years(&con, chat_id.as_str(), years)
+           }
+        }
+        None => {
+            period_str = "1d".to_string();
+            calls = db::get_channel_calls_last_x_days(&con, chat_id.as_str(), 1);
+        }
+    }
     let mut lb = Vec::new();
     let mut unique_tokens = std::collections::HashSet::new();
-
-    let calls_last_x_days = db::get_channel_calls_last_x_days(&con, chat_id.as_str(), days as i32);
-    for call in calls_last_x_days {
+    for call in calls {
         // Check if the token is already in the unique_tokens set
         if unique_tokens.insert(call.token_address.clone()) {
             // If the token is not in the set, add it and process the call
-            let ath = get_ath(time_to_timestamp(call.time.as_str()).await, call.token_address.as_str()).await?;
-            log::info!("ath: {:?}", ath);
+            let ath = get_ath(
+                utils::helpers::time_to_timestamp(call.time.as_str()).await, call.token_address.as_str()
+            ).await?;
+
             let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+
             let multiplier = ath_after_call / call.price.parse::<f64>().unwrap_or(0.0);
+
             let call_with_ath = CallWithAth {
                 call: call,
                 ath_after_call: ath_after_call,
@@ -782,7 +773,7 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot) ->
     lb.sort_by(|a, b| b.multiplier.partial_cmp(&a.multiplier).unwrap_or(std::cmp::Ordering::Equal));
 
 
-    bot.send_message(msg.chat.id, leaderboard_message(lb, days, msg.chat.first_name().unwrap_or(""))).parse_mode(teloxide::types::ParseMode::Html).await?;
+    bot.send_message(msg.chat.id, leaderboard_message(lb, period_str, msg.chat.first_name().unwrap_or(""))).parse_mode(teloxide::types::ParseMode::Html).await?;
 
     Ok(())
 }
@@ -842,7 +833,7 @@ fn get_user_average_multiplier(lb: &[CallWithAth], user_tg_id: String) -> f64 {
 /// # Returns
 /// 
 /// A String representing the leaderboard message
-pub fn leaderboard_message(lb: Vec<CallWithAth>, days: u32, channel_name: &str) -> String {
+pub fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, channel_name: &str) -> String {
     let con = db::get_connection();
     let mut learderboard_string = String::new();
     let mut count = 1;
@@ -857,7 +848,7 @@ pub fn leaderboard_message(lb: Vec<CallWithAth>, days: u32, channel_name: &str) 
             let mvp_average_multiplier = get_user_average_multiplier(&lb, call.call.user_tg_id.to_string());
             mvp_string.push_str(&format!("👑 {}\n", channel_name));
             mvp_string.push_str(&format!("├ <code>MVP:</code>               <b>@{}</b>\n", username));
-            mvp_string.push_str(&format!("├ <code>Period:</code>         <b>{}d</b>\n", days));
+            mvp_string.push_str(&format!("├ <code>Period:</code>         <b>{}</b>\n", period_str));
             mvp_string.push_str(&format!("├ <code>Calls:</code>           <b>{}</b>\n", calls_count));
             mvp_string.push_str(&format!("└ <code>Return:</code>         <b>{:.2}x</b>\n", mvp_average_multiplier));
         }
@@ -900,7 +891,7 @@ pub async fn best_call_user(user_tg_id: &str) -> Result<Option<CallWithAth>> {
     let mut best_call: Option<CallWithAth> = None;
     let mut count = 0;
     for call in user_calls {
-        let ath = get_ath(time_to_timestamp(call.time.as_str()).await, call.token_address.as_str()).await?;
+        let ath = get_ath(utils::helpers::time_to_timestamp(call.time.as_str()).await, call.token_address.as_str()).await?;
         let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
         let multiplier = ath_after_call / call.price.parse::<f64>().unwrap_or(0.0);
         
@@ -949,17 +940,15 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
     };
     let username = user.username;
     let calls_count = user_calls.len();
-    let best_call_multiplier = best_call.clone().unwrap().multiplier;
     let mut call_lb = Vec::new();   
     let mut seen_tokens = std::collections::HashSet::new(); // Track seen tokens
-
     for call in user_calls {
         if seen_tokens.contains(&call.token_symbol) {
             continue; // Skip if token has already been processed
         }
         seen_tokens.insert(call.token_symbol.clone()); // Mark token as seen
 
-        let ath = get_ath(time_to_timestamp(call.time.as_str()).await, call.token_address.as_str()).await?;
+        let ath = get_ath(utils::helpers::time_to_timestamp(call.time.as_str()).await, call.token_address.as_str()).await?;
         let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
         let multiplier = ath_after_call / call.price.parse::<f64>().unwrap_or(0.0);
         call_lb.push(CallWithAth {
@@ -975,10 +964,14 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
     let mut learderboard_string = String::new();
     let mut count = 1;
     // Create the user leaderboard string
-    let mut multipliers_sum: f64 = 0.0;
+    let mut percent_sum: f64 = 0.0;
+    let mut hits = 0;
     for call in call_lb {
         let multiplier = call.multiplier;
-        multipliers_sum += multiplier;
+        percent_sum += multiplier * 100.0;
+        if multiplier > 2.0 {
+            hits += 1;
+        }
         if count == 1 {
             learderboard_string.push_str(&format!("👑🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if count == 2 {
@@ -992,9 +985,13 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
         }
         count += 1;
     }
-    let multipliers_avg = multipliers_sum / count as f64;
+    let hit_rate = hits as f64 / count as f64 * 100.0;
+    percent_sum -= 100.0;
+    let multipliers_sum = percent_sum / 100.0;
+    let multipliers_avg = percent_sum / 100.0 / count as f64;
+    log::info!("Multipliers sum: {:?} multipleirs avg: {:?}", multipliers_sum, multipliers_avg);
 
-    bot.send_message(msg.chat.id,user_stats_message(username, calls_count, multipliers_sum, multipliers_avg, learderboard_string)).parse_mode(teloxide::types::ParseMode::Html).await?;
+    bot.send_message(msg.chat.id,user_stats_message(username, calls_count, multipliers_sum, multipliers_avg, learderboard_string, hit_rate)).parse_mode(teloxide::types::ParseMode::Html).await?;
     Ok(())
 }
 
@@ -1010,11 +1007,12 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
 /// # Returns
 /// 
 /// A String representing the user stats message
-pub fn user_stats_message(username: String, calls_count: usize, multipliers_sum: f64, multipliers_avg: f64, learderboard_string: String) -> String {
+pub fn user_stats_message(username: String, calls_count: usize, multipliers_sum: f64, multipliers_avg: f64, learderboard_string: String, hit_rate: f64) -> String {
     format!("
     🥷 @{username}\n\
     ├ Calls: <code>{calls_count}</code>\n\
-    └ Return: <code>{multipliers_sum:.2}x</code> ({multipliers_avg:.2}% avg)\n\n\
+    ├ Hit rate: <code>{hit_rate:.2}%</code>\n\
+    └ Return: <code>{multipliers_sum:.2}x</code> ({multipliers_avg:.2}x avg)\n\n\
     <blockquote>\
     {learderboard_string}
     </blockquote>\n\
