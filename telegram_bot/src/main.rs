@@ -88,6 +88,17 @@ async fn handle_message(bot: Bot, msg: Message) -> Result<(), Box<dyn std::error
     Ok(())
 }
 
+/// Handle all the callback queries
+/// 
+/// # Arguments
+/// 
+/// * `bot` - The bot structure
+/// * `query` - The callback query structure
+/// 
+/// # Returns
+/// 
+/// * `Ok(())` - The operation was successful
+/// * `Err(e)` - The operation failed
 async fn handle_callback_query(bot: Bot, query: CallbackQuery) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     
     if let Some(data) = query.data.as_ref() {
