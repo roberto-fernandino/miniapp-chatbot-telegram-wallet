@@ -12,6 +12,7 @@ async fn main() {
     log::info!("Starting bot...");
 
     let bot = Bot::from_env();
+    db::configure_db(&db::get_connection());
 
     let handler = dptree::entry()
         .branch(Update::filter_message().endpoint(handle_message))
@@ -25,26 +26,27 @@ async fn main() {
 }
 
 async fn handle_message(bot: Bot, msg: Message) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    log::info!("Handling message...");
     // Check if the message is a pnl command
     let con = db::get_connection();
     if let Some(text) = msg.text() {
         if is_pnl_command(text) {
+            log::info!("Message is a pnl command");
             // Get the pnl
-        match pnl(&msg, &bot).await {
-            Ok(_) => (),
-            Err(e) => log::error!("Failed to pnl: {:?}", e),
+            match pnl(&msg, &bot).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to pnl: {:?}", e),
             }
         }
         // Check if the message is a leaderboard command
-        else if is_lb_command(text) {
+        else if utils::helpers::is_lb_command(text) {
             // Get the leaderboard
             match leaderboard(&msg, &bot).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to leaderboard: {:?}", e),
             }
         }
-        else if msg.chat.is_chat() {
-            if let Some(text) = msg.text() {
+        else if msg.chat.is_private() {
                 if text.starts_with("/start user_") {
                     // get the user id
                     if let Some(user_id) = text.strip_prefix("/start user_") {
@@ -55,7 +57,6 @@ async fn handle_message(bot: Bot, msg: Message) -> Result<(), Box<dyn std::error
                         }
                     }
                 }
-            }
         }
         // Check if there's a valid solana address in the message
         else if there_is_valid_solana_address(text) {
