@@ -180,7 +180,7 @@ pub fn get_all_calls_chat_id(connection: &Connection, chat_id: &str) -> Vec<Call
 /// # Returns
 /// 
 /// A vector of calls
-pub fn get_channel_calls_last_x_days(connection: &Connection, chat_id: &str, days: i32) -> Vec<Call> {
+pub fn get_channel_calls_last_x_days(connection: &Connection, chat_id: &str, days: u32) -> Vec<Call> {
     let query = format!("
         SELECT * FROM calls 
         WHERE time >= datetime('now', '-{days} day') AND chat_id = ?
@@ -202,6 +202,110 @@ pub fn get_channel_calls_last_x_days(connection: &Connection, chat_id: &str, day
     }
     calls
 }
+
+/// Get all calls made in a channel in the last x hours
+/// 
+/// # Arguments
+/// 
+/// * `connection` - The database connection
+/// * `chat_id` - The chat id
+/// * `hours` - The number of hours to get the calls
+/// 
+/// # Returns
+/// 
+/// A vector of calls
+pub fn get_channel_calls_last_x_hours(connection: &Connection, chat_id: &str, hours: u32) -> Vec<Call> {
+    let query = format!("
+        SELECT * FROM calls 
+        WHERE time >= datetime('now', '-{hours} hour') AND chat_id = ?
+    ");
+    let mut stmt = connection.prepare(query).unwrap();
+    stmt.bind((1, chat_id)).unwrap();
+    let mut calls = Vec::new();
+    while let Ok(State::Row) = stmt.next() {
+        calls.push(Call {
+            id: stmt.read::<i64, _>("id").unwrap() as u64,
+            time: stmt.read::<String, _>("time").unwrap(),
+            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
+            price: stmt.read::<String, _>("price").unwrap(),
+            token_address: stmt.read::<String, _>("token_address").unwrap(),
+            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
+            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
+            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
+        });
+    }
+    calls
+}
+
+/// Get all calls made in a channel in the last x months
+/// 
+/// # Arguments
+/// 
+/// * `connection` - The database connection
+/// * `chat_id` - The chat id
+/// * `months` - The number of months to get the calls
+/// 
+/// # Returns
+/// 
+/// A vector of calls
+pub fn get_channel_calls_last_x_months(connection: &Connection, chat_id: &str, months: u32) -> Vec<Call> {
+    let query = format!("
+        SELECT * FROM calls 
+        WHERE time >= datetime('now', '-{months} month') AND chat_id = ?
+    ");
+    let mut stmt = connection.prepare(query).unwrap();
+    stmt.bind((1, chat_id)).unwrap();
+    let mut calls = Vec::new();
+    while let Ok(State::Row) = stmt.next() {
+        calls.push(Call {
+            id: stmt.read::<i64, _>("id").unwrap() as u64,
+            time: stmt.read::<String, _>("time").unwrap(),
+            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
+            price: stmt.read::<String, _>("price").unwrap(),
+            token_address: stmt.read::<String, _>("token_address").unwrap(),
+            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
+            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
+            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
+        });
+    }
+    calls
+}
+
+/// Get all calls made in a channel in the last x years
+///
+/// # Arguments
+/// 
+/// * `connection` - The database connection
+/// * `chat_id` - The chat id
+/// * `years` - The number of years to get the calls
+/// 
+/// # Returns
+/// 
+/// A vector of calls
+pub fn get_channel_calls_last_x_years(connection: &Connection, chat_id: &str, years: u32) -> Vec<Call> {
+    let query = format!("
+        SELECT * FROM calls 
+        WHERE time >= datetime('now', '-{years} year') AND chat_id = ?
+    ");
+    let mut stmt = connection.prepare(query).unwrap();
+    stmt.bind((1, chat_id)).unwrap();
+    let mut calls = Vec::new();
+    while let Ok(State::Row) = stmt.next() {
+        calls.push(Call {
+            id: stmt.read::<i64, _>("id").unwrap() as u64,
+            time: stmt.read::<String, _>("time").unwrap(),
+            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
+            price: stmt.read::<String, _>("price").unwrap(),
+            token_address: stmt.read::<String, _>("token_address").unwrap(),
+            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
+            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
+            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
+        });
+    }
+    calls
+}
+
+
 
 
 /// Get all calls made by a user
