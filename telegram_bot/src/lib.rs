@@ -1,7 +1,8 @@
 use crate::utils::helpers::check_period;
-use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
+use reqwest::Url;
+use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo};
 use chrono::Duration;
-use chrono::{DateTime,Utc, NaiveDateTime};
+use chrono::{DateTime, Utc};
 use teloxide::prelude::*;
 use sqlite::Connection;
 use reqwest::Client;
@@ -9,7 +10,7 @@ use anyhow::Result;
 use serde_json::Value;
 mod utils;
 mod db;
-use db::{Call, User};
+use db::{get_user_from_call, Call, User};
 use regex::Regex;
 
 /// Check if there's a valid solana address in a text
@@ -387,8 +388,8 @@ pub fn call_message(con: &Connection, ath_response: &Value, holders_response: &V
         LP: {lp} Mint:{verified}\n\
         {links_section}\
         <code>{token_address}</code>\n\n\
-        👨‍💼 @{}\n\
-        {call_info_str}\n\
+        👨‍💼 @{}\n\n\
+        {call_info_str}\n\n\
         🏆 <a href=\"https://app.dexcelerate.com/terminal/SOL/{token_address}\">See on #1 dex</a>\n\
         ", user.username)
 }
@@ -628,10 +629,20 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                                 0
                             }
                         };
-
-                        let keyboard =  InlineKeyboardMarkup::new(vec![vec![
-                            InlineKeyboardButton::callback("🔭 Just Scanning", format!("del_call:{}", call_id))
-                        ]]);
+                        
+                        // BUTTONS MANAGEMENT
+                        // Call info == "" means that is firt call
+                        let mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app")).expect("Invalid URL");
+                        let mut buttons: Vec<InlineKeyboardButton> = vec![];
+                        if call_info_str == "" {
+                            buttons.push(InlineKeyboardButton::callback("🔭 Just Scanning", format!("del_call:{}", call_id)));
+                        }
+                        buttons.push(InlineKeyboardButton::url("💳 Buy now", mini_app_url));
+                        buttons.push(InlineKeyboardButton::callback("🔄 Refresh", format!("refresh:{}", call_id)));
+                        buttons.push(InlineKeyboardButton::callback("🆑 Clear", format!("clear:{}", call_id)));
+                        let keyboard =  InlineKeyboardMarkup::new(vec![
+                            buttons
+                        ]);
                         
                         // Send the call message
                         bot.send_message(
@@ -930,10 +941,6 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
     log::info!("User stats called");
     let con = db::get_connection();
     let user_calls = db::get_all_calls_user_tg_id(&con, user_tg_id);
-    let best_call = match best_call_user(user_tg_id).await {
-        Ok(call) => call,
-        Err(e) => return Err(anyhow::Error::msg("No best call found")),
-    };
     let user = match db::get_user(&con, user_tg_id) {
         Some(user) => user,
         None => return Err(anyhow::Error::msg("User not found")),
@@ -1020,34 +1027,76 @@ pub fn user_stats_message(username: String, calls_count: usize, multipliers_sum:
 }
 
 
+/// Handle the callback query to delete a call
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The bot structure
+/// * `query` - The callback query structure
+/// 
+/// # Returns
+/// 
+/// * `Ok(())` - The operation was successful
+/// * `Err(e)` - The operation failed
 pub async fn handle_callback_del_call(data: String, bot: &teloxide::Bot, query: &teloxide::types::CallbackQuery) -> Result<()> {
     log::info!("Deleting call...");
     // Extract the call ID
+    let con = db::get_connection();
+    let user_tg_id =  query.from.id.to_string();
     let call_id = data.strip_prefix("del_call:").unwrap_or_default();
-    if let Ok(call_id_num) = call_id.parse::<u64>() {
-        // Get the database connection
-        let con = db::get_connection();
+    let call_user = get_user_from_call(&con, call_id).expect("Could not get user from call.");
+    if call_user.tg_id == user_tg_id {
+        if let Ok(call_id_num) = call_id.parse::<u64>() {
+            // Get the database connection
+            // Attempt to delete the call
+            match db::delete_call(&con, call_id_num) {
+                Ok(_) => {
+                    if let Some(ref message) = query.message {
+                        // Edit the message with and put just scanning text on the call 
+                        let call_info_regex = Regex::new(r"(?s)🔥 First Call.*?🎉|😈.*?@.*?\n").unwrap();
+                        match message {
+                            teloxide::types::MaybeInaccessibleMessage::Regular(msg) => {
+                                match msg.text() {
+                                    Some(text) => {
+                                        let updated_text = call_info_regex.replace(text, "‼️ Just Scanning...");
+    
+                                        bot.edit_message_text(msg.chat.id, msg.id, updated_text.to_string())
+                                            .parse_mode(teloxide::types::ParseMode::Html)
+                                            .await?;
+                                    }
+                                    None => {}
+                                }
+                            },
+                            teloxide::types::MaybeInaccessibleMessage::Inaccessible(_) => {
+                                {}
+                            },
+                        };
         
-        // Attempt to delete the call
-        match db::delete_call(&con, call_id_num) {
-            Ok(_) => {
-                log::info!("Call deleted successfully: {}", call_id_num);
-                bot.answer_callback_query(query.id.clone())
-                    .text("Call deleted successfully!")
-                    .await?;
-            },
-            Err(e) => {
-                log::error!("Failed to delete call {}: {:?}", call_id_num, e);
-                bot.answer_callback_query(query.id.clone())
-                    .text("Failed to delete call.")
-                    .await?;
-            },
+                        bot.answer_callback_query(query.id.clone())
+                            .text("Call deleted successfully!")
+                            .await?;
+                    }
+                },
+                Err(e) => {
+                    log::error!("Failed to delete call {}: {:?}", call_id_num, e);
+                    bot.answer_callback_query(query.id.clone())
+                        .text("Failed to delete call.")
+                        .await?;
+                },
+            }
+            
+        } else {
+            log::error!("Invalid call ID: {}", call_id);
+            bot.answer_callback_query(query.id.clone())
+                .text("Invalid call ID.")
+                .await?;
         }
     } else {
-        log::error!("Invalid call ID: {}", call_id);
         bot.answer_callback_query(query.id.clone())
-            .text("Invalid call ID.")
-            .await?;
+            .text("❌ Only the user who sent this call can use the button.")
+            .show_alert(true)
+            .await?; 
     }
     Ok(())
 }
