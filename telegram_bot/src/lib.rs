@@ -633,16 +633,13 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                         // BUTTONS MANAGEMENT
                         // Call info == "" means that is firt call
                         let mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app")).expect("Invalid URL");
-                        let mut buttons: Vec<InlineKeyboardButton> = vec![];
+                        let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
                         if call_info_str == "" {
-                            buttons.push(InlineKeyboardButton::callback("🔭 Just Scanning", format!("del_call:{}", call_id)));
+                            buttons.push(vec![InlineKeyboardButton::callback("🔭 Just Scanning", format!("del_call:{}", call_id))]);
                         }
-                        buttons.push(InlineKeyboardButton::url("💳 Buy now", mini_app_url));
-                        buttons.push(InlineKeyboardButton::callback("🔄 Refresh", format!("refresh:{}", call_id)));
-                        buttons.push(InlineKeyboardButton::callback("🆑 Clear", format!("clear:{}", call_id)));
-                        let keyboard =  InlineKeyboardMarkup::new(vec![
-                            buttons
-                        ]);
+                        buttons.push(vec![InlineKeyboardButton::url("💳 Buy now", mini_app_url)]);
+                        buttons.push(vec![InlineKeyboardButton::callback("🔄 Refresh", format!("refresh:{}", call_id)), InlineKeyboardButton::callback("🆑 Clear", format!("clear:{}", call_id))]);
+                        let keyboard =  InlineKeyboardMarkup::new(buttons);
                         
                         // Send the call message
                         bot.send_message(
