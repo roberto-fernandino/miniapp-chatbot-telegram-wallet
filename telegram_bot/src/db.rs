@@ -442,3 +442,32 @@ pub fn get_qtd_calls_user_made_in_24hrs(connection: &Connection, user_tg_id: &st
         0
     }
 }
+
+
+/// Get the user from a call by the call_id
+/// 
+/// # Arguments
+/// 
+/// * `connection` - The database connection
+/// * `call_id` - The call id
+/// 
+/// # Returns
+/// 
+/// An optional user
+pub fn get_user_from_call(connection: &Connection, call_id: &str) -> Option<User> {
+    let query = "SELECT users.id, users.username, users.tg_id 
+                 FROM calls 
+                 JOIN users ON calls.user_tg_id = users.tg_id 
+                 WHERE calls.id = ?";
+    let mut stmt = connection.prepare(query).unwrap();
+    stmt.bind((1, call_id)).unwrap();
+    if let Ok(State::Row) = stmt.next() {
+        Some(User {
+            id: stmt.read::<i64, _>("id").unwrap() as u64,
+            username: stmt.read::<String, _>("username").unwrap(),
+            tg_id: stmt.read::<String, _>("tg_id").unwrap(),
+        })
+    } else {
+        None
+    }
+}
