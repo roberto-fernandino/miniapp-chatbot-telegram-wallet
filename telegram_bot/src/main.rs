@@ -92,33 +92,9 @@ async fn handle_callback_query(bot: Bot, query: CallbackQuery) -> Result<(), Box
     
     if let Some(data) = query.data.as_ref() {
         if data.starts_with("del_call:") {
-            log::info!("Deleting call...");
-            // Extract the call ID
-            let call_id = data.strip_prefix("del_call:").unwrap_or_default();
-            if let Ok(call_id_num) = call_id.parse::<u64>() {
-                // Get the database connection
-                let con = db::get_connection();
-                
-                // Attempt to delete the call
-                match db::delete_call(&con, call_id_num) {
-                    Ok(_) => {
-                        log::info!("Call deleted successfully: {}", call_id_num);
-                        bot.answer_callback_query(query.id)
-                            .text("Call deleted successfully!")
-                            .await?;
-                    },
-                    Err(e) => {
-                        log::error!("Failed to delete call {}: {:?}", call_id_num, e);
-                        bot.answer_callback_query(query.id)
-                            .text("Failed to delete call.")
-                            .await?;
-                    },
-                }
-            } else {
-                log::error!("Invalid call ID: {}", call_id);
-                bot.answer_callback_query(query.id)
-                    .text("Invalid call ID.")
-                    .await?;
+            match handle_callback_del_call(data.to_string(), &bot, &query).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to delete call: {:?}", e),
             }
         } else {
             log::info!("Unrecognized callback query data: {}", data);

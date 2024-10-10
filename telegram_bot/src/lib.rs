@@ -1018,3 +1018,36 @@ pub fn user_stats_message(username: String, calls_count: usize, multipliers_sum:
     </blockquote>\n\
     ")
 }
+
+
+pub async fn handle_callback_del_call(data: String, bot: &teloxide::Bot, query: &teloxide::types::CallbackQuery) -> Result<()> {
+    log::info!("Deleting call...");
+    // Extract the call ID
+    let call_id = data.strip_prefix("del_call:").unwrap_or_default();
+    if let Ok(call_id_num) = call_id.parse::<u64>() {
+        // Get the database connection
+        let con = db::get_connection();
+        
+        // Attempt to delete the call
+        match db::delete_call(&con, call_id_num) {
+            Ok(_) => {
+                log::info!("Call deleted successfully: {}", call_id_num);
+                bot.answer_callback_query(query.id.clone())
+                    .text("Call deleted successfully!")
+                    .await?;
+            },
+            Err(e) => {
+                log::error!("Failed to delete call {}: {:?}", call_id_num, e);
+                bot.answer_callback_query(query.id.clone())
+                    .text("Failed to delete call.")
+                    .await?;
+            },
+        }
+    } else {
+        log::error!("Invalid call ID: {}", call_id);
+        bot.answer_callback_query(query.id.clone())
+            .text("Invalid call ID.")
+            .await?;
+    }
+    Ok(())
+}
