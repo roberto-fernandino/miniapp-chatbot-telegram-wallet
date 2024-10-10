@@ -13,17 +13,17 @@ services:
       - .env
     container_name: telegram_app
 
-  ngrok:
-    build:
-      context: .
-      dockerfile: Dockerfile.ngrok
-    volumes:
-      - ./scripts/ngrok:/usr/bin/ngrok
-    depends_on:
-      - telegram_app
-    networks:
-      - app-network
-    container_name: ngrok
+  # ngrok:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.ngrok
+  #   volumes:
+  #     - ./scripts/ngrok:/usr/bin/ngrok
+  #   depends_on:
+  #     - telegram_app
+  #   networks:
+  #     - app-network
+  #   container_name: ngrok
 
   redis:
     image: redis:latest
