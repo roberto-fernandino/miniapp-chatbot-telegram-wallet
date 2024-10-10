@@ -1,4 +1,8 @@
+use sqlite::Connection;
+use anyhow::Result;
+use crate::format_number;
 use crate::db::*;
+use teloxide::types::Message;
 use chrono::{NaiveDateTime, Utc, DateTime};
 
 
@@ -122,4 +126,29 @@ pub async fn time_to_timestamp(time: &str) -> i64 {
         .expect("Failed to parse datetime.");
     let datetime: DateTime<Utc> = DateTime::from_naive_utc_and_offset(naive_datetime, Utc);
     datetime.timestamp_millis()
+}
+
+/// Get the call info
+/// 
+/// # Arguments
+/// 
+/// * `address` - The address to get the call info from
+/// * `con` - The database connection
+/// * `msg` - The message structure
+/// 
+/// # Returns
+/// 
+/// A string containing the call info
+pub fn get_call_info(address: &String, con: &Connection, msg: &Message) -> String {
+    // First call info
+    let mut call_info_str = String::new();
+    let is_first_call = is_first_call(&con,address.as_ref(), msg.chat.id.to_string().as_str());
+    if !is_first_call {
+        let first_call = get_first_call_token_chat(&con, address.as_ref(), msg.chat.id.to_string().as_str());
+        if let Some(first_call) = first_call{
+            let user_called_first = get_user(&con, first_call.user_tg_id.as_str()).expect("User not found");
+            call_info_str.push_str(&format!("😈 <a href=\"https://t.me/sj_copyTradebot?start=user_{}\"><i><b>{}</b></i></a> @ {}", first_call.user_tg_id,  user_called_first.username, format_number(first_call.mkt_cap.parse::<f64>().unwrap_or(0.0))));
+        }
+    } 
+    call_info_str
 }
