@@ -620,6 +620,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                             &scanner_search["pair"]["token1Symbol"].as_str().unwrap_or(""),
                             &scanner_search["pair"]["pairPrice1Usd"].as_str().unwrap_or("0"),
                             chat_id.as_str(),
+                            &msg.id.to_string()
                         ) {
                             Ok(id) => {
                                 id
