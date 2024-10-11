@@ -631,9 +631,11 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                         };
                         
                         // BUTTONS MANAGEMENT
-                        // Call info == "" means that is firt call
-                        let mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app")).expect("Invalid URL");
+                        let mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app?openSwap=true&tokenCA={}", token_address)).expect("Invalid URL");
+                        log::info!("mini_app_url: {:?}", mini_app_url);
                         let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
+
+                        // Call info == "" means that is firt call
                         if call_info_str == "" {
                             buttons.push(vec![InlineKeyboardButton::callback("🔭 Just Scanning", format!("del_call:{}", call_id))]);
                         }
