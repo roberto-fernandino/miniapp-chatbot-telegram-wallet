@@ -24,6 +24,7 @@ pub fn configure_db(connection: &Connection) {
             price TEXT,
             user_tg_id INTEGER,
             chat_id TEXT,
+            message_id TEXT,
             FOREIGN KEY (user_tg_id) REFERENCES users (tg_id)
         );"
     ).unwrap();
@@ -46,6 +47,7 @@ pub struct Call {
     pub token_symbol: String,
     pub user_tg_id: String,
     pub chat_id: String,
+    pub message_id: String,
 }
 
 pub fn get_user(connection: &Connection, tg_id: &str) -> Option<User> {
@@ -81,9 +83,10 @@ pub fn add_call(
     token_address: &str, 
     token_symbol: &str, 
     price: &str, 
-    chat_id: &str
+    chat_id: &str,
+    message_id: &str
 ) -> Result<u64> {
-    let query = "INSERT INTO calls (user_tg_id, mkt_cap, token_address, token_symbol, price, chat_id) VALUES (?, ?, ?, ?, ?, ?)";
+    let query = "INSERT INTO calls (user_tg_id, mkt_cap, token_address, token_symbol, price, chat_id, message_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
     
     // Prepare and execute the INSERT statement
     let mut stmt = connection.prepare(query)?;
@@ -93,6 +96,7 @@ pub fn add_call(
     stmt.bind((4, token_symbol)).unwrap();
     stmt.bind((5, price)).unwrap();
     stmt.bind((6, chat_id)).unwrap();
+    stmt.bind((7, message_id)).unwrap();
     stmt.next().unwrap();  // Execute the insert
 
     // Query to get the last inserted row ID using SQLite's built-in function
@@ -120,6 +124,7 @@ pub fn get_call(connection: &Connection, token_address: &str, chat_id: &str) -> 
             price: stmt.read::<String, _>("price").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
+            message_id: stmt.read::<String, _>("message_id").unwrap(),
         })
     } else {
         None
@@ -141,6 +146,7 @@ pub fn get_call_by_id(connection: &Connection, id: u64) -> Option<Call> {
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
+            message_id: stmt.read::<String, _>("message_id").unwrap(),
         })
     } else {
         None
@@ -164,6 +170,7 @@ pub fn get_all_calls_chat_id(connection: &Connection, chat_id: &str) -> Vec<Call
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
+            message_id: stmt.read::<String, _>("message_id").unwrap(),
         });
     }
     calls
@@ -198,6 +205,7 @@ pub fn get_channel_calls_last_x_days(connection: &Connection, chat_id: &str, day
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
+            message_id: stmt.read::<String, _>("message_id").unwrap(),
         });
     }
     calls
@@ -232,6 +240,7 @@ pub fn get_channel_calls_last_x_hours(connection: &Connection, chat_id: &str, ho
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
+            message_id: stmt.read::<String, _>("message_id").unwrap(),
         });
     }
     calls
@@ -266,6 +275,7 @@ pub fn get_channel_calls_last_x_months(connection: &Connection, chat_id: &str, m
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
+            message_id: stmt.read::<String, _>("message_id").unwrap(),
         });
     }
     calls
@@ -300,6 +310,7 @@ pub fn get_channel_calls_last_x_years(connection: &Connection, chat_id: &str, ye
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
+            message_id: stmt.read::<String, _>("message_id").unwrap(),
         });
     }
     calls
@@ -333,6 +344,7 @@ pub fn get_all_calls_user_tg_id(connection: &Connection, user_tg_id: &str) -> Ve
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
+            message_id: stmt.read::<String, _>("message_id").unwrap(),
         });
     }
     calls
@@ -398,6 +410,7 @@ pub fn get_first_call_token_chat(connection: &Connection, token_address: &str, c
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
+            message_id: stmt.read::<String, _>("message_id").unwrap(),
         })
     } else {
         None
