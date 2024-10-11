@@ -98,11 +98,13 @@ const App: React.FC = () => {
   const rootTurnkeyClient = turnkey.apiClient();
 
   async function getBalance(address: string): Promise<string> {
-    const rpcUrl = import.meta.env.VITE_RPC_URL;
+    const rpcUrl =
+      "https://blue-bitter-sunset.solana-mainnet.quiknode.pro/0815d1ca6447e541dbdcd88286dc70013d9151ec";
 
     if (!rpcUrl.startsWith("http://") && !rpcUrl.startsWith("https://")) {
       throw new Error("VITE_RPC_URL must start with http:// or https://");
     }
+    log(`rpc url: ${rpcUrl}`, "info");
 
     const connection = new Connection(rpcUrl);
     const publicKey = new PublicKey(address);
