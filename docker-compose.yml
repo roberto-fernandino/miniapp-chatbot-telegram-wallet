@@ -84,6 +84,7 @@ services:
 
 volumes:
   redis-data:
+  telegram_node_modules:
 
 networks:
   app-network:
