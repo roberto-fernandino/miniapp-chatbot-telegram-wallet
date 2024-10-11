@@ -400,6 +400,7 @@ const App: React.FC = () => {
   const initializeApp = async () => {
     // Initialize Telegram API
     TelegramApi.init();
+    WebApp.ready();
     setIsLoading(true);
     checkSessionApiKeys();
     const user = await TelegramApi.getItem(
