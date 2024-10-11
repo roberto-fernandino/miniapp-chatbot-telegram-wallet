@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Connection, PublicKey } from "@solana/web3.js";
 import SolanaIcon from "./assets/sol.png";
 import SwapSheet from "./components/ui/SwapSheet";
 import {
@@ -17,7 +18,6 @@ import {
   getCopyTrades,
   decryptPassword,
   encryptPassword,
-  getBalance,
   getSOLPrice,
   transferSOL,
   copyTrade,
@@ -96,6 +96,17 @@ const App: React.FC = () => {
     defaultOrganizationId: import.meta.env.VITE_TURNKEY_ORGNIZATION!,
   });
   const rootTurnkeyClient = turnkey.apiClient();
+
+  async function getBalance(address: string): Promise<string> {
+    log(`${import.meta.env.VITE_RPC_URL}`, "info");
+    const connection = new Connection(import.meta.env.VITE_RPC_URL);
+    log(`${connection}`, "info");
+    const publicKey = new PublicKey(address);
+    log(`${publicKey}`, "info");
+    const balance = await connection.getBalance(publicKey);
+    log(`${balance}`, "info");
+    return (balance / 1e9).toFixed(4); // Convert lamports to SOL and format to 4 decimal places
+  }
 
   async function updateCopyTrades() {
     const getCopyTradesResponse = await getCopyTrades(
