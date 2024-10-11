@@ -3,8 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.telegram_app
-    volumes:
-      - ./telegram_app:/telegram_app
     networks:
       - app-network
     ports:
@@ -84,7 +82,6 @@ services:
 
 volumes:
   redis-data:
-  telegram_node_modules:
 
 networks:
   app-network:
