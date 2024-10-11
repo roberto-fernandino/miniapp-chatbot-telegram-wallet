@@ -631,7 +631,8 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                         };
                         
                         // BUTTONS MANAGEMENT
-                        let mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app?start=openSwap=true&tokenCA={}", token_address)).expect("Invalid URL");
+                        
+                        let mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app?start=tokenCA={}", token_address)).expect("Invalid URL");
                         log::info!("mini_app_url: {:?}", mini_app_url);
                         let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
 

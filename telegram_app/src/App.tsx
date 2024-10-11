@@ -455,19 +455,31 @@ const App: React.FC = () => {
       );
     } finally {
       setIsLoading(false);
+      // Access the query string
       const urlParams = new URLSearchParams(window.location.search);
-      log(`urlParams: ${JSON.stringify(urlParams)}`, "info");
-      log(`Full URL: ${window.location.href}`, "info");
 
-      const openSwap = urlParams.get("openSwap");
-      const tokenCAParam = urlParams.get("tokenCA");
-      log(`openSwap: ${openSwap}`, "info");
-      log(`tokenCA: ${tokenCAParam}`, "info");
+      // Get the tgWebAppStartParam
+      const startParam = urlParams.get("tgWebAppStartParam");
 
-      if (openSwap === "true" && tokenCAParam) {
-        setSwapSheetOpen(true);
-        setTokenCa(tokenCAParam);
-        handleGetTokenData(tokenCAParam);
+      if (startParam) {
+        // Decode the startParam
+        const decodedParams = decodeURIComponent(startParam);
+
+        // Manually parse the parameters
+        const paramsArray = decodedParams.split("&");
+        let params: { [key: string]: string } = {};
+        paramsArray.forEach((param) => {
+          const [key, value] = param.split("=");
+          params[key] = value;
+        });
+        const tokenCA = params["tokenCA"];
+        // Extract the openSwap and tokenCA parameters
+
+        if (tokenCA) {
+          setSwapSheetOpen(true);
+          setTokenCa(tokenCA);
+          handleGetTokenData(tokenCA);
+        }
       }
     }
   };
