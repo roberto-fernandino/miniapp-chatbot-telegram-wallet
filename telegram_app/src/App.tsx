@@ -98,13 +98,15 @@ const App: React.FC = () => {
   const rootTurnkeyClient = turnkey.apiClient();
 
   async function getBalance(address: string): Promise<string> {
-    log(`${import.meta.env.VITE_RPC_URL}`, "info");
-    const connection = new Connection(import.meta.env.VITE_RPC_URL);
-    log(`${connection}`, "info");
+    const rpcUrl = import.meta.env.VITE_RPC_URL;
+
+    if (!rpcUrl.startsWith("http://") && !rpcUrl.startsWith("https://")) {
+      throw new Error("VITE_RPC_URL must start with http:// or https://");
+    }
+
+    const connection = new Connection(rpcUrl);
     const publicKey = new PublicKey(address);
-    log(`${publicKey}`, "info");
     const balance = await connection.getBalance(publicKey);
-    log(`${balance}`, "info");
     return (balance / 1e9).toFixed(4); // Convert lamports to SOL and format to 4 decimal places
   }
 
