@@ -599,9 +599,7 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    let newSocket = new WebSocket(
-      "wss://woodcock-engaging-usually.ngrok-free.app/solana_ws"
-    );
+    let newSocket = new WebSocket("wss://srv617785.hstgr.cloud/solana_ws");
 
     // Establish connection handshake
     newSocket.onopen = function () {

@@ -23,7 +23,7 @@ export function cn(...inputs: ClassValue[]) {
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // 2 seconds
-const BASE_URL_API = "https://woodcock-engaging-usually.ngrok-free.app/api";
+const BASE_URL_API = "https://srv617785.hstgr.cloud/api";
 export interface CopyTradeWalletData {
   user_id: string;
   wallet_id: string;
