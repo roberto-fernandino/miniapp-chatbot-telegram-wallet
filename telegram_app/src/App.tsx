@@ -456,6 +456,8 @@ const App: React.FC = () => {
       setIsLoading(false);
       const urlParams = new URLSearchParams(window.location.search);
       log(`urlParams: ${JSON.stringify(urlParams)}`, "info");
+      log(`Full URL: ${window.location.href}`, "info");
+
       const openSwap = urlParams.get("openSwap");
       const tokenCAParam = urlParams.get("tokenCA");
       log(`openSwap: ${openSwap}`, "info");
