@@ -399,7 +399,6 @@ const App: React.FC = () => {
 
   const initializeApp = async () => {
     // Initialize Telegram API
-    log(`${import.meta.env.VITE_BASE_URL_API}`, "info");
     TelegramApi.init();
     setIsLoading(true);
     checkSessionApiKeys();
@@ -418,7 +417,6 @@ const App: React.FC = () => {
       if (!tgUser) {
         throw new Error("No User found. Please open App from Telegram");
       }
-      log(` ${JSON.stringify(json_user)}`, "info");
       const turnkey = new Turnkey({
         apiBaseUrl: "https://api.turnkey.com",
         apiPublicKey: json_user?.publicKey ?? "",
