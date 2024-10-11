@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Connection, PublicKey } from "@solana/web3.js";
 import SolanaIcon from "./assets/sol.png";
 import SwapSheet from "./components/ui/SwapSheet";
 import {
@@ -19,6 +18,7 @@ import {
   decryptPassword,
   encryptPassword,
   getSOLPrice,
+  getBalance,
   transferSOL,
   copyTrade,
 } from "./lib/utils";
@@ -96,21 +96,6 @@ const App: React.FC = () => {
     defaultOrganizationId: import.meta.env.VITE_TURNKEY_ORGNIZATION!,
   });
   const rootTurnkeyClient = turnkey.apiClient();
-
-  async function getBalance(address: string): Promise<string> {
-    const rpcUrl =
-      "https://blue-bitter-sunset.solana-mainnet.quiknode.pro/0815d1ca6447e541dbdcd88286dc70013d9151ec";
-
-    if (!rpcUrl.startsWith("http://") && !rpcUrl.startsWith("https://")) {
-      throw new Error("VITE_RPC_URL must start with http:// or https://");
-    }
-    log(`rpc url: ${rpcUrl}`, "info");
-
-    const connection = new Connection(rpcUrl);
-    const publicKey = new PublicKey(address);
-    const balance = await connection.getBalance(publicKey);
-    return (balance / 1e9).toFixed(4); // Convert lamports to SOL and format to 4 decimal places
-  }
 
   async function updateCopyTrades() {
     const getCopyTradesResponse = await getCopyTrades(

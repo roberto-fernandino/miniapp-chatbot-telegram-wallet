@@ -6,7 +6,6 @@ import { twMerge } from "tailwind-merge";
 import { Turnkey } from "@turnkey/sdk-server";
 import { TurnkeySigner } from "@turnkey/solana";
 import { SendTransactionError } from "@solana/web3.js";
-
 import {
   Connection,
   PublicKey,
@@ -31,6 +30,19 @@ export interface CopyTradeWalletData {
   buy_amount: string;
   copy_trade_address: string;
   status: string;
+}
+
+export async function getBalance(address: string): Promise<string> {
+  const rpcUrl = import.meta.env.VITE_RPC_URL;
+
+  if (!rpcUrl.startsWith("http://") && !rpcUrl.startsWith("https://")) {
+    throw new Error("VITE_RPC_URL must start with http:// or https://");
+  }
+
+  const connection = new Connection(rpcUrl);
+  const publicKey = new PublicKey(address);
+  const balance = await connection.getBalance(publicKey);
+  return (balance / 1e9).toFixed(4); // Convert lamports to SOL and format to 4 decimal places
 }
 
 function createCopyTradeWalletPayload(
