@@ -874,16 +874,16 @@ pub fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, channel_nam
             mvp_string.push_str(&format!("├ <code>Period:</code>         <b>{}</b>\n", period_str));
             mvp_string.push_str(&format!("├ <code>Calls:</code>           <b>{}</b>\n", calls_count_chat));
             
-            learderboard_string.push_str(&format!("👑🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("👑🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.1}x</b>]\n", count, call.call.token_symbol, multiplier));
         }
         if count == 2 {
-            learderboard_string.push_str(&format!("🥈🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("🥈🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.1}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if count == 3 {
-            learderboard_string.push_str(&format!("🥉🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("🥉🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.1}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if multiplier < 1.5  && count > 3{
             learderboard_string.push_str(&format!("😭🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${}\n", count, call.call.token_symbol));
         } else if count > 3 && multiplier > 2.0 {
-            learderboard_string.push_str(&format!("😎 🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("😎 🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.1}x</b>]\n", count, call.call.token_symbol, multiplier));
         }
         count += 1;
         if count == 10 {
@@ -891,7 +891,7 @@ pub fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, channel_nam
         }
     }
     let hit_rate = hits as f64 / count as f64 * 100.0;
-    mvp_string.push_str(&format!("├ <code>Hit rate:</code>       <b>{:.2}%</b>\n", hit_rate));
+    mvp_string.push_str(&format!("├ <code>Hit rate:</code>      <b>{:.2}%</b>\n", hit_rate));
     mvp_string.push_str(&format!("└ <code>Return:</code>         <b>{:.2}x</b>\n", mvp_average_multiplier));
     format!("
     {mvp_string}\n\
