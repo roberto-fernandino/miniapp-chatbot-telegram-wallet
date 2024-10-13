@@ -331,8 +331,8 @@ pub fn call_message(con: &Arc<Mutex<Connection>>, ath_response: &Value, holders_
     
     // Info
     let buy_volume = format_number(scanner_response["pairStats"]["oneHour"]["buyVolume"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
-    let buys = scanner_response["pairStats"]["oneHour"]["buys"].as_i64().unwrap_or(0);
-    let sells = scanner_response["pairStats"]["oneHour"]["sells"].as_i64().unwrap_or(0);
+    let buys = format_number(scanner_response["pairStats"]["oneHour"]["buys"].as_i64().unwrap_or(0) as f64);
+    let sells = format_number(scanner_response["pairStats"]["oneHour"]["sells"].as_i64().unwrap_or(0) as f64);
     let lp = if scanner_response["pair"]["totalLockedRatio"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) > 0.0 { "🔥" } else { "🔴" };
     let token_address = scanner_response["pair"]["token1Address"].as_str().unwrap_or("");
     let verified = if scanner_response["pair"]["isVerified"].as_bool().unwrap_or(false) { "🟢" } else { "🔴" };
@@ -354,7 +354,7 @@ pub fn call_message(con: &Arc<Mutex<Connection>>, ath_response: &Value, holders_
     .map(|(i, holder)| {
         let holder_address = holder["holderAddress"].as_str().unwrap_or("");
         let percent = holder["percent"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * 100.0;
-        let percent_str = format!("{:.2}", percent);
+        let percent_str = format!("{:.1}", percent);
         
         match i {
             0 => format!("👥 TH: <a href=\"https://solscan.io/account/{holder_address}\">{percent_str}</a>⋅"),
@@ -792,28 +792,17 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot) ->
 
     // Sort by multiplier in descending order
     lb.sort_by(|a, b| b.multiplier.partial_cmp(&a.multiplier).unwrap_or(std::cmp::Ordering::Equal));
+    lb = lb.into_iter().take(10).collect();
 
 
-    bot.send_message(msg.chat.id, leaderboard_message(lb, period_str, msg.chat.first_name().unwrap_or(""))).parse_mode(teloxide::types::ParseMode::Html).await?;
+    bot.send_message(msg.chat.id, leaderboard_message(lb, period_str, msg.chat.first_name().unwrap_or("")))
+    .reply_parameters(teloxide::types::ReplyParameters { message_id: msg.id, chat_id: None, allow_sending_without_reply: Some(true), quote: None, quote_parse_mode: None, quote_entities: None, quote_position: None })
+    .parse_mode(teloxide::types::ParseMode::Html).await?;
 
     Ok(())
 }
 
-/// Get the user call count for a user
-/// 
-/// # Arguments
-/// 
-/// * `lb` - The leaderboard
-/// * `user_id` - The user ID
-/// 
-/// # Returns
-/// 
-/// A usize representing the user call count
-fn get_user_call_count_for_user(lb: &[CallWithAth], user_id: &str) -> usize {
-    lb.iter()
-        .filter(|call| call.call.user_tg_id == user_id)
-        .count()
-}
+
 
 /// Get the user calls average multiplier
 /// 
@@ -858,36 +847,45 @@ pub fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, channel_nam
     let con = db::get_connection();
     let mut learderboard_string = String::new();
     let mut count = 1;
+    let mut hits = 0;
     let mut mvp_string = String::new();
+    let mut mvp_average_multiplier = 0.0;
     for call in &lb {
         let multiplier = call.ath_after_call / call.call.price.parse::<f64>().unwrap_or(0.0);
         let user = db::get_user(&con, call.call.user_tg_id.as_str()).expect("User not found");
         let user_tg_id = user.tg_id;
         let username = user.username;
-        let calls_count = get_user_call_count_for_user(&lb, call.call.user_tg_id.as_str());
+        let calls_count_user = db::get_user_call_count_for_user_chat_with_period(&con, call.call.user_tg_id.as_str(), call.call.chat_id.as_str(), period_str.as_str());
+        let calls_count_chat = db::get_chat_call_count_with_period(&con, call.call.chat_id.as_str(), period_str.as_str());
+        if multiplier > 2.0 {
+            hits += 1;
+        }
         if count == 1 {
-            let mvp_average_multiplier = get_user_average_multiplier(&lb, call.call.user_tg_id.to_string());
+            mvp_average_multiplier = get_user_average_multiplier(&lb, call.call.user_tg_id.to_string());
             mvp_string.push_str(&format!("👑 {}\n", channel_name));
             mvp_string.push_str(&format!("├ <code>MVP:</code>               <b>@{}</b>\n", username));
             mvp_string.push_str(&format!("├ <code>Period:</code>         <b>{}</b>\n", period_str));
-            mvp_string.push_str(&format!("├ <code>Calls:</code>           <b>{}</b>\n", calls_count));
-            mvp_string.push_str(&format!("└ <code>Return:</code>         <b>{:.2}x</b>\n", mvp_average_multiplier));
-            learderboard_string.push_str(&format!("👑🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a>({calls_count}) ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            mvp_string.push_str(&format!("├ <code>Calls:</code>           <b>{}</b>\n", calls_count_chat));
+            
+            learderboard_string.push_str(&format!("👑🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         }
         if count == 2 {
-            learderboard_string.push_str(&format!("🥈🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a>({calls_count}) ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("🥈🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if count == 3 {
-            learderboard_string.push_str(&format!("🥉🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a>({calls_count}) ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
-        } else if multiplier < 1.5 {
-            learderboard_string.push_str(&format!("😭🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a>({calls_count}) ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
-        } else if count > 3 {
-            learderboard_string.push_str(&format!("😎 🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a>({calls_count}) ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("🥉🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+        } else if multiplier < 1.5  && count > 3{
+            learderboard_string.push_str(&format!("😭🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+        } else if count > 3 && multiplier > 2.0 {
+            learderboard_string.push_str(&format!("😎 🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         }
         count += 1;
         if count == 10 {
             break;
         }
     }
+    let hit_rate = hits as f64 / count as f64 * 100.0;
+    mvp_string.push_str(&format!("├ <code>Hit rate:</code>       <b>{:.2}%</b>\n", hit_rate));
+    mvp_string.push_str(&format!("└ <code>Return:</code>         <b>{:.2}x</b>\n", mvp_average_multiplier));
     format!("
     {mvp_string}\n\
     <blockquote>\
@@ -1008,7 +1006,6 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
     percent_sum -= 100.0;
     let multipliers_sum = percent_sum / 100.0;
     let multipliers_avg = percent_sum / 100.0 / count as f64;
-    log::info!("Multipliers sum: {:?} multipleirs avg: {:?}", multipliers_sum, multipliers_avg);
 
     bot.send_message(msg.chat.id,user_stats_message(username, calls_count, multipliers_sum, multipliers_avg, learderboard_string, hit_rate)).parse_mode(teloxide::types::ParseMode::Html).await?;
     Ok(())
