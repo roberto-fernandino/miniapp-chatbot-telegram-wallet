@@ -1,7 +1,7 @@
 #!/bin/bash
 echo "🟡 starting telegram app"
 
-/telegram_app/target/release/telegram_bot &
+/telegram_bot/target/release/telegram_bot &
 
 echo "✅ telegram app started"
 
