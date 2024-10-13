@@ -1,4 +1,6 @@
-use crate::utils::helpers::check_period;
+
+
+use std::sync::{Arc, Mutex};
 use teloxide::types::ReplyMarkup::InlineKeyboard;
 use reqwest::Url;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo};
@@ -252,7 +254,7 @@ fn format_duration(duration: Duration) -> String {
 /// # Returns
 /// 
 /// A string containing the formatted age
-fn format_age(duration: Duration) -> String {
+pub fn format_age(duration: Duration) -> String {
     if duration.num_seconds() < 60 {
         format!("{}s", duration.num_seconds())
     } else if duration.num_minutes() < 60 {
@@ -278,10 +280,11 @@ fn format_age(duration: Duration) -> String {
 /// # Returns
 /// 
 /// A string containing the formatted message
-pub fn call_message(con: &Connection, ath_response: &Value, holders_response: &Value, scanner_response: &Value,  mut call_info_str: String, user: User) -> String {
+pub fn call_message(con: &Arc<Mutex<Connection>>, ath_response: &Value, holders_response: &Value, scanner_response: &Value,  mut call_info_str: String, user: User) -> String {
     // Main info
     let pair_address = scanner_response["pair"]["pairAddress"].as_str().unwrap_or("");
     let token_symbol = scanner_response["pair"]["token1Symbol"].as_str().unwrap_or("N/A").to_uppercase();
+    let token_name = scanner_response["pair"]["token1Name"].as_str().unwrap_or("N/A");
     let token_usd_price = format!("{:.8}", scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0)).parse::<f64>().unwrap_or(0.0);
     let age = age_token(scanner_response["pair"]["pairCreatedAt"].as_str().unwrap_or(""));
     let circulating_supply = scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
@@ -333,26 +336,37 @@ pub fn call_message(con: &Connection, ath_response: &Value, holders_response: &V
     let lp = if scanner_response["pair"]["totalLockedRatio"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) > 0.0 { "🔥" } else { "🔴" };
     let token_address = scanner_response["pair"]["token1Address"].as_str().unwrap_or("");
     let verified = if scanner_response["pair"]["isVerified"].as_bool().unwrap_or(false) { "🟢" } else { "🔴" };
-    let mut holders_str = String::new();
-    let mut count = 0;
-    for holder in holders_response["holders"].as_array().unwrap_or(&Vec::new()).iter() {
-        if count == 5 {
-            break;
-        }
+    let top_10_holders_percentage = format_number(holders_response["holders"]
+    .as_array()
+    .unwrap_or(&Vec::new())
+    .iter()
+    .skip(1)
+    .take(10)  // Take only the first 10 elements
+    .map(|h| h["percent"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * 100.0) // Multiply by 100 to convert to percentage
+    .sum::<f64>());
+    let holders_str = holders_response["holders"]
+    .as_array()
+    .unwrap_or(&Vec::new())
+    .iter()
+    .skip(1)
+    .take(5)
+    .enumerate()
+    .map(|(i, holder)| {
         let holder_address = holder["holderAddress"].as_str().unwrap_or("");
         let percent = holder["percent"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * 100.0;
         let percent_str = format!("{:.2}", percent);
-        if count == 1 {
-            holders_str.push_str(&format!("👥 TH: <a href=\"https://solscan.io/account/{holder_address}\">{percent_str}⋅</a>"));
-        } 
-        if count > 1 {
-            holders_str.push_str(&format!("<a href=\"https://solscan.io/account/{holder_address}\">{percent_str}</a>⋅"));
+        
+        match i {
+            0 => format!("👥 TH: <a href=\"https://solscan.io/account/{holder_address}\">{percent_str}</a>⋅"),
+            1..4 => format!("<a href=\"https://solscan.io/account/{holder_address}\">{percent_str}</a>⋅"),
+            4 => format!("<a href=\"https://solscan.io/account/{holder_address}\">{percent_str}</a> <b>({:.2}%)</b>", top_10_holders_percentage),
+            _ => String::new()
         }
-        if count == 4 {
-            holders_str.push_str(&format!("<a href=\"https://solscan.io/account/{holder_address}\">{percent_str}</a>"));
-        }
-        count += 1;
-    }
+    })
+    .collect::<Vec<String>>()
+    .join("");
+
+// links
     // links
     let twitter = scanner_response["pair"]["linkTwitter"].as_str().unwrap_or("");
     let website = scanner_response["pair"]["linkWebsite"].as_str().unwrap_or("");   
@@ -368,7 +382,7 @@ pub fn call_message(con: &Connection, ath_response: &Value, holders_response: &V
     if !telegram.is_empty() {
         links.push_str(&format!("<a href=\"{telegram}\">TG</a> | "));
     }
-
+    let token_spawned_at_str = if token_address.contains("pump") { "💊" } else { "🟣" };
     let links_section = if links.len() > 0 {
         format!("🧰 More {links}\n\n")
     } else {
@@ -376,13 +390,13 @@ pub fn call_message(con: &Connection, ath_response: &Value, holders_response: &V
     };
 
     format!(
-        "🟢 <a href=\"https://app.dexcelerate.com/terminal/SOL/{pair_address}\">{token_symbol}</a> [{mkt_cap}/{twenty_four_hour_change_str}%]\n\
+        "{token_spawned_at_str} <a href=\"https://app.dexcelerate.com/terminal/SOL/{pair_address}\">{token_name}</a> <b>[{mkt_cap}/{twenty_four_hour_change_str}%] ${token_symbol}</b>\n\
         🌐 Solana @ Raydium\n\
         💰 USD: <code>${token_usd_price}</code>\n\
         💶 MCAP: <code>${mkt_cap}</code> \n\
         💎 FDV: <code>${fdv}</code>\n\
-        💦 Liq: <code>${liquidity}</code>\n\
-        📊 Vol: <code>${volume}</code> 🕰️ Age: {age} \n\
+        💦 Liq: <code>${liquidity}</code> \n\
+        📊 Vol: <code>${volume}</code> 🕰️ Age: <code>{age}</code> \n\
         ⛰️  ATH: <code>${ath}</code> <code>[{ath_date}]</code>\n\
         📉 1H: <code>{one_hour_change_str}%</code> . <code>${buy_volume}</code> 🅑 {buys} 🅢 {sells}\n\
         {holders_str}\n\
@@ -575,9 +589,9 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
     db::configure_db(&con);
     // Get the pair address and token address
     match get_pair_token_pair_and_token_address(address).await {
-        Ok(token_pair_and_token) => {
-            let pair_address = token_pair_and_token["pairAddress"].as_str().unwrap_or("");
-            let token_address = token_pair_and_token["tokenAddress"].as_str().unwrap_or("");
+        Ok(token_pair_and_token_address) => {
+            let pair_address = token_pair_and_token_address["pairAddress"].as_str().unwrap_or("");
+            let token_address = token_pair_and_token_address["tokenAddress"].as_str().unwrap_or("");
             // Check if the pair address and token address are valid
             if pair_address.is_empty() || token_address.is_empty() {
                 log::error!("Invalid pair or token address");
@@ -642,7 +656,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                         bot.send_message(
                             msg.chat.id,
                             call_message(
-                                &con,
+                                &Arc::new(Mutex::new(con)),
                                 &ath_response,
                                 &holders_response,
                                 &scanner_search,
@@ -718,7 +732,7 @@ pub struct CallWithAth {
 /// 
 /// An Ok result
 pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot) -> Result<()> {
-    let period = check_period(msg.text().unwrap());
+    let period = utils::helpers::check_period(msg.text().unwrap());
     let con = db::get_connection();
     let chat_id = msg.chat.id.to_string();
     let mut calls: Vec<Call> = vec![];
@@ -759,7 +773,8 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot) ->
         if unique_tokens.insert(call.token_address.clone()) {
             // If the token is not in the set, add it and process the call
             let ath = get_ath(
-                utils::helpers::time_to_timestamp(call.time.as_str()).await, call.token_address.as_str()
+                utils::helpers::time_to_timestamp(call.time.as_str()).await, 
+                call.token_address.as_str()
             ).await?;
 
             let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
@@ -857,17 +872,16 @@ pub fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, channel_nam
             mvp_string.push_str(&format!("├ <code>Period:</code>         <b>{}</b>\n", period_str));
             mvp_string.push_str(&format!("├ <code>Calls:</code>           <b>{}</b>\n", calls_count));
             mvp_string.push_str(&format!("└ <code>Return:</code>         <b>{:.2}x</b>\n", mvp_average_multiplier));
+            learderboard_string.push_str(&format!("👑🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a>({calls_count}) ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         }
-        if count == 1 {
-            learderboard_string.push_str(&format!("👑🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
-        } else if count == 2 {
-            learderboard_string.push_str(&format!("🥈🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+        if count == 2 {
+            learderboard_string.push_str(&format!("🥈🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a>({calls_count}) ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if count == 3 {
-            learderboard_string.push_str(&format!("🥉🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("🥉🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a>({calls_count}) ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if multiplier < 1.2 {
-            learderboard_string.push_str(&format!("😭🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("😭🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a>({calls_count}) ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if count > 3 {
-            learderboard_string.push_str(&format!("😎 🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("😎 🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a>({calls_count}) ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         }
         count += 1;
     }
@@ -1167,7 +1181,8 @@ pub async fn handle_callback_refresh(data: String, bot: &teloxide::Bot, query: &
     if let Some(ref message) = query.message {
         match message {
             teloxide::types::MaybeInaccessibleMessage::Regular(msg) => {
-                let call_info_str = utils::helpers::get_call_info(&call.token_address.clone(), &con, msg);
+                let con = Arc::new(Mutex::new(db::get_connection()));
+                let call_info_str = utils::helpers::get_call_info(&call.token_address.clone(), &con, msg).await?;
                 let call_message = call_message(
                     &con,
                     &ath_response,
