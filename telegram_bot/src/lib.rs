@@ -878,12 +878,15 @@ pub fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, channel_nam
             learderboard_string.push_str(&format!("🥈🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a>({calls_count}) ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if count == 3 {
             learderboard_string.push_str(&format!("🥉🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a>({calls_count}) ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
-        } else if multiplier < 1.2 {
+        } else if multiplier < 1.5 {
             learderboard_string.push_str(&format!("😭🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a>({calls_count}) ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if count > 3 {
             learderboard_string.push_str(&format!("😎 🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a>({calls_count}) ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         }
         count += 1;
+        if count == 10 {
+            break;
+        }
     }
     format!("
     {mvp_string}\n\
@@ -891,7 +894,7 @@ pub fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, channel_nam
     {learderboard_string}\
     </blockquote>\n\n\
     • TOKEN PNL » /pnl <i>token_address</i>\n\
-    • LEADERBOARD » /lb <i>days</i>\n\n\
+    • LEADERBOARD » /lb <i>Period</i>\n\n\
     🏆 <a href=\"https://app.dexcelerate.com/scanner\">Watch and trade automatically with #1 dex</a>\n
     ")
 }
