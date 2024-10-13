@@ -5,6 +5,14 @@ mod utils;
 mod db;
 use telegram_bot::*;
 use telegram_bot::format_number;
+use std::sync::{Arc, Mutex};
+use sqlite::Connection;
+
+pub type SafeConnection = Arc<Mutex<Connection>>;
+
+pub fn get_safe_connection() -> SafeConnection {
+    Arc::new(Mutex::new(db::get_connection()))
+}
 
 #[tokio::main]
 async fn main() {
@@ -15,8 +23,12 @@ async fn main() {
     db::configure_db(&db::get_connection());
 
     let handler = dptree::entry()
-        .branch(Update::filter_message().endpoint(handle_message))
-        .branch(Update::filter_callback_query().endpoint(handle_callback_query));
+        .branch(Update::filter_message().endpoint(|bot: Bot, msg: Message| async move {
+            handle_message(bot, msg).await
+        }))
+        .branch(Update::filter_callback_query().endpoint(|bot: Bot, q: CallbackQuery| async move {
+            handle_callback_query(bot, q).await
+        }));
 
     Dispatcher::builder(bot, handler)
         .enable_ctrlc_handler()
@@ -28,7 +40,7 @@ async fn main() {
 async fn handle_message(bot: Bot, msg: Message) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     log::info!("Handling message...");
     // Check if the message is a pnl command
-    let con = db::get_connection();
+    let con = get_safe_connection();
     if let Some(text) = msg.text() {
         if is_pnl_command(text) {
             log::info!("Message is a pnl command");
@@ -62,7 +74,7 @@ async fn handle_message(bot: Bot, msg: Message) -> Result<(), Box<dyn std::error
         else if there_is_valid_solana_address(text) {
             // Get the valid solana address
             let address = get_valid_solana_address(text);
-            let call_info_str = utils::helpers::get_call_info(&address.clone().expect("No address found"), &con, &msg);
+            let call_info_str = utils::helpers::get_call_info(&address.clone().expect("No address found"), &con, &msg).await?;
             match address {
                 Some(address) => {
                     // Call the address
