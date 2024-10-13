@@ -1,4 +1,5 @@
 use crate::utils::helpers::check_period;
+use teloxide::types::ReplyMarkup::InlineKeyboard;
 use reqwest::Url;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo};
 use chrono::Duration;
@@ -375,7 +376,7 @@ pub fn call_message(con: &Connection, ath_response: &Value, holders_response: &V
     };
 
     format!(
-        "🟢 <a href=\"https://app.dexcelerate.com/terminal/SOL/{pair_address}\">{token_symbol}</a> [{mkt_cap}/{twenty_four_hour_change_str}%] 🔼\n\
+        "🟢 <a href=\"https://app.dexcelerate.com/terminal/SOL/{pair_address}\">{token_symbol}</a> [{mkt_cap}/{twenty_four_hour_change_str}%]\n\
         🌐 Solana @ Raydium\n\
         💰 USD: <code>${token_usd_price}</code>\n\
         💶 MCAP: <code>${mkt_cap}</code> \n\
@@ -388,10 +389,9 @@ pub fn call_message(con: &Connection, ath_response: &Value, holders_response: &V
         LP: {lp} Mint:{verified}\n\
         {links_section}\
         <code>{token_address}</code>\n\n\
-        👨‍💼 @{}\n\n\
         {call_info_str}\n\n\
         🏆 <a href=\"https://app.dexcelerate.com/terminal/SOL/{token_address}\">See on #1 dex</a>\n\
-        ", user.username)
+        ")
 }
 
 /// Struct to hold the PNL call information
@@ -416,7 +416,7 @@ pub struct PnlCall {
 /// 
 /// A Result containing the PNL call or an error
 pub fn check_pnl_call(connection: &Connection, mkt_cap: &str, token_address: &str, chat_id: &str) -> Result<PnlCall> {
-     let call: Option<Call> = db::get_call(connection, token_address, chat_id);
+     let call: Option<Call> = db::get_first_call_by_token_address(connection, token_address, chat_id);
      if let Some(call) = call {
         let mkt_cap_i = call.mkt_cap.parse::<f64>().unwrap_or(0.0);
         let mkt_cap_n = mkt_cap.parse::<f64>().unwrap_or(0.0);
@@ -571,7 +571,6 @@ pub async fn get_holders(address: &str) -> Result<Value> {
 /// 
 /// An Ok result
 pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message, call_info_str: String) -> Result<()> {
-    log::info!("Calling address: {:?}", address);
     let con = db::get_connection();
     db::configure_db(&con);
     // Get the pair address and token address
@@ -588,7 +587,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                 let user_id = msg.clone().from.unwrap().id.to_string();
                 let user_id_str = user_id.as_str();
                 // Get the user
-                let user = db::get_user(&con, user_id_str);
+                let mut user = db::get_user(&con, user_id_str);
                 // If the user is not in the database, add them
                 if user.is_none() {
                     match db::add_user(&con, user_id_str, msg.from.clone().unwrap().username.clone().unwrap_or("Unknown".to_string()).to_string().as_str()) {
@@ -599,6 +598,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                             log::error!("Failed to add user to database: {:?}", e);
                         }
                     }
+                    user = db::get_user(&con, user_id_str);
                 }
                 // Get the scanner search
                 match get_scanner_search(pair_address, token_address).await {
@@ -616,7 +616,8 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                             &con, 
                             user_id_str, 
                             &scanner_search["pair"]["fdv"].as_str().unwrap_or("0"), 
-                            token_address, 
+                            token_address,
+                            address,
                             &scanner_search["pair"]["token1Symbol"].as_str().unwrap_or(""),
                             &scanner_search["pair"]["pairPrice1Usd"].as_str().unwrap_or("0"),
                             chat_id.as_str(),
@@ -633,17 +634,9 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                         
                         // BUTTONS MANAGEMENT
                         
-                        let mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app?start=tokenCA={}", token_address)).expect("Invalid URL");
-                        log::info!("mini_app_url: {:?}", mini_app_url);
-                        let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
-
-                        // Call info == "" means that is firt call
-                        if call_info_str == "" {
-                            buttons.push(vec![InlineKeyboardButton::callback("🔭 Just Scanning", format!("del_call:{}", call_id))]);
-                        }
-                        buttons.push(vec![InlineKeyboardButton::url("💳 Buy now", mini_app_url)]);
-                        buttons.push(vec![InlineKeyboardButton::callback("🔄 Refresh", format!("refresh:{}", call_id)), InlineKeyboardButton::callback("🆑 Clear", format!("clear:{}", call_id))]);
-                        let keyboard =  InlineKeyboardMarkup::new(buttons);
+                       
+                        let keyboard = create_call_keyboard(call_info_str.as_str(), call_id.to_string().as_str(), token_address);
+                        
                         
                         // Send the call message
                         bot.send_message(
@@ -654,9 +647,10 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                                 &holders_response,
                                 &scanner_search,
                                 call_info_str,
-                                user.unwrap()
+                                user.expect("User not found")
                             )
                         )
+                        .reply_parameters(teloxide::types::ReplyParameters { message_id: msg.id, chat_id: None, allow_sending_without_reply: Some(true), quote: None, quote_parse_mode: None, quote_entities: None, quote_position: None })
                         .reply_markup(keyboard)
                         .link_preview_options(teloxide::types::LinkPreviewOptions {
                             is_disabled: true,
@@ -1047,6 +1041,7 @@ pub async fn handle_callback_del_call(data: String, bot: &teloxide::Bot, query: 
     let user_tg_id =  query.from.id.to_string();
     let call_id = data.strip_prefix("del_call:").unwrap_or_default();
     let call_user = get_user_from_call(&con, call_id).expect("Could not get user from call.");
+    let call = db::get_call_by_id(&con, call_id.parse::<u64>().unwrap()).expect("Could not get call.");
     if call_user.tg_id == user_tg_id {
         if let Ok(call_id_num) = call_id.parse::<u64>() {
             // Get the database connection
@@ -1061,9 +1056,12 @@ pub async fn handle_callback_del_call(data: String, bot: &teloxide::Bot, query: 
                                 match msg.text() {
                                     Some(text) => {
                                         let updated_text = call_info_regex.replace(text, "‼️ Just Scanning...");
-    
+                                        // Create the buttons
+                                        let keyboard = create_call_keyboard_after_just_scanning(call_id.to_string().as_str(), call.token_address.as_str());
+
                                         bot.edit_message_text(msg.chat.id, msg.id, updated_text.to_string())
                                             .parse_mode(teloxide::types::ParseMode::Html)
+                                            .reply_markup(keyboard)
                                             .await?;
                                     }
                                     None => {}
@@ -1099,5 +1097,102 @@ pub async fn handle_callback_del_call(data: String, bot: &teloxide::Bot, query: 
             .show_alert(true)
             .await?; 
     }
+    Ok(())
+}
+
+/// Create the call buttons
+/// 
+/// # Arguments
+/// 
+/// * `call_info_str` - The call info string
+/// * `call_id` - The call ID
+/// * `mini_app_url` - The mini app URL
+/// 
+/// # Returns
+/// 
+/// A InlineKeyboardMarkup struct
+pub fn create_call_keyboard(call_info_str: &str, call_id: &str, token_address: &str) -> InlineKeyboardMarkup {
+    let mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app?start=tokenCA={}", token_address)).expect("Invalid URL");
+    log::info!("mini_app_url: {:?}", mini_app_url);
+    let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
+    // Call info == "" means that is firt call
+    if call_info_str == "" {
+        buttons.push(vec![InlineKeyboardButton::callback("🔭 Just Scanning", format!("del_call:{}", call_id))]);
+    }
+    buttons.push(vec![InlineKeyboardButton::url("💳 Buy now", mini_app_url)]);
+    buttons.push(vec![InlineKeyboardButton::callback("🔄 Refresh", format!("refresh:{}", call_id)), InlineKeyboardButton::callback("🆑 Clear", format!("clear:{}", call_id))]);
+    InlineKeyboardMarkup::new(buttons)
+}
+/// Create the call buttons
+/// 
+/// # Arguments
+/// 
+/// * `call_info_str` - The call info string
+/// * `call_id` - The call ID
+/// * `mini_app_url` - The mini app URL
+/// 
+/// # Returns
+/// 
+/// A InlineKeyboardMarkup struct
+pub fn create_call_keyboard_after_just_scanning(call_id: &str, token_address: &str) -> InlineKeyboardMarkup {
+    let mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app?start=tokenCA={}", token_address)).expect("Invalid URL");
+    log::info!("mini_app_url: {:?}", mini_app_url);
+    let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
+    buttons.push(vec![InlineKeyboardButton::url("💳 Buy now", mini_app_url)]);
+    buttons.push(vec![InlineKeyboardButton::callback("🔄 Refresh", format!("refresh:{}", call_id)), InlineKeyboardButton::callback("🆑 Clear", format!("clear:{}", call_id))]);
+    InlineKeyboardMarkup::new(buttons)
+}
+
+
+pub async fn handle_callback_refresh(data: String, bot: &teloxide::Bot, query: &teloxide::types::CallbackQuery) -> Result<()> {
+    let call_id = data.strip_prefix("refresh:").unwrap_or_default();
+    let con = db::get_connection();
+    let call = db::get_call_by_id(&con, call_id.parse::<u64>().unwrap()).expect("Could not get call.");
+    let token_pair_token_address = get_pair_token_pair_and_token_address(&call.token_mint).await?;
+    let pair_address = token_pair_token_address["pairAddress"].as_str().unwrap_or("");
+    let token_address = token_pair_token_address["tokenAddress"].as_str().unwrap_or("");
+    let scanner_response = get_scanner_search(
+        pair_address,
+        token_address
+    ).await?;
+
+    let created_datetime_str = scanner_response["pair"]["pairCreatedAt"].as_str().unwrap_or("");
+    let datetime: DateTime<Utc> = created_datetime_str.parse().expect("Failed to parse datetime.");
+    let unix_timestamp_milis = datetime.timestamp_millis();
+
+    let ath_response = get_ath(unix_timestamp_milis, &call.token_mint).await?;
+    log::info!("ath_response: {:?}", ath_response);
+    let holders_response = get_holders(token_address).await?;
+    let user = db::get_user(&con, call.user_tg_id.as_str()).expect("User not found");
+    if let Some(ref message) = query.message {
+        match message {
+            teloxide::types::MaybeInaccessibleMessage::Regular(msg) => {
+                let call_info_str = utils::helpers::get_call_info(&call.token_address.clone(), &con, msg);
+                let call_message = call_message(
+                    &con,
+                    &ath_response,
+                    &holders_response,
+                    &scanner_response,
+                    call_info_str,
+                    user,
+                );
+                let keyboard = create_call_keyboard_after_just_scanning(call_id, call.token_address.as_str());
+                bot.edit_message_text(msg.chat.id, msg.id, call_message)
+                    .parse_mode(teloxide::types::ParseMode::Html)
+                    .link_preview_options(teloxide::types::LinkPreviewOptions {
+                        is_disabled: true,
+                        url: None,
+                        prefer_small_media: false,
+                        prefer_large_media: false,
+                        show_above_text: false,
+                    })
+                    .reply_markup(keyboard)
+                    .await?;
+            }
+            _ => {}
+        }
+    }
+
+
     Ok(())
 }

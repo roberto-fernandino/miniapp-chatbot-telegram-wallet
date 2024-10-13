@@ -100,6 +100,12 @@ async fn handle_callback_query(bot: Bot, query: CallbackQuery) -> Result<(), Box
                 Err(e) => log::error!("Failed to delete call: {:?}", e),
             }
         } 
+        if data.starts_with("refresh:"){
+            match handle_callback_refresh(data.to_string(), &bot, &query).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to refresh: {:?}", e),
+            }
+        }
         else {
             log::info!("Unrecognized callback query data: {}", data);
         }
