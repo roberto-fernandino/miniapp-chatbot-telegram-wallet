@@ -11,7 +11,7 @@ import {
 import WebApp from "@twa-dev/sdk";
 import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
-import { Turnkey } from "@turnkey/sdk-server";
+import { DEFAULT_ETHEREUM_ACCOUNTS, Turnkey } from "@turnkey/sdk-server";
 import {
   setCopyTradeWallet,
   getCopyTrades,
@@ -133,6 +133,7 @@ const App: React.FC = () => {
                 path: "m/44'/501'/0'/0'",
                 addressFormat: "ADDRESS_FORMAT_SOLANA",
               },
+              ...DEFAULT_ETHEREUM_ACCOUNTS,
             ],
           },
           rootUsers: [
