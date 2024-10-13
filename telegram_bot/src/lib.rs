@@ -1,5 +1,3 @@
-
-
 use std::sync::{Arc, Mutex};
 use teloxide::types::ReplyMarkup::InlineKeyboard;
 use reqwest::Url;
@@ -366,21 +364,30 @@ pub fn call_message(con: &Arc<Mutex<Connection>>, ath_response: &Value, holders_
     .collect::<Vec<String>>()
     .join("");
 
-// links
-    // links
+    // links management
     let twitter = scanner_response["pair"]["linkTwitter"].as_str().unwrap_or("");
     let website = scanner_response["pair"]["linkWebsite"].as_str().unwrap_or("");   
     let telegram = scanner_response["pair"]["linkTelegram"].as_str().unwrap_or("");
 
     let mut links = String::new();
+    let mut link_added = false;
+    
     if !twitter.is_empty() {
-        links.push_str(&format!("<a href=\"{twitter}\">X</a> | "));
+        links.push_str(&format!("<a href=\"{twitter}\">X</a>"));
+        link_added = true;
     }
     if !website.is_empty() {
-        links.push_str(&format!("<a href=\"{website}\">WEB</a> | "));
+        if link_added {
+            links.push_str(" ⋅ ");
+        }
+        links.push_str(&format!("<a href=\"{website}\">WEB</a>"));
+        link_added = true;
     }
     if !telegram.is_empty() {
-        links.push_str(&format!("<a href=\"{telegram}\">TG</a> | "));
+        if link_added {
+            links.push_str(" ⋅ ");
+        }
+        links.push_str(&format!("<a href=\"{telegram}\">TG</a>"));
     }
     let token_spawned_at_str = if token_address.contains("pump") { "💊" } else { "🟣" };
     let links_section = if links.len() > 0 {
@@ -874,7 +881,7 @@ pub fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, channel_nam
         } else if count == 3 {
             learderboard_string.push_str(&format!("🥉🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         } else if multiplier < 1.5  && count > 3{
-            learderboard_string.push_str(&format!("😭🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
+            learderboard_string.push_str(&format!("😭🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${}\n", count, call.call.token_symbol));
         } else if count > 3 && multiplier > 2.0 {
             learderboard_string.push_str(&format!("😎 🟣 <b>{}</b>:<a href=\"https://t.me/sj_copyTradebot?start=user_{user_tg_id}\"><i><b>{username}</b></i></a> ({calls_count_user}): ${} [<b>{:.2}x</b>]\n", count, call.call.token_symbol, multiplier));
         }
@@ -1133,7 +1140,7 @@ pub fn create_call_keyboard(call_info_str: &str, call_id: &str, token_address: &
     if call_info_str == "" {
         buttons.push(vec![InlineKeyboardButton::callback("🔭 Just Scanning", format!("del_call:{}", call_id))]);
     }
-    buttons.push(vec![InlineKeyboardButton::url("💳 Buy now", mini_app_url)]);
+    buttons.push(vec![InlineKeyboardButton::url("💳 Buy now", mini_app_url), InlineKeyboardButton::callback("Copy", format!("copy:{}", call_id))]);
     buttons.push(vec![InlineKeyboardButton::callback("🔄 Refresh", format!("refresh:{}", call_id)), InlineKeyboardButton::callback("🆑 Clear", format!("clear:{}", call_id))]);
     InlineKeyboardMarkup::new(buttons)
 }
@@ -1152,7 +1159,7 @@ pub fn create_call_keyboard_after_just_scanning(call_id: &str, token_address: &s
     let mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app?start=tokenCA={}", token_address)).expect("Invalid URL");
     log::info!("mini_app_url: {:?}", mini_app_url);
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
-    buttons.push(vec![InlineKeyboardButton::url("💳 Buy now", mini_app_url)]);
+    buttons.push(vec![InlineKeyboardButton::url("💳 Buy now", mini_app_url), InlineKeyboardButton::callback("Copy", format!("copy:{}", call_id))]);
     buttons.push(vec![InlineKeyboardButton::callback("🔄 Refresh", format!("refresh:{}", call_id)), InlineKeyboardButton::callback("🆑 Clear", format!("clear:{}", call_id))]);
     InlineKeyboardMarkup::new(buttons)
 }
@@ -1209,5 +1216,20 @@ pub async fn handle_callback_refresh(data: String, bot: &teloxide::Bot, query: &
     }
 
 
+    Ok(())
+}
+
+pub async fn handle_callback_clear_call(data: String, bot: &teloxide::Bot, query: &teloxide::types::CallbackQuery) -> Result<()> {
+    let call_id = data.strip_prefix("clear:").unwrap_or_default();
+    let con = db::get_connection();
+    let call = db::get_call_by_id(&con, call_id.parse::<u64>().unwrap()).expect("Could not get call.");
+    if let Some(ref message) = query.message {
+        match message {
+            teloxide::types::MaybeInaccessibleMessage::Regular(msg) => {
+                bot.delete_message(msg.chat.id, msg.id).await?;
+            }
+            _ => {}
+        }
+    }
     Ok(())
 }

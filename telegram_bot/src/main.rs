@@ -121,6 +121,12 @@ async fn handle_callback_query(bot: Bot, query: CallbackQuery) -> Result<(), Box
         else {
             log::info!("Unrecognized callback query data: {}", data);
         }
+        if data.starts_with("clear_call:"){
+            match handle_callback_clear_call(data.to_string(), &bot, &query).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to clear call: {:?}", e),
+            }
+        }
     } else {
         log::info!("Callback query without data");
     }
