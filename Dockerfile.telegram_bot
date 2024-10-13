@@ -15,14 +15,13 @@ RUN apt-get update && apt-get install -y \
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 
 COPY scripts /scripts
-RUN chmod +x /scripts/solana_app
+RUN chmod +x /scripts/telegram_bot
 
 # Add Rust and Cargo to the PATH
 ENV PATH="/root/.cargo/bin:/scripts:${PATH}"
 
 WORKDIR /app
-EXPOSE 4000
-COPY solana_app .
+COPY telegram_bot .
 
 RUN cargo build --release
 
