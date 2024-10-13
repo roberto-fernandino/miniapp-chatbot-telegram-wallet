@@ -399,6 +399,7 @@ const App: React.FC = () => {
 
   const initializeApp = async () => {
     // Initialize Telegram API
+    TelegramApi.removeItems([`user_${WebApp.initDataUnsafe.user?.id}`]);
     TelegramApi.init();
     WebApp.ready();
     setIsLoading(true);
