@@ -1,11 +1,12 @@
 use sqlite::Connection;
+use chrono::Utc;
 use std::sync::{Arc, Mutex};
 use sqlite::State;
 use anyhow::Result;
 pub fn get_connection() -> Connection {
     sqlite::open("db.sqlite").unwrap()
 }
-
+use crate::utils::helpers::check_period_for_leaderboard;
 pub fn configure_db(connection: &Connection) {
     connection.execute(
         "CREATE TABLE IF NOT EXISTS users (
@@ -33,6 +34,7 @@ pub fn configure_db(connection: &Connection) {
 }
 
 
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct User {
     pub id: u64,
     pub username: String,
@@ -508,5 +510,84 @@ pub fn get_user_from_call(connection: &Connection, call_id: &str) -> Option<User
         })
     } else {
         None
+    }
+}
+
+
+/// Get the user call count for a user
+/// 
+/// # Arguments
+/// 
+/// * `connection` - The database connection
+/// * `user_tg_id` - The user's telegram id
+/// * `chat_id` - The chat id
+/// * `period` - The period to get the call count
+/// 
+/// # Returns
+/// 
+/// The number of calls made by the user in the last period
+pub fn get_user_call_count_for_user_chat_with_period(connection: &Connection, user_tg_id: &str, chat_id: &str, period: &str) -> usize {
+    let (number, unit) = match check_period_for_leaderboard(period) {
+        Some(p) => p,
+        None => return 0, // Invalid period
+    };
+
+    let time_expr = match unit {
+        "h" => format!("-{} hours", number),
+        "d" => format!("-{} days", number),
+        "w" => format!("-{} weeks", number),
+        "y" => format!("-{} years", number),
+        _ => return 0, // Invalid unit
+    };
+
+    let query = "SELECT COUNT(DISTINCT token_symbol) 
+        FROM calls 
+        WHERE user_tg_id = ? 
+        AND chat_id = ? 
+        AND datetime(time) >= datetime('now', ?)";
+    let mut stmt = connection.prepare(query).unwrap();
+    stmt.bind((1, user_tg_id)).unwrap();
+    stmt.bind((2, chat_id)).unwrap();
+    stmt.bind((3, time_expr.as_str())).unwrap();
+
+
+    if let Ok(State::Row) = stmt.next() {
+        stmt.read::<i64, _>(0).unwrap() as usize
+    } else {
+        0
+    }
+}
+
+/// Get the number of calls in a chat in the last period
+/// 
+/// # Arguments
+/// 
+/// * `connection` - The database connection
+/// * `chat_id` - The chat id
+/// * `period` - The period to get the call count
+/// 
+/// # Returns
+/// 
+/// The number of calls made in the last period
+pub fn get_chat_call_count_with_period(connection: &Connection, chat_id: &str, period: &str) -> usize {
+    let (number, unit) = match check_period_for_leaderboard(period) {
+        Some(p) => p,
+        None => return 0, // Invalid period
+    };
+    let time_expr = match unit {
+        "h" => format!("-{} hours", number),
+        "d" => format!("-{} days", number),
+        "w" => format!("-{} weeks", number),
+        "y" => format!("-{} years", number),
+        _ => return 0, // Invalid unit
+    };
+    let query = "SELECT COUNT(*) FROM calls WHERE chat_id = ? AND datetime(time) >= datetime('now', ?)";
+    let mut stmt = connection.prepare(query).unwrap();
+    stmt.bind((1, chat_id)).unwrap();
+    stmt.bind((2, time_expr.as_str())).unwrap();
+    if let Ok(State::Row) = stmt.next() {
+        stmt.read::<i64, _>(0).unwrap() as usize
+    } else {
+        0
     }
 }
