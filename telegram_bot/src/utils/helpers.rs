@@ -21,19 +21,37 @@ use chrono::{NaiveDateTime, Utc, DateTime};
 /// An Option containing the period or None if no period is found
 pub fn check_period(text: &str) -> Option<String> {
     
-    if text.ends_with("d") {
+    if text.ends_with("d") || text.ends_with("D") {
         Some("Days".to_string())
-    } else if text.ends_with("w") {
+    } else if text.ends_with("w") || text.ends_with("W") {
         Some("Weeks".to_string())
-    } else if text.ends_with("m") {
+    } else if text.ends_with("m") || text.ends_with("M") {
         Some("Months".to_string())
-    } else if text.ends_with("y") {
+    } else if text.ends_with("y") || text.ends_with("Y") {
         Some("Years".to_string())
-    } else if text.ends_with("h") {
+    } else if text.ends_with("h") || text.ends_with("H") {
         Some("Hours".to_string())
     } else {
         None
     }
+}
+
+/// Check the period for a leaderboard command
+/// 
+/// # Arguments
+/// 
+/// * `text` - The command text to check
+/// 
+/// # Returns
+/// 
+/// An Option containing a tuple of the number and unit
+pub fn check_period_for_leaderboard(text: &str) -> Option<(u32, &str)> {
+    let re = regex::Regex::new(r"(\d+)([hdwy])$").unwrap();
+    re.captures(text).and_then(|cap| {
+        let number = cap.get(1)?.as_str().parse::<u32>().ok()?;
+        let unit = cap.get(2)?.as_str();
+        Some((number, unit))
+    })
 }
 
 /// Check if the message is a lb command
