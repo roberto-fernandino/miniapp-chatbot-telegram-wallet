@@ -1,0 +1,8 @@
+#!/bin/bash
+echo "🟡 starting telegram app"
+
+/telegram_app/target/release/telegram_bot &
+
+echo "✅ telegram app started"
+
+wait %1

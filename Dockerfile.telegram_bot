@@ -1,0 +1,29 @@
+FROM debian:buster-slim
+
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    gcc \
+    netcat \
+    libssl-dev \
+    pkg-config \
+    ca-certificates \
+    && apt-get clean
+
+# install rust
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+
+COPY scripts /scripts
+RUN chmod +x /scripts/solana_app
+
+# Add Rust and Cargo to the PATH
+ENV PATH="/root/.cargo/bin:/scripts:${PATH}"
+
+WORKDIR /app
+EXPOSE 4000
+COPY solana_app .
+
+RUN cargo build --release
+
+CMD ["telegram_bot"]

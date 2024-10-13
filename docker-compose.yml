@@ -80,6 +80,20 @@ services:
       # websocket
       - "4040:4040"
 
+  telegram_bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.telegram_bot
+    env_file:
+      - .env
+    networks:
+      - app-network
+    container_name: telegram_bot
+    depends_on:
+      - telegram_app
+      - solana_app
+      - backend_app
+
 volumes:
   redis-data:
 
