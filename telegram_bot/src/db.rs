@@ -1,4 +1,5 @@
 use sqlite::Connection;
+use std::sync::{Arc, Mutex};
 use sqlite::State;
 use anyhow::Result;
 pub fn get_connection() -> Connection {
@@ -20,6 +21,7 @@ pub fn configure_db(connection: &Connection) {
             time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             mkt_cap TEXT,
             token_address TEXT,
+            token_mint TEXT,
             token_symbol TEXT,
             price TEXT,
             user_tg_id INTEGER,
@@ -44,6 +46,7 @@ pub struct Call {
     pub mkt_cap: String,
     pub price: String,
     pub token_address: String,
+    pub token_mint: String,
     pub token_symbol: String,
     pub user_tg_id: String,
     pub chat_id: String,
@@ -81,22 +84,24 @@ pub fn add_call(
     tg_id: &str, 
     mkt_cap: &str, 
     token_address: &str, 
+    token_mint: &str,
     token_symbol: &str, 
     price: &str, 
     chat_id: &str,
     message_id: &str
 ) -> Result<u64> {
-    let query = "INSERT INTO calls (user_tg_id, mkt_cap, token_address, token_symbol, price, chat_id, message_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
+    let query = "INSERT INTO calls (user_tg_id, mkt_cap, token_address, token_mint, token_symbol, price, chat_id, message_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
     
     // Prepare and execute the INSERT statement
     let mut stmt = connection.prepare(query)?;
     stmt.bind((1, tg_id)).unwrap();
     stmt.bind((2, mkt_cap)).unwrap();
     stmt.bind((3, token_address)).unwrap();
-    stmt.bind((4, token_symbol)).unwrap();
-    stmt.bind((5, price)).unwrap();
-    stmt.bind((6, chat_id)).unwrap();
-    stmt.bind((7, message_id)).unwrap();
+    stmt.bind((4, token_mint)).unwrap();
+    stmt.bind((5, token_symbol)).unwrap();
+    stmt.bind((6, price)).unwrap();
+    stmt.bind((7, chat_id)).unwrap();
+    stmt.bind((8, message_id)).unwrap();
     stmt.next().unwrap();  // Execute the insert
 
     // Query to get the last inserted row ID using SQLite's built-in function
@@ -109,8 +114,18 @@ pub fn add_call(
     Ok(row_id as u64)
 }
 
-pub fn get_call(connection: &Connection, token_address: &str, chat_id: &str) -> Option<Call> {
-    let query = "SELECT * FROM calls WHERE token_address = ?";
+/// Get the first call of a token in a chat
+/// 
+/// # Arguments
+/// * `connection` - The database connection
+/// * `token_address` - The token address
+/// * `chat_id` - The chat id
+/// 
+/// # Returns
+/// 
+/// An optional first call
+pub fn get_first_call_by_token_address(connection: &Connection, token_address: &str, chat_id: &str) -> Option<Call> {
+    let query = "SELECT * FROM calls WHERE token_address = ? AND chat_id = ?";
     let mut stmt = connection.prepare(query).unwrap();
     stmt.bind((1, token_address)).unwrap();
     
@@ -120,6 +135,7 @@ pub fn get_call(connection: &Connection, token_address: &str, chat_id: &str) -> 
             time: stmt.read::<String, _>("time").unwrap(),
             mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
             token_address: stmt.read::<String, _>("token_address").unwrap(),
+            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             price: stmt.read::<String, _>("price").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
@@ -143,6 +159,7 @@ pub fn get_call_by_id(connection: &Connection, id: u64) -> Option<Call> {
             mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
             price: stmt.read::<String, _>("price").unwrap(),
             token_address: stmt.read::<String, _>("token_address").unwrap(),
+            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
@@ -167,6 +184,7 @@ pub fn get_all_calls_chat_id(connection: &Connection, chat_id: &str) -> Vec<Call
             mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
             price: stmt.read::<String, _>("price").unwrap(),
             token_address: stmt.read::<String, _>("token_address").unwrap(),
+            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
@@ -202,6 +220,7 @@ pub fn get_channel_calls_last_x_days(connection: &Connection, chat_id: &str, day
             mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
             price: stmt.read::<String, _>("price").unwrap(),
             token_address: stmt.read::<String, _>("token_address").unwrap(),
+            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
@@ -237,6 +256,7 @@ pub fn get_channel_calls_last_x_hours(connection: &Connection, chat_id: &str, ho
             mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
             price: stmt.read::<String, _>("price").unwrap(),
             token_address: stmt.read::<String, _>("token_address").unwrap(),
+            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
@@ -272,6 +292,7 @@ pub fn get_channel_calls_last_x_months(connection: &Connection, chat_id: &str, m
             mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
             price: stmt.read::<String, _>("price").unwrap(),
             token_address: stmt.read::<String, _>("token_address").unwrap(),
+            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
@@ -307,6 +328,7 @@ pub fn get_channel_calls_last_x_years(connection: &Connection, chat_id: &str, ye
             mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
             price: stmt.read::<String, _>("price").unwrap(),
             token_address: stmt.read::<String, _>("token_address").unwrap(),
+            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
@@ -341,6 +363,7 @@ pub fn get_all_calls_user_tg_id(connection: &Connection, user_tg_id: &str) -> Ve
             mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
             price: stmt.read::<String, _>("price").unwrap(),
             token_address: stmt.read::<String, _>("token_address").unwrap(),
+            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
@@ -361,12 +384,13 @@ pub fn get_all_calls_user_tg_id(connection: &Connection, user_tg_id: &str) -> Ve
 /// # Returns
 // 
 /// A boolean indicating if the call was already made
-pub fn is_first_call(connection: &Connection, token_address: &str, chat_id: &str) -> bool {
+pub fn is_first_call(connection: &Arc<Mutex<Connection>>, token_address: &str, chat_id: &str) -> bool {
     // Define the query
     let query = "SELECT COUNT(*) FROM calls WHERE token_address = ? AND chat_id = ?";
 
     // Prepare the statement
-    let mut stmt = connection.prepare(query).unwrap();
+    let conn = connection.lock().unwrap();
+    let mut stmt = conn.prepare(query).unwrap();
 
     // Bind the parameters
     stmt.bind((1, token_address)).unwrap();
@@ -377,7 +401,7 @@ pub fn is_first_call(connection: &Connection, token_address: &str, chat_id: &str
     
     if result == sqlite::State::Row {
         let count: i64 = stmt.read::<i64, _>(0).unwrap();
-        count == 1
+        count == 0  // Check if the count is 0 for the first call
     } else {
         false
     }
@@ -407,6 +431,7 @@ pub fn get_first_call_token_chat(connection: &Connection, token_address: &str, c
             mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
             price: stmt.read::<String, _>("price").unwrap(),
             token_address: stmt.read::<String, _>("token_address").unwrap(),
+            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
             token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
             user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
             chat_id: stmt.read::<String, _>("chat_id").unwrap(),
@@ -445,9 +470,10 @@ pub fn delete_call(connection: &Connection, call_id: u64) -> Result<()> {
 /// # Returns
 /// 
 /// The number of calls made by the user in the last 24 hours
-pub fn get_qtd_calls_user_made_in_24hrs(connection: &Connection, user_tg_id: &str) -> usize {
+pub fn get_qtd_calls_user_made_in_24hrs(connection: &Arc<Mutex<Connection>>, user_tg_id: &str) -> usize {
+    let conn = connection.lock().unwrap();
     let query = "SELECT COUNT(*) FROM calls WHERE user_tg_id = ? AND time >= datetime('now', '-24 hour')";
-    let mut stmt = connection.prepare(query).unwrap();
+    let mut stmt = conn.prepare(query).unwrap();
     stmt.bind((1, user_tg_id)).unwrap();
     if let Ok(State::Row) = stmt.next() {
         stmt.read::<i64, _>(0).unwrap() as usize
