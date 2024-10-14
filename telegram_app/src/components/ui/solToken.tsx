@@ -7,7 +7,7 @@ interface TokenInfo {
   account: AccountInfo<ParsedAccountData>;
 }
 
-const solToken: React.FC<{ token: TokenInfo }> = ({ token }) => {
+const SolToken: React.FC<{ token: TokenInfo }> = ({ token }) => {
   const [tokenLogoUrl, setTokenLogoUrl] = useState<string | null>(null);
   useEffect(() => {
     getTokenInfo(token.account.data.parsed.info.mint).then((response) => {
@@ -45,4 +45,4 @@ const solToken: React.FC<{ token: TokenInfo }> = ({ token }) => {
   );
 };
 
-export default solToken;
+export default SolToken;
