@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import SolanaIcon from "./assets/sol.png";
+import EthereumIcon from "./assets/eth.png";
 import SwapSheet from "./components/ui/SwapSheet";
 import {
   checkUserAccounts,
@@ -418,16 +419,16 @@ const App: React.FC = () => {
         json_user
       );
 
+      log(`has_solana: ${has_solana}`, "info");
+      log(`has_evm: ${has_evm}`, "info");
+      log(`has_sui: ${has_sui}`, "info");
       if (!has_evm) {
         log("User does not have an EVM account", "info");
         log("Creating EVM account", "info");
         const evm_account = await createEvmAccount(json_user);
-        return;
       }
     } catch (error) {
-      log("User not signed up", "success");
-      setIsRegistered(false);
-      return;
+      throw new Error("Initialization error: " + error);
     }
     try {
       const tgUser = WebApp.initDataUnsafe.user;
@@ -892,6 +893,23 @@ const App: React.FC = () => {
                             {account.addressFormat ===
                             "ADDRESS_FORMAT_SOLANA" ? (
                               <img src={SolanaIcon} className="w-8 h-4" />
+                            ) : (
+                              "Unknown"
+                            )}
+                          </span>
+                          <span
+                            className="mr-2 text-sm font-medium"
+                            style={{
+                              color:
+                                account.addressFormat ===
+                                "ADDRESS_FORMAT_ETHEREUM"
+                                  ? "blue"
+                                  : "inherit",
+                            }}
+                          >
+                            {account.addressFormat ===
+                            "ADDRESS_FORMAT_ETHEREUM" ? (
+                              <img src={EthereumIcon} className="w-8 h-4" />
                             ) : (
                               "Unknown"
                             )}
