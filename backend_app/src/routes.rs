@@ -88,6 +88,15 @@ pub struct UserSessionPost {
     pub private_key: String,
 }
 
+/// Set user session
+/// 
+/// # Arguments
+/// 
+/// * `req` - The request object
+/// 
+/// # Returns
+/// 
+/// * `String` - The response message
 pub async fn set_user_session(mut req: tide::Request<()>) -> tide::Result<String> {
     let post: UserSessionPost = match req.body_json().await {
         Ok(post) => post,
