@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { getAllSolanaTokensBalance, getTokenData } from "../../lib/utils";
 import { PublicKey, AccountInfo, ParsedAccountData } from "@solana/web3.js";
 import { Spinner } from "./spinner";
-import Token from "./token";
+import SolToken from "./solToken";
 
 interface TokenInfo {
   pubkey: PublicKey;
@@ -56,7 +56,7 @@ const TokensBalancesSwap: React.FC<TokensBalancesSwapProps> = ({
                   handleGetTokenData(token.account.data.parsed.info.mint)
                 }
               >
-                <Token key={token.pubkey.toBase58()} token={token} />
+                <SolToken key={token.pubkey.toBase58()} token={token} />
               </div>
             ) : null
           )}
