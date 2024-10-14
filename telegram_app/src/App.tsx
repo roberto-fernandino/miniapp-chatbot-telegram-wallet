@@ -36,6 +36,7 @@ import TokensBalancesSwap from "./components/ui/tokensBalancesSwap";
 import SwapInterface from "./components/ui/swap";
 import { DEFAULT_SOLANA_ACCOUNTS } from "@turnkey/sdk-browser";
 import EthTokenBalances from "./components/ui/ethTokenBalances";
+import { getAllEthereumTokensBalance } from "./lib/utils";
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -407,6 +408,11 @@ const App: React.FC = () => {
   const initializeApp = async () => {
     // Initialize Telegram API
     // TelegramApi.removeItems([`user_${WebApp.initDataUnsafe.user?.id}`]);
+    let response = await getAllEthereumTokensBalance(
+      "0x3aeCC5beAB37700EB660f6b7A843646252d78ead"
+    );
+    log(JSON.stringify(response), "info");
+
     TelegramApi.init();
     WebApp.ready();
     setIsLoading(true);
