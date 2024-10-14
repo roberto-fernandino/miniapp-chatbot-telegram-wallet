@@ -29,7 +29,7 @@ const EthToken: React.FC<{ token: TokenInfo }> = ({ token }) => {
             <div className="text-xs truncate w-24">{token.symbol}</div>
             <div className="text-xs flex flex-col items-center justify-center">
               <span className="text-xs text-gray-500">
-                {parseFloat(token.balance).toFixed(2)}
+                {parseFloat(token.balance).toFixed(token.decimals)}
               </span>
               <TokenPrice ca={token.token_address} />
             </div>
