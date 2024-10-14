@@ -408,6 +408,7 @@ const App: React.FC = () => {
   const initializeApp = async () => {
     // Initialize Telegram API
     // TelegramApi.removeItems([`user_${WebApp.initDataUnsafe.user?.id}`]);
+    log(`${import.meta.env.VITE_MORALIS_API_KEY}`, "info");
     let response = await getAllEthereumTokensBalance(
       "0x3aeCC5beAB37700EB660f6b7A843646252d78ead"
     );
