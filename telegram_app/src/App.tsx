@@ -31,10 +31,11 @@ import { Spinner } from "./components/ui/spinner";
 import CopyIcon from "./assets/copy.svg";
 import { ErrorHandler, LogFunction } from "./lib/cloudStorageUtil";
 import { TelegramApi } from "./telegram/telegram-api";
-import TokensBalances from "./components/ui/tokenBalances";
+import SolTokenBalances from "./components/ui/solTokenBalances";
 import TokensBalancesSwap from "./components/ui/tokensBalancesSwap";
 import SwapInterface from "./components/ui/swap";
 import { DEFAULT_SOLANA_ACCOUNTS } from "@turnkey/sdk-browser";
+import EthTokenBalances from "./components/ui/ethTokenBalances";
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -916,29 +917,28 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm font-semibold">
-                          {account.addressFormat === "ADDRESS_FORMAT_SOLANA"
-                            ? "SOL"
-                            : "ETH"}
+                          {account.addressFormat === "ADDRESS_FORMAT_SOLANA" &&
+                            "SOL"}
+                          {account.addressFormat ===
+                            "ADDRESS_FORMAT_ETHEREUM" && "ETH"}
                         </span>
                         <div className="text-right">
                           <div className="text-sm font-medium">
-                            {account.addressFormat === "ADDRESS_FORMAT_SOLANA"
-                              ? solBalance
-                              : ethBalance}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            $
-                            {account.addressFormat === "ADDRESS_FORMAT_SOLANA"
-                              ? usdSolBalance
-                              : usdEthBalance}
+                            {account.addressFormat ===
+                              "ADDRESS_FORMAT_SOLANA" && solBalance}
+                            {account.addressFormat ===
+                              "ADDRESS_FORMAT_ETHEREUM" && ethBalance}
                           </div>
                         </div>
                       </div>
                       <div className="mt-4">
-                        <h4 className="text-lg font-semibold mb-2">
-                          Token Portfolio
-                        </h4>
-                        <TokensBalances address={account.address} />
+                        {account.addressFormat === "ADDRESS_FORMAT_SOLANA" && (
+                          <SolTokenBalances address={account.address} />
+                        )}
+                        {account.addressFormat ===
+                          "ADDRESS_FORMAT_ETHEREUM" && (
+                          <EthTokenBalances address={account.address} />
+                        )}
                       </div>
                     </div>
                   ))}
