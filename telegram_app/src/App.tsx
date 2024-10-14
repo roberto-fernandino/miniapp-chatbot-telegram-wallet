@@ -21,7 +21,7 @@ import {
   decryptPassword,
   encryptPassword,
   getSOLPrice,
-  getBalance,
+  getBalance as getSolBalance,
   transferSOL,
   copyTrade,
 } from "./lib/utils";
@@ -43,7 +43,6 @@ const App: React.FC = () => {
   const [password, setPassword] = useState("");
   const [userAccounts, setUserAccounts] = useState<any[]>([]);
   const [walletId, setWalletId] = useState<string>("");
-  const [solAddress, setSolAddress] = useState<string>("");
 
   // Session information
   const [sessionActive, setSessionActive] = useState<boolean>(false);
@@ -70,6 +69,8 @@ const App: React.FC = () => {
     useState(true);
 
   // Balance information
+  const [ethBalance, setEthBalance] = useState<string>("0");
+  const [usdEthBalance, setUsdEthBalance] = useState<string>("0.00");
   const [solBalance, setSolBalance] = useState<string>("0");
   const [usdSolBalance, setUsdSolBalance] = useState<string>("0.00");
 
@@ -506,7 +507,7 @@ const App: React.FC = () => {
           (account) => account.addressFormat === "ADDRESS_FORMAT_SOLANA"
         )?.address;
         if (solanaAddress) {
-          const balance = await getBalance(solanaAddress);
+          const balance = await getSolBalance(solanaAddress);
           setSolBalance(balance);
 
           const solPrice = await getSOLPrice();
@@ -876,72 +877,68 @@ const App: React.FC = () => {
                   {userAccounts.map((account) => (
                     <div
                       key={account.walletId}
-                      className="flex items-center justify-between mb-2 p-2 bg-gray-50 rounded"
+                      className="flex flex-col mb-4 p-4 bg-gray-50 rounded-lg shadow"
                     >
-                      <div className="flex flex-col items-center justify-between w-full">
+                      <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center">
-                          <span
-                            className="mr-2 text-sm font-medium"
-                            style={{
-                              color:
-                                account.addressFormat ===
-                                "ADDRESS_FORMAT_SOLANA"
-                                  ? "purple"
-                                  : "inherit",
-                            }}
-                          >
-                            {account.addressFormat ===
-                            "ADDRESS_FORMAT_SOLANA" ? (
-                              <img src={SolanaIcon} className="w-8 h-4" />
-                            ) : (
-                              "Unknown"
-                            )}
-                          </span>
-                          <span
-                            className="mr-2 text-sm font-medium"
-                            style={{
-                              color:
-                                account.addressFormat ===
-                                "ADDRESS_FORMAT_ETHEREUM"
-                                  ? "blue"
-                                  : "inherit",
-                            }}
-                          >
-                            {account.addressFormat ===
-                            "ADDRESS_FORMAT_ETHEREUM" ? (
-                              <img src={EthereumIcon} className="w-8 h-4" />
-                            ) : (
-                              "Unknown"
-                            )}
-                          </span>
-                          <span className="text-sm text-[#ff4d35] mr-5">
+                          {account.addressFormat ===
+                            "ADDRESS_FORMAT_SOLANA" && (
+                            <img
+                              src={SolanaIcon}
+                              className="w-6 h-6 mr-2"
+                              alt="Solana"
+                            />
+                          )}
+                          {account.addressFormat ===
+                            "ADDRESS_FORMAT_ETHEREUM" && (
+                            <img
+                              src={EthereumIcon}
+                              className="w-6 h-6 mr-2"
+                              alt="Ethereum"
+                            />
+                          )}
+                          <span className="text-sm font-medium text-gray-600">
                             {`${account.address.slice(
                               0,
-                              3
-                            )}...${account.address.slice(-3)}`}
+                              4
+                            )}...${account.address.slice(-4)}`}
                           </span>
-                          <div className="flex flex-col items-center justify-center">
-                            <span className="text-sm text-[#ff4d35]">
-                              SOL {solBalance}
-                            </span>
-                            <span className="text-sm text-[#ff4d35]">
-                              ${usdSolBalance}
-                            </span>
-                          </div>{" "}
-                          <button
-                            className="p-2 hover:bg-gray-100 rounded"
-                            onClick={() => {
-                              navigator.clipboard.writeText(account.address);
-                              // Optionally, you can add a toast or alert here to confirm the copy action
-                              alert("Address copied to clipboard!");
-                            }}
-                          >
-                            <img src={CopyIcon} className="w-4 h-4" />
-                          </button>
                         </div>
-                        <div className="flex flex-col items-center justify-center">
-                          <TokensBalances address={account.address} />
+                        <button
+                          className="p-2 hover:bg-gray-200 rounded"
+                          onClick={() => {
+                            navigator.clipboard.writeText(account.address);
+                            alert("Address copied to clipboard!");
+                          }}
+                        >
+                          <img src={CopyIcon} className="w-4 h-4" alt="Copy" />
+                        </button>
+                      </div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-semibold">
+                          {account.addressFormat === "ADDRESS_FORMAT_SOLANA"
+                            ? "SOL"
+                            : "ETH"}
+                        </span>
+                        <div className="text-right">
+                          <div className="text-sm font-medium">
+                            {account.addressFormat === "ADDRESS_FORMAT_SOLANA"
+                              ? solBalance
+                              : ethBalance}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            $
+                            {account.addressFormat === "ADDRESS_FORMAT_SOLANA"
+                              ? usdSolBalance
+                              : usdEthBalance}
+                          </div>
                         </div>
+                      </div>
+                      <div className="mt-4">
+                        <h4 className="text-lg font-semibold mb-2">
+                          Token Portfolio
+                        </h4>
+                        <TokensBalances address={account.address} />
                       </div>
                     </div>
                   ))}
