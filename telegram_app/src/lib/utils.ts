@@ -47,8 +47,8 @@ export async function getAllEthereumTokensBalance(address: string) {
     });
 
     const response = await Moralis.EvmApi.token.getWalletTokenBalances({
-      address,
-      chain: "eth",
+      address: address,
+      chain: "0x1",
     });
     return response.toJSON();
   } catch (error) {
