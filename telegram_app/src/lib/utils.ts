@@ -248,21 +248,7 @@ export async function setUserSession(user_id: string) {
  * @returns {Promise<any>} The response from the Turnkey API after creating the wallet account.
  * @throws {Error} If the user data is invalid or cannot be parsed.
  */
-export async function createEvmAccount(): Promise<any> {
-  // Retrieve user data from TelegramApi
-  const user = await TelegramApi.getItem(
-    `user_${WebApp.initDataUnsafe.user?.id}`
-  );
-
-  let user_json;
-  try {
-    // Parse the user data from JSON string to object
-    user_json = JSON.parse(user);
-  } catch (error) {
-    // If parsing fails, throw an error
-    throw new Error("Invalid user data provided.");
-  }
-
+export async function createEvmAccount(user_json: any): Promise<any> {
   // Initialize the Turnkey client with user-specific credentials
   const turnkeyClient = new Turnkey({
     apiBaseUrl: "https://api.turnkey.com",

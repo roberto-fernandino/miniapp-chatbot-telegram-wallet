@@ -3,6 +3,7 @@ import SolanaIcon from "./assets/sol.png";
 import SwapSheet from "./components/ui/SwapSheet";
 import {
   checkUserAccounts,
+  createEvmAccount,
   deleteCopyTradeWallet,
   generateKeyPair,
   getTokenData,
@@ -32,6 +33,7 @@ import { TelegramApi } from "./telegram/telegram-api";
 import TokensBalances from "./components/ui/tokenBalances";
 import TokensBalancesSwap from "./components/ui/tokensBalancesSwap";
 import SwapInterface from "./components/ui/swap";
+import { DEFAULT_SOLANA_ACCOUNTS } from "@turnkey/sdk-browser";
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -128,12 +130,7 @@ const App: React.FC = () => {
           wallet: {
             walletName: WebApp.initDataUnsafe.user?.username ?? "",
             accounts: [
-              {
-                curve: "CURVE_ED25519",
-                pathFormat: "PATH_FORMAT_BIP32",
-                path: "m/44'/501'/0'/0'",
-                addressFormat: "ADDRESS_FORMAT_SOLANA",
-              },
+              ...DEFAULT_SOLANA_ACCOUNTS,
               ...DEFAULT_ETHEREUM_ACCOUNTS,
             ],
           },
@@ -420,9 +417,13 @@ const App: React.FC = () => {
       const { has_solana, has_evm, has_sui } = await checkUserAccounts(
         json_user
       );
-      log(`has_solana: ${has_solana}`, "info");
-      log(`has_evm: ${has_evm}`, "info");
-      log(`has_sui: ${has_sui}`, "info");
+
+      if (!has_evm) {
+        log("User does not have an EVM account", "info");
+        log("Creating EVM account", "info");
+        const evm_account = await createEvmAccount(json_user);
+        return;
+      }
     } catch (error) {
       log("User not signed up", "success");
       setIsRegistered(false);
