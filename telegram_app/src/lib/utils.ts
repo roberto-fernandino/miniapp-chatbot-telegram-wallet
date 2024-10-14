@@ -3,7 +3,7 @@ import { type ClassValue, clsx } from "clsx";
 import axios from "axios";
 import * as crypto from "crypto";
 import { twMerge } from "tailwind-merge";
-import { DEFAULT_ETHEREUM_ACCOUNTS, Turnkey } from "@turnkey/sdk-server";
+import { Turnkey } from "@turnkey/sdk-server";
 import { TurnkeySigner } from "@turnkey/solana";
 import { SendTransactionError } from "@solana/web3.js";
 import {
@@ -16,7 +16,46 @@ import {
 import { TelegramApi } from "../telegram/telegram-api";
 import { log } from "console";
 import WebApp from "@twa-dev/sdk";
-import { DEFAULT_SOLANA_ACCOUNTS } from "@turnkey/sdk-browser";
+import {
+  DEFAULT_SOLANA_ACCOUNTS,
+  DEFAULT_ETHEREUM_ACCOUNTS,
+} from "@turnkey/sdk-browser";
+
+// Web3Provider is the Ethereum provider that allows interaction with the Ethereum blockchain
+// It wraps a standard Web3 provider and provides additional Ethereum-specific functionality
+import { Web3Provider } from "@ethersproject/providers";
+
+// Contract is a utility for interacting with Ethereum smart contracts
+import { Contract } from "@ethersproject/contracts";
+
+// formatUnits is a utility function for converting a value from its smallest unit (e.g., wei) to a larger unit (e.g., ether)
+import { formatUnits } from "@ethersproject/units";
+
+// Api to fetch ETH data
+import Moralis from "moralis";
+
+const ERC20_ABI = [
+  "function balanceOf(address owner) view returns (uint256)",
+  "function decimals() view returns (uint8)",
+  "function symbol() view returns (string)",
+];
+
+export async function getAllEthereumTokensBalance(address: string) {
+  try {
+    await Moralis.start({
+      apiKey: import.meta.env.VITE_MORALIS_API_KEY,
+    });
+
+    const response = await Moralis.EvmApi.token.getWalletTokenBalances({
+      address,
+      chain: "eth",
+    });
+    return response.toJSON();
+  } catch (error) {
+    throw error;
+  }
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
