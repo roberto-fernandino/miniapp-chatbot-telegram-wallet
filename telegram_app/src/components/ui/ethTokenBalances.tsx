@@ -21,7 +21,9 @@ const EthTokenBalances: React.FC<{ address: string }> = ({ address }) => {
   useEffect(() => {
     setLoading(true);
     getAllEthereumTokensBalance(address).then((response) => {
-      setTokens(response);
+      if (response.length > 0) {
+        setTokens(response);
+      }
       setLoading(false);
     });
   }, [address]);
