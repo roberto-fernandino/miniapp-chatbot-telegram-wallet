@@ -152,7 +152,12 @@ const App: React.FC = () => {
             },
           ],
         });
-
+      log(
+        `Create sub org with user response: ${JSON.stringify(
+          createSubOrgWithUserRespse
+        )}`,
+        "success"
+      );
       const walletId =
         (await createSubOrgWithUserRespse)?.wallet?.walletId ?? "";
       const subOrgId =
