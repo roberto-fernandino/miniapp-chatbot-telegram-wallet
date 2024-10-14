@@ -1,28 +1,43 @@
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
-use tokio_tungstenite::{connect_async, WebSocketStream, MaybeTlsStream};
-use futures::{stream::SplitSink, SinkExt, StreamExt};
-use solana_transaction_status::{EncodedConfirmedTransactionWithStatusMeta, UiTransactionEncoding};
+use serde::Serialize;
+use crate::modules::matis::SwapTransaction;
+use futures::stream::SplitSink;
+use solana_transaction_status::EncodedConfirmedTransactionWithStatusMeta;
+use std::str::FromStr;
+use tokio::sync::broadcast;
 use solana_account_decoder::UiAccountData;
-use solana_program::native_token::{lamports_to_sol, sol_to_lamports};
-use solana_sdk::{
-    commitment_config::{CommitmentLevel, CommitmentConfig},
-    signature::Signature,
-    pubkey::Pubkey,
-};
-use solana_client::{rpc_client::RpcClient, rpc_config::RpcTransactionConfig};
+use solana_program::native_token::lamports_to_sol;
+use solana_sdk::native_token::sol_to_lamports;
+use crate::modules::matis::get_swap_transaction;
+use solana_transaction_status::UiTransactionEncoding;
+use solana_sdk::commitment_config::CommitmentLevel;
+use solana_sdk::commitment_config::CommitmentConfig;
+use solana_client::rpc_config::RpcTransactionConfig;
+use serde::Deserialize;
+use solana_sdk::signature::Signature;
+use solana_sdk::pubkey::Pubkey;
 use serde_json::Value as JsonValue;
-use tokio::{net::TcpStream, sync::broadcast, time::{sleep, Duration}};
-use std::{env, str::FromStr, sync::Arc, error::Error};
+use futures_util::StreamExt;
+use std::sync::Arc;
+use tokio::net::TcpStream;
+use tokio_tungstenite::{ MaybeTlsStream, WebSocketStream};
+use futures_util::stream::SplitStream;
+use futures::SinkExt;
+use std::env;
+use solana_client::rpc_client::RpcClient;
 use redis::{Commands, Connection};
-
-// Import local modules
+use utils::helpers::{decode_signature_get_transaction, get_account_involved_in_transaction};
+use tokio::time::{sleep, Duration};
 mod utils;
 mod modules;
 use modules::{
-    jupiter, pump, raydium, transfer,
-    matis::{SwapTransaction, get_swap_transaction},
+    jupiter::{is_jupiter_swap, info_jupiter_swap},
+    pump::{is_pump_swap, info_pump_swap},
+    raydium::{is_raydium_swap, info_raydium_swap},
+    transfer::handle_transfer_transaction
 };
+use tokio_tungstenite::tungstenite::Message;
+use futures::lock::Mutex;
 
 /// Initialize the RPC client
 ///
@@ -119,7 +134,12 @@ pub fn get_copy_trade_wallets(conn: &mut redis::Connection) -> Result<Vec<CopyTr
 /// # Returns
 /// - `Result<()>`: Ok if successful, or an error
 pub async fn subscribe_to_account_transaction(
-    write: &mut SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
+    write: &mut futures::stream::SplitSink<
+        tokio_tungstenite::WebSocketStream<
+            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        >,
+        tokio_tungstenite::tungstenite::Message,
+    >,
     addresses: Vec<CopyTradeWallet>,
 ) -> Result<()> {
     println!("Watching for {} addresses", addresses.len());
@@ -538,6 +558,8 @@ async fn get_and_send_buy_transaction(
         token_ca.to_string(),
         sol_to_lamports(buy_amount),
     ).await?;
+
+    // Create and send payload
     let payload = Payload {
         event_type: "copy_trade".to_string(),
         data: transaction,
