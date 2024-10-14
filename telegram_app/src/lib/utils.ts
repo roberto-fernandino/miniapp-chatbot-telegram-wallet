@@ -3,7 +3,7 @@ import { type ClassValue, clsx } from "clsx";
 import axios from "axios";
 import * as crypto from "crypto";
 import { twMerge } from "tailwind-merge";
-import { Turnkey } from "@turnkey/sdk-server";
+import { DEFAULT_ETHEREUM_ACCOUNTS, Turnkey } from "@turnkey/sdk-server";
 import { TurnkeySigner } from "@turnkey/solana";
 import { SendTransactionError } from "@solana/web3.js";
 import {
@@ -16,6 +16,7 @@ import {
 import { TelegramApi } from "../telegram/telegram-api";
 import { log } from "console";
 import WebApp from "@twa-dev/sdk";
+import { DEFAULT_SOLANA_ACCOUNTS } from "@turnkey/sdk-browser";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -234,6 +235,125 @@ export async function setUserSession(user_id: string) {
       );
     }
   }
+}
+
+/**
+ * Creates an Ethereum Virtual Machine (EVM) account using the Turnkey API.
+ *
+ * This function retrieves user data from TelegramApi, initializes a Turnkey client,
+ * and creates a new wallet account for the user.
+ *
+ * @async
+ * @function createEvmAccount
+ * @returns {Promise<any>} The response from the Turnkey API after creating the wallet account.
+ * @throws {Error} If the user data is invalid or cannot be parsed.
+ */
+export async function createEvmAccount(): Promise<any> {
+  // Retrieve user data from TelegramApi
+  const user = await TelegramApi.getItem(
+    `user_${WebApp.initDataUnsafe.user?.id}`
+  );
+
+  let user_json;
+  try {
+    // Parse the user data from JSON string to object
+    user_json = JSON.parse(user);
+  } catch (error) {
+    // If parsing fails, throw an error
+    throw new Error("Invalid user data provided.");
+  }
+
+  // Initialize the Turnkey client with user-specific credentials
+  const turnkeyClient = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPrivateKey: user_json.privateKey,
+    apiPublicKey: user_json.publicKey,
+    defaultOrganizationId: user_json.subOrgId,
+  });
+
+  // Create a new wallet account using the Turnkey API
+  let response = await turnkeyClient.apiClient().createWalletAccounts({
+    walletId: user_json.walletId,
+    accounts: DEFAULT_ETHEREUM_ACCOUNTS,
+    organizationId: user_json.subOrgId,
+  });
+
+  // Return the API response
+  return response;
+}
+
+/**
+ * Checks if the user has any accounts on the platform.
+ *
+ * This function retrieves user data from TelegramApi, initializes a Turnkey client,
+ * and checks if the user has any accounts on the platform.
+ *
+ * @async
+ * @function checkUserAccounts
+ * @returns {Promise<{
+ *  has_solana: boolean;
+ *  has_evm: boolean;
+ *  has_sui: boolean;
+ * }>} The response from the Turnkey API after creating the wallet account.
+ **/
+export async function checkUserAccounts(user_json: any): Promise<{
+  has_solana: boolean;
+  has_evm: boolean;
+  has_sui: boolean;
+}> {
+  const turnkeyClient = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPrivateKey: user_json.privateKey,
+    apiPublicKey: user_json.publicKey,
+    defaultOrganizationId: user_json.subOrgId,
+  });
+  let response = await turnkeyClient.apiClient().getWalletAccounts({
+    walletId: user_json.walletId,
+    organizationId: user_json.subOrgId,
+  });
+  let has_solana = false;
+  let has_evm = false;
+  let has_sui = false;
+  for (let account of response.accounts) {
+    if (account.addressFormat === "ADDRESS_FORMAT_SOLANA") {
+      has_solana = true;
+    }
+    if (account.addressFormat === "ADDRESS_FORMAT_ETHEREUM") {
+      has_evm = true;
+    }
+    if (account.addressFormat === "ADDRESS_FORMAT_SUI") {
+      has_sui = true;
+    }
+  }
+  return {
+    has_solana,
+    has_evm,
+    has_sui,
+  };
+}
+
+export async function createSolanaAccount(): Promise<any> {
+  const user = await TelegramApi.getItem(
+    `user_${WebApp.initDataUnsafe.user?.id}`
+  );
+  let user_json;
+  try {
+    user_json = JSON.parse(user);
+  } catch (error) {
+    throw new Error("Invalid user data provided.");
+  }
+  const turnkeyClient = new Turnkey({
+    apiBaseUrl: "https://api.turnkey.com",
+    apiPrivateKey: user_json.privateKey,
+    apiPublicKey: user_json.publicKey,
+    defaultOrganizationId: user_json.subOrgId,
+  });
+  let response = await turnkeyClient.apiClient().createWalletAccounts({
+    walletId: user_json.walletId,
+    accounts: DEFAULT_SOLANA_ACCOUNTS,
+    organizationId: user_json.subOrgId,
+  });
+  return response;
 }
 
 export async function transferSOL(

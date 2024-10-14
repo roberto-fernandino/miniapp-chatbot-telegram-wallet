@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import SolanaIcon from "./assets/sol.png";
 import SwapSheet from "./components/ui/SwapSheet";
 import {
+  checkUserAccounts,
   deleteCopyTradeWallet,
   generateKeyPair,
   getTokenData,
@@ -416,8 +417,15 @@ const App: React.FC = () => {
     let json_user;
     try {
       json_user = JSON.parse(user);
+      const { has_solana, has_evm, has_sui } = await checkUserAccounts(
+        json_user
+      );
+      log(`has_solana: ${has_solana}`, "info");
+      log(`has_evm: ${has_evm}`, "info");
+      log(`has_sui: ${has_sui}`, "info");
     } catch (error) {
       log("User not signed up", "success");
+      setIsRegistered(false);
       return;
     }
     try {
@@ -433,11 +441,9 @@ const App: React.FC = () => {
       });
 
       const turnkeyClient = turnkey.apiClient();
-
       const accounts = await turnkeyClient.getWalletAccounts({
         walletId: json_user.walletId,
       });
-      json_user.accounts = accounts.accounts;
       await TelegramApi.setItem(
         `user_${WebApp.initDataUnsafe.user?.id}`,
         JSON.stringify(json_user)
