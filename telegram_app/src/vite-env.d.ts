@@ -11,6 +11,7 @@ interface ImportMetaEnv {
   readonly VITE_TURNKEY_ORGNIZATION: string;
   readonly VITE_ENCRYPTION_KEY: string;
   readonly VITE_RPC_URL: string;
+  readonly VITE_MORALIS_API_KEY: string;
 }
 
 interface ImportMeta {
