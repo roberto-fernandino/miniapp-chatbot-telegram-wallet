@@ -5,14 +5,15 @@ import SwapSheet from "./components/ui/SwapSheet";
 import {
   checkUserAccounts,
   createEvmAccount,
+  createSolanaAccount,
   deleteCopyTradeWallet,
   generateKeyPair,
+  getEthBalance,
+  getETHPrice,
   getTokenData,
   setUserSession,
-  signAndSendTransaction,
 } from "./lib/utils";
 import WebApp from "@twa-dev/sdk";
-import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { DEFAULT_ETHEREUM_ACCOUNTS, Turnkey } from "@turnkey/sdk-server";
 import {
@@ -21,7 +22,7 @@ import {
   decryptPassword,
   encryptPassword,
   getSOLPrice,
-  getBalance as getSolBalance,
+  getSolBalance as getSolBalance,
   transferSOL,
   copyTrade,
 } from "./lib/utils";
@@ -36,15 +37,18 @@ import TokensBalancesSwap from "./components/ui/tokensBalancesSwap";
 import SwapInterface from "./components/ui/swap";
 import { DEFAULT_SOLANA_ACCOUNTS } from "@turnkey/sdk-browser";
 import EthTokenBalances from "./components/ui/ethTokenBalances";
-import { getAllEthereumTokensBalance } from "./lib/utils";
+import { swapSolanaTokens } from "./lib/solana";
 
 const App: React.FC = () => {
+  // User information
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [userAccounts, setUserAccounts] = useState<any[]>([]);
   const [walletId, setWalletId] = useState<string>("");
+  const [userSolAddress, setUserSolAddress] = useState<string>("");
+  const [userEthAddress, setUserEthAddress] = useState<string>("");
 
   // Session information
   const [sessionActive, setSessionActive] = useState<boolean>(false);
@@ -429,6 +433,23 @@ const App: React.FC = () => {
         log("User does not have an EVM account", "info");
         log("Creating EVM account", "info");
         const evm_account = await createEvmAccount(json_user);
+        setUserEthAddress(evm_account);
+      } else {
+        let evm_address = json_user.accounts.find(
+          (account: any) => account.addressFormat === "ADDRESS_FORMAT_ETHEREUM"
+        )?.address;
+        setUserEthAddress(evm_address);
+      }
+      if (!has_solana) {
+        log("User does not have an Solana account", "info");
+        log("Creating Solana account", "info");
+        const solana_account = await createSolanaAccount(json_user);
+        setUserSolAddress(solana_account);
+      } else {
+        let sol_address = json_user.accounts.find(
+          (account: any) => account.addressFormat === "ADDRESS_FORMAT_SOLANA"
+        )?.address;
+        setUserSolAddress(sol_address);
       }
     } catch (error) {
       throw new Error("Initialization error: " + error);
@@ -505,83 +526,31 @@ const App: React.FC = () => {
   const updateBalance = async () => {
     if (userAccounts.length > 0) {
       try {
-        const solanaAddress = userAccounts.find(
-          (account) => account.addressFormat === "ADDRESS_FORMAT_SOLANA"
-        )?.address;
-        if (solanaAddress) {
-          const balance = await getSolBalance(solanaAddress);
-          setSolBalance(balance);
-
+        // get sol balance
+        if (userSolAddress) {
+          const solBalance = await getSolBalance(userSolAddress);
+          setSolBalance(solBalance);
           const solPrice = await getSOLPrice();
-          const usdValue = (parseFloat(balance) * solPrice).toFixed(2);
-
+          const usdValue = (parseFloat(solBalance) * solPrice).toFixed(2);
           setUsdSolBalance(usdValue);
+        } else {
+          log("User does not have a Solana address", "error");
+        }
+
+        // get eth balance
+        if (userEthAddress) {
+          const ethBalanace = await getEthBalance(userEthAddress);
+          setEthBalance(ethBalanace);
+          const ethPrice = await getETHPrice();
+          const usdValue = (parseFloat(ethBalanace) * ethPrice).toFixed(2);
+          setUsdEthBalance(usdValue);
+        } else {
+          log("User does not have a EVM address", "error");
         }
       } catch (error) {
         log(`Failed to update balance: ${error}`, "error");
       }
     }
-  };
-
-  interface Token {
-    symbol: string;
-    name: string;
-    logoURI: string;
-    balance: string;
-    address: string;
-  }
-
-  const swapTokens = async (
-    userPublicKey: string,
-    toToken: Token,
-    fromToken: Token,
-    fromAmount: number,
-    slippage: number
-  ) => {
-    const slippageBps = slippage * 100;
-    log(`Slippage: ${slippageBps}`, "info");
-    log(`From Token: ${fromToken.address}`, "info");
-    log(`To Token: ${JSON.stringify(toToken.address)}`, "info");
-    log(`From Amount: ${fromAmount}`, "info");
-
-    // convert fromAmount to integer
-    let integerAmount;
-    if (fromToken.symbol === "SOL") {
-      integerAmount = fromAmount * 1e9;
-    } else {
-      integerAmount = fromAmount * 10 ** 6;
-    }
-
-    // get quote
-    let urlQuote = `https://public.jupiterapi.com/quote?inputMint=${fromToken.address}&outputMint=${toToken.address}&amount=${integerAmount}&slippageBps=${slippageBps}`;
-
-    const quoteResponse = await axios.get(urlQuote);
-
-    // get swap
-    const urlSwap = `https://public.jupiterapi.com/swap`;
-    const payload = {
-      userPublicKey: userPublicKey,
-      quoteResponse: quoteResponse.data,
-    };
-    const swapResponse = await axios.post(urlSwap, payload, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-    log("Swap built", "success");
-    let tx = swapResponse.data.swapTransaction;
-    if (!tx || typeof tx !== "string") {
-      return;
-    }
-    // Verify that tx is a valid base64 string
-    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(tx)) {
-      throw new Error("Swap transaction is not a valid base64 string");
-    }
-    log("Swap transaction is valid", "success");
-    log("Signing and sending transaction", "info");
-    let result = await signAndSendTransaction(tx);
-    log(`Transaction result: ${JSON.stringify(result)}`, "success");
-    return result;
   };
 
   const handleEndSession = async () => {
@@ -858,8 +827,10 @@ const App: React.FC = () => {
                         <SwapInterface
                           tokenData={tokenData}
                           solBalance={solBalance}
+                          ethBalance={ethBalance}
                           address={userAccounts[0].address}
-                          swapTokens={swapTokens}
+                          swapSolanaTokens={swapSolanaTokens}
+                          swapEthereumTokens={swapEthereumTokens}
                         />
                       </>
                     )}
@@ -927,8 +898,18 @@ const App: React.FC = () => {
                           <div className="text-sm font-medium">
                             {account.addressFormat ===
                               "ADDRESS_FORMAT_SOLANA" && solBalance}
+                            {usdSolBalance ? (
+                              `USD ${usdSolBalance}`
+                            ) : (
+                              <Spinner />
+                            )}
                             {account.addressFormat ===
                               "ADDRESS_FORMAT_ETHEREUM" && ethBalance}
+                            {usdEthBalance ? (
+                              `USD ${usdEthBalance}`
+                            ) : (
+                              <Spinner />
+                            )}
                           </div>
                         </div>
                       </div>
