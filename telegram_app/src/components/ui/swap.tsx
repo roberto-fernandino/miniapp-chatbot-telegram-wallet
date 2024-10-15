@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Button } from "./button";
 import { Input } from "./input";
 import solLogo from "../../assets/sol.png";
-import { getAllSolanaTokensBalance, getSOLPrice } from "../../lib/utils";
+import { getAllSolanaTokensBalance, getSOLPrice } from "../../lib/solana";
 import { AccountInfo, ParsedAccountData, PublicKey } from "@solana/web3.js";
+import { isValidSolanaAddress } from "../../lib/solana";
+import { isValidEthereumAddress } from "../../lib/eth";
 
 interface Token {
   symbol: string;
@@ -12,15 +14,26 @@ interface Token {
   balance: string;
   address: string;
 }
-interface TokenInfo {
+type Network = "solana" | "ethereum";
+
+interface SolTokenInfo {
   pubkey: PublicKey;
   account: AccountInfo<ParsedAccountData>;
 }
+
 interface SwapInterfaceProps {
   tokenData: any;
   solBalance: string;
+  ethBalance: string;
   address: string;
-  swapTokens: (
+  swapSolanaTokens: (
+    userPublicKey: string,
+    toToken: Token,
+    fromToken: Token,
+    fromAmount: number,
+    slippage: number
+  ) => Promise<any>;
+  swapEthereumTokens: (
     userPublicKey: string,
     toToken: Token,
     fromToken: Token,
@@ -32,8 +45,10 @@ interface SwapInterfaceProps {
 const SwapInterface: React.FC<SwapInterfaceProps> = ({
   tokenData,
   solBalance,
+  ethBalance,
   address,
-  swapTokens,
+  swapSolanaTokens: swapSolanaTkoens,
+  swapEthereumTokens: swapEthereumTokens,
 }) => {
   const [fromToken, setFromToken] = useState<Token>({
     symbol: "SOL",
@@ -51,8 +66,7 @@ const SwapInterface: React.FC<SwapInterfaceProps> = ({
   const [debounceTimeout, setDebounceTimeout] = useState<NodeJS.Timeout | null>(
     null
   );
-
-  const [quote, setQuote] = useState(null);
+  const [network, setNetwork] = useState<Network | null>(null);
 
   useEffect(() => {
     if (tokenData) {
@@ -68,7 +82,7 @@ const SwapInterface: React.FC<SwapInterfaceProps> = ({
 
   useEffect(() => {
     getAllSolanaTokensBalance(address).then((response) => {
-      response.value.map((token: TokenInfo) => {
+      response.value.map((token: SolTokenInfo) => {
         setTokenAmount(token.account.data.parsed.info.tokenAmount.uiAmount);
       });
     });
@@ -115,6 +129,14 @@ const SwapInterface: React.FC<SwapInterfaceProps> = ({
     handleChangeAmount(fromToken.balance);
   };
 
+  const checkAddressNetwork = (address: string): Network | null => {
+    if (isValidSolanaAddress(address)) {
+      return "solana";
+    } else if (isValidEthereumAddress(address)) {
+      return "ethereum";
+    }
+    return null;
+  };
   const handleSwap = async (
     userPublicKey: string,
     toToken: Token,
@@ -122,9 +144,29 @@ const SwapInterface: React.FC<SwapInterfaceProps> = ({
     fromAmount: number,
     slippage: number
   ) => {
-    await swapTokens(userPublicKey, toToken, fromToken, fromAmount, slippage);
+    const network = checkAddressNetwork(address);
+    if (!network) {
+      throw new Error("Invalid address for solana and ethereum.");
+    }
+    if (network === "solana") {
+      await swapSolanaTkoens(
+        userPublicKey,
+        toToken,
+        fromToken,
+        fromAmount,
+        slippage
+      );
+    }
+    if (network === "ethereum") {
+      await swapEthereumTokens(
+        userPublicKey,
+        toToken,
+        fromToken,
+        fromAmount,
+        slippage
+      );
+    }
   };
-
   return (
     <div className="p-4 bg-white rounded-lg shadow-md">
       <div className="mb-4">
@@ -213,7 +255,7 @@ const SwapInterface: React.FC<SwapInterfaceProps> = ({
       </div>
       <Button
         onClick={() => {
-          if (toToken && fromAmount) {
+          if (toToken?.address && fromAmount) {
             handleSwap(
               address,
               toToken,
