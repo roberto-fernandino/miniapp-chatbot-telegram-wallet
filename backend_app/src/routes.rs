@@ -158,5 +158,6 @@ pub async fn get_user_calls(req: tide::Request<()>) -> tide::Result<String> {
         };
         calls_with_ath.push(call_with_ath);
     }
+    println!("{:?}", calls_with_ath);
     Ok(serde_json::to_string(&calls_with_ath)?)
 }
