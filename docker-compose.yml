@@ -8,7 +8,7 @@ services:
     ports:
       - "5173:5173"
     volumes:
-      - sqlite-data:/app
+      - sqlite-data:/data
     env_file:
       - .env
     container_name: telegram_app
@@ -92,7 +92,7 @@ services:
       - app-network
     container_name: telegram_bot
     volumes:
-      - sqlite-data:/app
+      - sqlite-data:/data
     depends_on:
       - telegram_app
       - solana_app

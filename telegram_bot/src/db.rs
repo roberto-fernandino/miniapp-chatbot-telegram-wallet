@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use sqlite::State;
 use anyhow::Result;
 pub fn get_connection() -> Connection {
-    sqlite::open("/app/db.sqlite").unwrap()
+    sqlite::open("/data/db.sqlite").unwrap()
 }
 use crate::utils::helpers::check_period_for_leaderboard;
 pub fn configure_db(connection: &Connection) {

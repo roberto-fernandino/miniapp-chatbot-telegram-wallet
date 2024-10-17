@@ -6,7 +6,7 @@ use serde::Serialize;
 use crate::utils::helpers::check_period_for_leaderboard;
 
 pub fn get_db_connection() -> Connection {
-    sqlite::open("/app/db.sqlite").unwrap()
+    sqlite::open("/data/db.sqlite").unwrap()
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Serialize)]
