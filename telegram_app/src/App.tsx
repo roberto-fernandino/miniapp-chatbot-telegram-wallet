@@ -803,7 +803,6 @@ const App: React.FC = () => {
                     </>
                   )}
                   <Button onClick={() => setSwapSheetOpen(true)}>Swap</Button>
-                  // Swap sheet
                   <Sheet
                     isOpen={swapSheetOpen}
                     onClose={() => setSwapSheetOpen(false)}
@@ -845,7 +844,6 @@ const App: React.FC = () => {
                       />
                     </div>
                   </Sheet>
-                  // History sheet
                   <Sheet
                     isOpen={historySheetOpen}
                     onClose={() => setHistorySheetOpen(false)}
@@ -903,20 +901,24 @@ const App: React.FC = () => {
                         </span>
                         <div className="text-right">
                           <div className="text-sm font-medium">
-                            {account.addressFormat ===
-                              "ADDRESS_FORMAT_SOLANA" && solBalance}
-                            {usdSolBalance ? (
-                              `USD ${usdSolBalance}`
-                            ) : (
-                              <Spinner />
-                            )}
-                            {account.addressFormat ===
-                              "ADDRESS_FORMAT_ETHEREUM" && ethBalance}
-                            {usdEthBalance ? (
-                              `USD ${usdEthBalance}`
-                            ) : (
-                              <Spinner />
-                            )}
+                            <div className="flex flex-col items-center">
+                              {account.addressFormat ===
+                                "ADDRESS_FORMAT_SOLANA" && solBalance}
+                              {usdSolBalance ? (
+                                `USD ${usdSolBalance}`
+                              ) : (
+                                <Spinner />
+                              )}
+                            </div>
+                            <div className="flex flex-col items-center">
+                              {account.addressFormat ===
+                                "ADDRESS_FORMAT_ETHEREUM" && ethBalance}
+                              {usdEthBalance ? (
+                                `USD ${usdEthBalance}`
+                              ) : (
+                                <Spinner />
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
