@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getAllSolanaTokensBalance } from "../../lib/utils";
+import { getAllSolanaTokensBalance } from "../../lib/solana";
 import { PublicKey, AccountInfo, ParsedAccountData } from "@solana/web3.js";
 import { Spinner } from "./spinner";
 import SolToken from "./solToken";
