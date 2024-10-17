@@ -141,8 +141,16 @@ pub fn extract_years(command: &str) -> Option<u32> {
 /// # Returns
 /// 
 /// An i64 timestamp
-pub async fn time_to_timestamp(time: &str) -> i64 {
+pub async fn async_time_to_timestamp(time: &str) -> i64 {
     log::info!("time: {:?}", time);
+    let format = "%Y-%m-%d %H:%M:%S";
+    let naive_datetime = NaiveDateTime::parse_from_str(time, format)
+        .expect("Failed to parse datetime.");
+    let datetime: DateTime<Utc> = DateTime::from_naive_utc_and_offset(naive_datetime, Utc);
+    datetime.timestamp_millis()
+}
+
+pub fn time_to_timestamp(time: &str) -> i64 {
     let format = "%Y-%m-%d %H:%M:%S";
     let naive_datetime = NaiveDateTime::parse_from_str(time, format)
         .expect("Failed to parse datetime.");
@@ -180,7 +188,7 @@ pub async fn get_call_info(address: &String, con: &Arc<Mutex<Connection>>, msg: 
 
 
         // Calculating the age of the call
-        let timestamp = time_to_timestamp(&first_call.clone().expect("First call doesn't exist.").time).await;
+        let timestamp = async_time_to_timestamp(&first_call.clone().expect("First call doesn't exist.").time).await;
         let call_time = Utc.timestamp_millis_opt(timestamp).unwrap();
         let current_time = Utc::now();
         let time_delta: TimeDelta = current_time.signed_duration_since(call_time);

@@ -1,5 +1,4 @@
 use std::sync::{Arc, Mutex};
-use crate::utils::helpers::time_to_timestamp;
 use serde::Serialize;
 use reqwest::Url;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
@@ -12,7 +11,8 @@ use anyhow::Result;
 use serde_json::Value;
 mod utils;
 mod db;
-use db::{get_user_from_call, Call, User, get_connection, get_all_user_firsts_calls_by_user_tg_id};
+use crate::utils::helpers::time_to_timestamp;
+use db::{get_user_from_call, Call, User, get_all_user_firsts_calls_by_user_tg_id};
 use regex::Regex;
 
 /// Check if there's a valid solana address in a text
@@ -823,7 +823,7 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot) ->
         if unique_tokens.insert(call.token_address.clone()) {
             // If the token is not in the set, add it and process the call
             let ath = get_ath(
-                utils::helpers::time_to_timestamp(call.time.as_str()).await, 
+                utils::helpers::async_time_to_timestamp(call.time.as_str()).await, 
                 call.token_address.as_str(),
                 call.chain.as_str()).await?;
 
@@ -962,7 +962,7 @@ pub async fn best_call_user(user_tg_id: &str) -> Result<Option<CallWithAth>> {
     let mut best_call: Option<CallWithAth> = None;
     let mut count = 0;
     for call in user_calls {
-        let ath = get_ath(utils::helpers::time_to_timestamp(call.time.as_str()).await, call.token_address.as_str(), call.chain.as_str()).await?;
+        let ath = get_ath(utils::helpers::async_time_to_timestamp(call.time.as_str()).await, call.token_address.as_str(), call.chain.as_str()).await?;
         let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
         let multiplier = ath_after_call / call.price.parse::<f64>().unwrap_or(0.0);
         
@@ -1015,7 +1015,7 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
         }
         seen_tokens.insert(call.token_symbol.clone()); // Mark token as seen
 
-        let ath = get_ath(utils::helpers::time_to_timestamp(call.time.as_str()).await, call.token_address.as_str(), call.chain.as_str()).await?;
+        let ath = get_ath(utils::helpers::async_time_to_timestamp(call.time.as_str()).await, call.token_address.as_str(), call.chain.as_str()).await?;
         let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
         let multiplier = ath_after_call / call.price.parse::<f64>().unwrap_or(0.0);
         call_lb.push(CallWithAth {
@@ -1324,24 +1324,29 @@ pub fn get_safe_connection() -> SafeConnection {
 /// * `String` - A json string with the calls and the ATH
 pub async fn get_user_calls(req: tide::Request<()>) -> tide::Result<String> {
     println!("Getting user calls...");
-    let user_tg_id = req.param("tg_user_id")?;
+    let user_tg_id = req.param("tg_user_id")?.to_string();
     println!("user_tg_id: {}", user_tg_id);
     let mut con = get_safe_connection();
     println!("Connection to db stablished");
-    let calls_without_ath = get_all_user_firsts_calls_by_user_tg_id(&mut con, user_tg_id);
-    let mut calls_with_ath = Vec::new();
-    for call in calls_without_ath {
-        let ath = get_ath(time_to_timestamp(&call.time).await, &call.token_address, &call.chain).await?;
-        let ath_price = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
-        let multiplier = ath_price / call.price.parse::<f64>().unwrap_or(0.0);
-        let call_with_ath = CallHistoryUser
-         {
-            call,
-            multiplier,
-            ath: ath_price,
-        };
-        calls_with_ath.push(call_with_ath);
-    }
+
+    // Use tokio::spawn for async operations
+    let calls_with_ath = tokio::spawn(async move {
+        let calls_without_ath = get_all_user_firsts_calls_by_user_tg_id(&mut con, user_tg_id.as_str());
+        let mut calls_with_ath = Vec::new();
+        for call in calls_without_ath {
+            let ath = get_ath(time_to_timestamp(&call.time), &call.token_address, &call.chain).await?;
+            let ath_price = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+            let multiplier = ath_price / call.price.parse::<f64>().unwrap_or(0.0);
+            let call_with_ath = CallHistoryUser {
+                call,
+                multiplier,
+                ath: ath_price,
+            };
+            calls_with_ath.push(call_with_ath);
+        }
+        Ok::<Vec<CallHistoryUser>, anyhow::Error>(calls_with_ath)
+    }).await??;
+
     println!("calls_with_ath: {:?}", calls_with_ath);
     Ok(serde_json::to_string(&calls_with_ath)?)
 }
