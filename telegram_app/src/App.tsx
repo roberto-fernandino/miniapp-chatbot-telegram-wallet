@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import SolanaIcon from "./assets/sol.png";
 import EthereumIcon from "./assets/eth.png";
-import SwapSheet from "./components/ui/SwapSheet";
+import Sheet from "./components/ui/sheet";
 import {
   checkUserAccounts,
   createEvmAccount,
@@ -9,7 +9,6 @@ import {
   deleteCopyTradeWallet,
   generateKeyPair,
   getEthBalance,
-  getETHPrice,
   getTokenData,
   setUserSession,
 } from "./lib/utils";
@@ -21,11 +20,11 @@ import {
   getCopyTrades,
   decryptPassword,
   encryptPassword,
-  getSOLPrice,
   getSolBalance as getSolBalance,
-  transferSOL,
   copyTrade,
 } from "./lib/utils";
+import { transferSOL, getSOLPrice } from "./lib/solana";
+import { getETHPrice } from "./lib/eth";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Spinner } from "./components/ui/spinner";
@@ -95,6 +94,9 @@ const App: React.FC = () => {
   const [swapSheetOpen, setSwapSheetOpen] = useState(false);
   const [tokenCa, setTokenCa] = useState("");
   const [tokenData, setTokenData] = useState<any>(null);
+
+  // History
+  const [historySheetOpen, setHistorySheetOpen] = useState(false);
 
   useEffect(() => {
     initializeApp();
@@ -801,7 +803,8 @@ const App: React.FC = () => {
                     </>
                   )}
                   <Button onClick={() => setSwapSheetOpen(true)}>Swap</Button>
-                  <SwapSheet
+                  // Swap sheet
+                  <Sheet
                     isOpen={swapSheetOpen}
                     onClose={() => setSwapSheetOpen(false)}
                   >
@@ -830,7 +833,6 @@ const App: React.FC = () => {
                           ethBalance={ethBalance}
                           address={userAccounts[0].address}
                           swapSolanaTokens={swapSolanaTokens}
-                          swapEthereumTokens={swapEthereumTokens}
                         />
                       </>
                     )}
@@ -842,11 +844,16 @@ const App: React.FC = () => {
                         setTokenCa={setTokenCa}
                       />
                     </div>
-                  </SwapSheet>
-
-                  <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 text-transparent bg-clip-text">
-                    Wallets
-                  </h3>
+                  </Sheet>
+                  // History sheet
+                  <Sheet
+                    isOpen={historySheetOpen}
+                    onClose={() => setHistorySheetOpen(false)}
+                  >
+                    <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 text-transparent bg-clip-text">
+                      History
+                    </h3>
+                  </Sheet>
                   {userAccounts.map((account) => (
                     <div
                       key={account.walletId}
