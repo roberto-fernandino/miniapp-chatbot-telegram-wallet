@@ -1,6 +1,6 @@
 use chrono::{TimeDelta, TimeZone};
+use sqlx::PgPool;
 use crate::{there_is_valid_solana_address, there_is_valid_eth_address, get_valid_solana_address, get_valid_eth_address};
-use sqlite::Connection;
 use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use crate::{format_age, format_number};
@@ -141,12 +141,8 @@ pub fn extract_years(command: &str) -> Option<u32> {
 /// # Returns
 /// 
 /// An i64 timestamp
-pub async fn async_time_to_timestamp(time: &str) -> i64 {
-    log::info!("time: {:?}", time);
-    let format = "%Y-%m-%d %H:%M:%S";
-    let naive_datetime = NaiveDateTime::parse_from_str(time, format)
-        .expect("Failed to parse datetime.");
-    let datetime: DateTime<Utc> = DateTime::from_naive_utc_and_offset(naive_datetime, Utc);
+pub async fn async_time_to_timestamp(time: NaiveDateTime) -> i64 {
+    let datetime: DateTime<Utc> = DateTime::from_naive_utc_and_offset(time, Utc);
     datetime.timestamp_millis()
 }
 
@@ -169,35 +165,35 @@ pub fn time_to_timestamp(time: &str) -> i64 {
 /// # Returns
 /// 
 /// A string containing the call info
-pub async fn get_call_info(address: &String, con: &Arc<Mutex<Connection>>, msg: &Message) -> Result<String> {
+pub async fn get_call_info(address: &String, pool: &PgPool, msg: &Message) -> Result<String> {
     // First call info
     let mut call_info_str = String::new();
-    let is_first_call = is_first_call(&con,address.as_ref(), msg.chat.id.to_string().as_str());
+    let is_first_call = is_first_call(&pool,address.as_ref(), msg.chat.id.to_string().as_str()).await?;
     let token_pair_and_token_address  = get_pair_token_pair_and_token_address(address).await?;
     let scanner_response = get_scanner_search(token_pair_and_token_address["pairAddress"].as_str().unwrap_or(""), token_pair_and_token_address["tokenAddress"].as_str().unwrap_or(""), token_pair_and_token_address["chainName"].as_str().unwrap_or("")).await?;
     let mkt_cap = scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
     if !is_first_call {
+        let chat_id_str = msg.chat.id.to_string();
         let first_call = {
-            let con = con.lock().unwrap();
-            get_first_call_token_chat(&con, address.as_ref(), msg.chat.id.to_string().as_str())
+            get_first_call_token_chat(&pool, address.as_ref(), chat_id_str.as_str())
         };
 
         // Calculating the % change
-        let first_call_mkt_cap = first_call.clone().expect("First call not found").mkt_cap.parse::<f64>().unwrap_or(0.0);
+        let first_call = first_call.await.expect("First call not found");
+        let first_call_mkt_cap = first_call.clone().unwrap().mkt_cap.parse::<f64>().unwrap_or(0.0);
         let percentage_change = format_number(((mkt_cap - first_call_mkt_cap) / first_call_mkt_cap) * 100.0);
 
 
         // Calculating the age of the call
-        let timestamp = async_time_to_timestamp(&first_call.clone().expect("First call doesn't exist.").time).await;
+        let timestamp = async_time_to_timestamp(first_call.clone().unwrap().time).await;
         let call_time = Utc.timestamp_millis_opt(timestamp).unwrap();
         let current_time = Utc::now();
         let time_delta: TimeDelta = current_time.signed_duration_since(call_time);
         if let Some(first_call) = first_call{
             let user_called_first = {
-                let con = con.lock().unwrap();
-                get_user(&con, first_call.user_tg_id.as_str()).expect("User not found")
+                get_user(&pool, first_call.user_tg_id.as_str()).await.expect("User not found")
             };
-            call_info_str.push_str(&format!("😈 <a href=\"https://t.me/sj_copyTradebot?start=user_{}\"><i><b>{}</b></i></a> @ {} <b>[{}%]</b> ({})", first_call.user_tg_id,  user_called_first.username, format_number(first_call.mkt_cap.parse::<f64>().unwrap_or(0.0)), percentage_change, format_age(time_delta)));
+            call_info_str.push_str(&format!("😈 <a href=\"https://t.me/sj_copyTradebot?start=user_{}\"><i><b>{}</b></i></a> @ {} <b>[{}%]</b> ({})", first_call.user_tg_id,  user_called_first.expect("Couldn't get the user").username.unwrap_or("Unknown".to_string()), format_number(first_call.mkt_cap.parse::<f64>().unwrap_or(0.0)), percentage_change, format_age(time_delta)));
         }
     } 
     Ok(call_info_str)

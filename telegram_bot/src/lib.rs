@@ -5,7 +5,6 @@ use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 use chrono::Duration;
 use chrono::{DateTime, Utc};
 use teloxide::prelude::*;
-use sqlite::Connection;
 use reqwest::Client;
 use anyhow::Result;
 use serde_json::Value;
@@ -14,6 +13,10 @@ mod db;
 use crate::utils::helpers::time_to_timestamp;
 use db::{get_user_from_call, Call, User, get_all_user_firsts_calls_by_user_tg_id};
 use regex::Regex;
+use sqlx::Pool;
+use sqlx::Postgres;
+
+pub type SafePool = Arc<Pool<Postgres>>;
 
 /// Check if there's a valid solana address in a text
 /// 
@@ -310,7 +313,7 @@ pub fn format_age(duration: Duration) -> String {
 /// # Returns
 /// 
 /// A string containing the formatted message
-pub fn call_message(con: &Arc<Mutex<Connection>>, ath_response: &Value, holders_response: &Value, scanner_response: &Value,  mut call_info_str: String, user: User, chain: &str) -> String {
+pub async fn call_message(pool: &SafePool, ath_response: &Value, holders_response: &Value, scanner_response: &Value,  mut call_info_str: String, user: User, chain: &str) -> String {
     // Main info
     let pair_address = scanner_response["pair"]["pairAddress"].as_str().unwrap_or("");
     let token_symbol = scanner_response["pair"]["token1Symbol"].as_str().unwrap_or("N/A").to_uppercase();
@@ -337,8 +340,8 @@ pub fn call_message(con: &Arc<Mutex<Connection>>, ath_response: &Value, holders_
 
    //  If is first call, call_info_str com empty from @call function, so we need to add the first call info
     if call_info_str == "" {
-        call_info_str = format!("🔥 First Call <a href=\"https://t.me/sj_copyTradebot?start=user_{}\"><i><b>{}</b></i></a> @ {}\n",user.id,  user.username, mkt_cap);
-        call_info_str.push_str(&format!("└ Calls today: {} 🎉", db::get_qtd_calls_user_made_in_24hrs(&con, user.tg_id.as_str())));
+        call_info_str = format!("🔥 First Call <a href=\"https://t.me/sj_copyTradebot?start=user_{}\"><i><b>{}</b></i></a> @ {}\n",user.id,  user.username.unwrap_or("N/A".to_string()), mkt_cap);
+        call_info_str.push_str(&format!("└ Calls today: {} 🎉", db::get_qtd_calls_user_made_in_24hrs(&pool, user.tg_id.as_str()).await.unwrap_or(0)));
     }   
     // One hour change
     let one_hour_first = scanner_response["pairStats"]["oneHour"]["first"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
@@ -475,8 +478,8 @@ pub struct PnlCall {
 /// # Returns
 /// 
 /// A Result containing the PNL call or an error
-pub fn check_pnl_call(pool: &SafePool, mkt_cap: &str, token_address: &str, chat_id: &str) -> Result<PnlCall> {
-     let call: Option<Call> = db::get_first_call_by_token_address(connection, token_address, chat_id);
+pub async fn check_pnl_call(pool: &SafePool, mkt_cap: &str, token_address: &str, chat_id: &str) -> Result<PnlCall> {
+     let call: Option<Call> = db::get_first_call_by_token_address(&pool, token_address, chat_id).await?;
      if let Some(call) = call {
         let mkt_cap_i = call.mkt_cap.parse::<f64>().unwrap_or(0.0);
         let mkt_cap_n = mkt_cap.parse::<f64>().unwrap_or(0.0);
@@ -492,7 +495,7 @@ pub fn check_pnl_call(pool: &SafePool, mkt_cap: &str, token_address: &str, chat_
             percent: percent_str,
             token_address: call.token_address,
             mkt_cap: mkt_cap.to_string(),
-            call_id: call.id,
+            call_id: call.id as u64,
         })
     } else {
         Err(anyhow::anyhow!("Call not found"))
@@ -512,10 +515,11 @@ pub fn check_pnl_call(pool: &SafePool, mkt_cap: &str, token_address: &str, chat_
 /// # Returns
 /// 
 /// A string containing the formatted PNL message
-pub fn pnl_message(connection: &Connection, pnl_call: PnlCall, symbol: &str, pair_address: &str) -> String {
-    let call = db::get_call_by_id(connection, pnl_call.call_id).expect("Call not found");
-    let user = db::get_user(connection, call.user_tg_id.as_str()).expect("User not found");
-    let mkt_cap_called = format_number(call.mkt_cap.parse::<f64>().unwrap_or(0.0));
+pub async fn pnl_message(pool: &SafePool, pnl_call: PnlCall, symbol: &str, pair_address: &str) -> String {
+    let call = db::get_call_by_id(&pool, pnl_call.call_id as i64).await.expect("Call not found");
+    let call = call.unwrap(); // Store the result of unwrap in a separate variable
+    let user = db::get_user(&pool, call.clone().user_tg_id.as_str()).await.expect("User not found");
+    let mkt_cap_called = format_number(call.clone().mkt_cap.parse::<f64>().unwrap_or(0.0));
     let win_loss;
     let percent = pnl_call.percent.parse::<f64>().unwrap_or(0.0);
     let multiplier = if percent >= 0.0 {
@@ -542,7 +546,7 @@ pub fn pnl_message(connection: &Connection, pnl_call: PnlCall, symbol: &str, pai
     💰 Called at: <code>{}</code>\n\
     Called by: @{}\n\
     🏆 <a href=\"https://app.dexcelerate.com/terminal/SOL/{pair_address}\">See on #1 dex</a>\n\
-    ",  mkt_cap_called, user.username)
+    ",  mkt_cap_called, user.unwrap().username.unwrap_or("N/A".to_string()))
     
 }
 
@@ -576,10 +580,10 @@ pub async fn pnl(msg: &teloxide::types::Message, bot: &teloxide::Bot, pool: Safe
                     let mkt_cap = scanner_search["pair"]["fdv"].as_str().unwrap_or("0");
                     let symbol = scanner_search["pair"]["token1Symbol"].as_str().unwrap_or("");
                     // check the pnl call
-                    match check_pnl_call(&pool, mkt_cap, token_address, chat_id.as_str()) {
+                    match check_pnl_call(&pool, mkt_cap, token_address, chat_id.as_str()).await {
                         Ok(pnl_call) => {
                             // send the pnl message
-                            bot.send_message(msg.chat.id, pnl_message(&pool, pnl_call, symbol, pair_address)).parse_mode(teloxide::types::ParseMode::Html).await?;
+                            bot.send_message(msg.chat.id, pnl_message(&pool, pnl_call, symbol, pair_address).await).parse_mode(teloxide::types::ParseMode::Html).await?;
                         }
                         Err(e) => {
                             log::error!("Failed to check PNL call: {:?}", e);
@@ -630,9 +634,7 @@ pub async fn get_holders(address: &str) -> Result<Value> {
 /// # Returns
 /// 
 /// An Ok result
-pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message, call_info_str: String) -> Result<()> {
-    let con = db::get_connection();
-    db::configure_db(&con);
+pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message, call_info_str: String, pool: &SafePool) -> Result<()> {
     // Get the pair address and token address
     match get_pair_token_pair_and_token_address(address).await {
         Ok(token_pair_and_token_address) => {
@@ -648,10 +650,10 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                 let user_id = msg.clone().from.unwrap().id.to_string();
                 let user_id_str = user_id.as_str();
                 // Get the user
-                let mut user = db::get_user(&con, user_id_str);
+                let mut user = db::get_user(&pool, user_id_str).await?;
                 // If the user is not in the database, add them
                 if user.is_none() {
-                    match db::add_user(&con, user_id_str, msg.from.clone().unwrap().username.clone().unwrap_or("Unknown".to_string()).to_string().as_str()) {
+                    match db::add_user(&pool, user_id_str, Some(msg.from.clone().unwrap().username.clone().unwrap_or("Unknown".to_string()).as_str())).await {
                         Ok(_) => {
                             log::info!("User added to database");
                         }
@@ -659,7 +661,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                             log::error!("Failed to add user to database: {:?}", e);
                         }
                     }
-                    user = db::get_user(&con, user_id_str);
+                    user = db::get_user(&pool, user_id_str).await?;
                 }
                 // Get the scanner search
                 match get_scanner_search(pair_address, token_address, chain).await {
@@ -674,7 +676,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                         let chat_id = msg.clone().chat.id.to_string();
                         // Add the call to the database
                         let call_id = match db::add_call(
-                            &con, 
+                            &pool, 
                             user_id_str, 
                             &scanner_search["pair"]["fdv"].as_str().unwrap_or("0"), 
                             token_address,
@@ -684,7 +686,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                             chat_id.as_str(),
                             &msg.id.to_string(),
                             chain
-                        ) {
+                        ).await {
                             Ok(id) => {
                                 id
                             }
@@ -704,14 +706,14 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                         bot.send_message(
                             msg.chat.id,
                             call_message(
-                                &Arc::new(Mutex::new(con)),
+                                &pool,
                                 &ath_response,
                                 &holders_response,
                                 &scanner_search,
                                 call_info_str,
-                                user.expect("User not found"),
+                                user.unwrap(),
                                 chain
-                            )
+                            ).await
                         )
                         .reply_parameters(teloxide::types::ReplyParameters { message_id: msg.id, chat_id: None, allow_sending_without_reply: Some(true), quote: None, quote_parse_mode: None, quote_entities: None, quote_position: None })
                         .reply_markup(keyboard)
@@ -790,28 +792,28 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot, po
            if period == "Hours" {
                 let hours = utils::helpers::extract_hours(msg.text().unwrap()).unwrap_or(0);
                 period_str = format!("{hours}h");
-                calls = db::get_channel_calls_last_x_hours(&pool, chat_id.as_str(), hours);
+                calls = db::get_channel_calls_last_x_hours(&pool, chat_id.as_str(), hours).await?;
                 log::info!("Calls: {:?}", calls.len());
            }
            if period == "Days"  {
                 let days = utils::helpers::extract_days(msg.text().unwrap()).unwrap_or(0);
                 period_str = format!("{days}d");
-                calls = db::get_channel_calls_last_x_days(&pool, chat_id.as_str(), days);
+                calls = db::get_channel_calls_last_x_days(&pool, chat_id.as_str(), days).await?;
            }
            if period == "Months" {
                 let months = utils::helpers::extract_months(msg.text().unwrap()).unwrap_or(0);
                 period_str = format!("{months}m");
-                calls = db::get_channel_calls_last_x_months(&pool, chat_id.as_str(), months);
+                calls = db::get_channel_calls_last_x_months(&pool, chat_id.as_str(), months).await?;
             }
             if period == "Years"{
                 let years = utils::helpers::extract_years(msg.text().unwrap()).unwrap_or(0);
                 period_str = format!("{years}y");
-                calls = db::get_channel_calls_last_x_years(&pool, chat_id.as_str(), years)
+                calls = db::get_user_calls_last_x_years(&pool, chat_id.as_str(), years).await?;
            }
         }
         None => {
             period_str = "1d".to_string();
-            calls = db::get_channel_calls_last_x_days(&pool, chat_id.as_str(), 1);
+            calls = db::get_channel_calls_last_x_days(&pool, chat_id.as_str(), 1).await?;
         }
     }
     let mut lb = Vec::new();
@@ -821,7 +823,7 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot, po
         if unique_tokens.insert(call.token_address.clone()) {
             // If the token is not in the set, add it and process the call
             let ath = get_ath(
-                utils::helpers::async_time_to_timestamp(call.time.as_str()).await, 
+                utils::helpers::async_time_to_timestamp(call.time.clone()).await, 
                 call.token_address.as_str(),
                 call.chain.as_str()).await?;
 
@@ -843,7 +845,7 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot, po
     lb = lb.into_iter().take(10).collect();
 
 
-    bot.send_message(msg.chat.id, leaderboard_message(lb, period_str, msg.chat.first_name().unwrap_or("")))
+    bot.send_message(msg.chat.id, leaderboard_message(lb, period_str, msg.chat.first_name().unwrap_or(""), &pool).await)
     .reply_parameters(teloxide::types::ReplyParameters { message_id: msg.id, chat_id: None, allow_sending_without_reply: Some(true), quote: None, quote_parse_mode: None, quote_entities: None, quote_position: None })
     .parse_mode(teloxide::types::ParseMode::Html).await?;
 
@@ -891,8 +893,7 @@ fn get_user_average_multiplier(lb: &[CallWithAth], user_tg_id: String) -> f64 {
 /// # Returns
 /// 
 /// A String representing the leaderboard message
-pub fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, channel_name: &str) -> String {
-    let con = db::get_connection();
+pub async fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, channel_name: &str, pool: &SafePool) -> String {
     let mut learderboard_string = String::new();
     let mut count = 1;
     let mut hits = 0;
@@ -900,11 +901,11 @@ pub fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, channel_nam
     let mut mvp_average_multiplier = 0.0;
     for call in &lb {
         let multiplier = call.ath_after_call / call.call.price.parse::<f64>().unwrap_or(0.0);
-        let user = db::get_user(&con, call.call.user_tg_id.as_str()).expect("User not found");
+        let user = db::get_user(&pool, call.call.user_tg_id.as_str()).await.expect("User not found").expect("User not found");
         let user_tg_id = user.tg_id;
-        let username = user.username;
-        let calls_count_user = db::get_user_call_count_for_user_chat_with_period(&con, call.call.user_tg_id.as_str(), call.call.chat_id.as_str(), period_str.as_str());
-        let calls_count_chat = db::get_chat_call_count_with_period(&con, call.call.chat_id.as_str(), period_str.as_str());
+        let username = user.username.unwrap_or("Unknown".to_string());
+        let calls_count_user = db::get_user_call_count_for_user_chat_with_period(&pool, call.call.user_tg_id.as_str(), call.call.chat_id.as_str(), period_str.as_str()).await.expect("User not found");
+        let calls_count_chat = db::get_chat_call_count_with_period(&pool, call.call.chat_id.as_str(), period_str.as_str()).await.expect("Chat not found");
         if multiplier > 2.0 {
             hits += 1;
         }
@@ -954,13 +955,12 @@ pub fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, channel_nam
 /// # Returns
 /// 
 /// An Option containing the best call as a CallWithAth struct
-pub async fn best_call_user(user_tg_id: &str) -> Result<Option<CallWithAth>> {
-    let con = db::get_connection();
-    let user_calls = db::get_all_calls_user_tg_id(&con, user_tg_id);
+pub async fn best_call_user(user_tg_id: &str, pool: &SafePool) -> Result<Option<CallWithAth>> {
+    let user_calls = db::get_all_calls_user_tg_id(&pool, user_tg_id).await?;
     let mut best_call: Option<CallWithAth> = None;
     let mut count = 0;
     for call in user_calls {
-        let ath = get_ath(utils::helpers::async_time_to_timestamp(call.time.as_str()).await, call.token_address.as_str(), call.chain.as_str()).await?;
+        let ath = get_ath(utils::helpers::async_time_to_timestamp(call.time).await, call.token_address.as_str(), call.chain.as_str()).await?;
         let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
         let multiplier = ath_after_call / call.price.parse::<f64>().unwrap_or(0.0);
         
@@ -995,25 +995,24 @@ pub async fn best_call_user(user_tg_id: &str) -> Result<Option<CallWithAth>> {
 /// # Returns
 /// 
 /// An Ok result
-pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message) -> Result<()> {
+pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool) -> Result<()> {
     log::info!("User stats called");
-    let con = db::get_connection();
-    let user_calls = db::get_all_calls_user_tg_id(&con, user_tg_id);
-    let user = match db::get_user(&con, user_tg_id) {
+    let user_calls = db::get_all_calls_user_tg_id(&pool, user_tg_id).await?;
+    let user = match db::get_user(&pool, user_tg_id).await? {
         Some(user) => user,
         None => return Err(anyhow::Error::msg("User not found")),
     };
-    let username = user.username;
+    let username = user.username.unwrap_or("Unknown".to_string());
     let calls_count = user_calls.len();
     let mut call_lb = Vec::new();   
     let mut seen_tokens = std::collections::HashSet::new(); // Track seen tokens
     for call in user_calls {
-        if seen_tokens.contains(&call.token_symbol) {
+        if seen_tokens.contains(&call.token_symbol.clone()) {
             continue; // Skip if token has already been processed
         }
         seen_tokens.insert(call.token_symbol.clone()); // Mark token as seen
 
-        let ath = get_ath(utils::helpers::async_time_to_timestamp(call.time.as_str()).await, call.token_address.as_str(), call.chain.as_str()).await?;
+        let ath = get_ath(utils::helpers::async_time_to_timestamp(call.time).await, call.token_address.as_str(), call.chain.as_str()).await?;
         let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
         let multiplier = ath_after_call / call.price.parse::<f64>().unwrap_or(0.0);
         call_lb.push(CallWithAth {
@@ -1101,13 +1100,12 @@ pub async fn handle_callback_del_call(data: String, bot: &teloxide::Bot, query: 
     // Extract the call ID
     let user_tg_id =  query.from.id.to_string();
     let call_id = data.strip_prefix("del_call:").unwrap_or_default();
-    let call_user = get_user_from_call(&pool, call_id).expect("Could not get user from call.");
-    let call = db::get_call_by_id(&pool, call_id.parse::<u64>().unwrap()).expect("Could not get call.");
+    let call_user = get_user_from_call(&pool, call_id.parse::<i64>().expect("Could not parse call id, maybe the value is not a number or to big.")).await.expect("Could not get user from call.").expect("User not found.");
+    let call = db::get_call_by_id(&pool, call_id.parse::<i64>().expect("Could not parse call id, maybe the value is not a number or to big.")).await.expect("Could not get call.").expect("Call not found.");
     if call_user.tg_id == user_tg_id {
-        if let Ok(call_id_num) = call_id.parse::<u64>() {
-            // Get the database connection
+        if let Ok(call_id_num) = call_id.parse::<i64>() {
             // Attempt to delete the call
-            match db::delete_call(&con, call_id_num) {
+            match db::delete_call(&pool, call_id_num).await {
                 Ok(_) => {
                     if let Some(ref message) = query.message {
                         // Edit the message with and put just scanning text on the call 
@@ -1221,7 +1219,7 @@ pub fn create_call_keyboard_after_just_scanning(call_id: &str, token_address: &s
 
 pub async fn handle_callback_refresh(data: String, bot: &teloxide::Bot, query: &teloxide::types::CallbackQuery, pool: SafePool) -> Result<()> {
     let call_id = data.strip_prefix("refresh:").unwrap_or_default();
-    let call = db::get_call_by_id(&pool, call_id.parse::<u64>().unwrap()).expect("Could not get call.");
+    let call = db::get_call_by_id(&pool, call_id.parse::<i64>().expect("Could not parse call id, maybe the value is not a number or to big.")).await.expect("Could not get call.").expect("Call not found.");
     let token_pair_token_address = get_pair_token_pair_and_token_address(&call.token_mint).await?;
     let pair_address = token_pair_token_address["pairAddress"].as_str().unwrap_or("");
     let token_address = token_pair_token_address["tokenAddress"].as_str().unwrap_or("");
@@ -1239,21 +1237,20 @@ pub async fn handle_callback_refresh(data: String, bot: &teloxide::Bot, query: &
     let ath_response = get_ath(unix_timestamp_milis, &call.token_mint, &call.chain).await?;
     log::info!("ath_response: {:?}", ath_response);
     let holders_response = get_holders(token_address).await?;
-    let user = db::get_user(&con, call.user_tg_id.as_str()).expect("User not found");
+    let user = db::get_user(&pool, call.user_tg_id.as_str()).await.expect("User not found.").expect("User not found.");
     if let Some(ref message) = query.message {
         match message {
             teloxide::types::MaybeInaccessibleMessage::Regular(msg) => {
-                let con = Arc::new(Mutex::new(db::get_connection()));
-                let call_info_str = utils::helpers::get_call_info(&call.token_address.clone(), &con, msg).await?;
+                let call_info_str = utils::helpers::get_call_info(&call.token_address.clone(), &pool, msg).await?;
                 let call_message = call_message(
-                    &con,
+                    &pool,
                     &ath_response,
                     &holders_response,
                     &scanner_response,
                     call_info_str,
                     user,
                     chain
-                );
+                ).await;
                 let keyboard = create_call_keyboard_after_just_scanning(call_id, call.token_address.as_str());
                 bot.edit_message_text(msg.chat.id, msg.id, call_message)
                     .parse_mode(teloxide::types::ParseMode::Html)
@@ -1275,8 +1272,7 @@ pub async fn handle_callback_refresh(data: String, bot: &teloxide::Bot, query: &
     Ok(())
 }
 
-pub async fn handle_callback_clear_call(data: String, bot: &teloxide::Bot, query: &teloxide::types::CallbackQuery, pool: SafePool) -> Result<()> {
-    let call_id = data.strip_prefix("clear_call:").unwrap_or_default();
+pub async fn handle_callback_clear_call( bot: &teloxide::Bot, query: &teloxide::types::CallbackQuery) -> Result<()> {
     if let Some(ref message) = query.message {
         match message {
             teloxide::types::MaybeInaccessibleMessage::Regular(msg) => {

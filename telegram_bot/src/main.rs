@@ -100,7 +100,7 @@ async fn handle_callback_query(
             }
         }
         else if data.starts_with("clear_call:") {
-            match handle_callback_clear_call(data.to_string(), &bot, &query, &pool).await {
+            match handle_callback_clear_call(&bot, &query).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to clear call: {:?}", e),
             }
