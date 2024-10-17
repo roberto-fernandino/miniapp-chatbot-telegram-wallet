@@ -1329,7 +1329,6 @@ pub async fn get_user_calls(req: tide::Request<()>) -> tide::Result<String> {
     let mut con = get_safe_connection();
     println!("Connection to db stablished");
 
-    // Use tokio::spawn for async operations
     let calls_with_ath = tokio::spawn(async move {
         let calls_without_ath = get_all_user_firsts_calls_by_user_tg_id(&mut con, user_tg_id.as_str());
         let mut calls_with_ath = Vec::new();
