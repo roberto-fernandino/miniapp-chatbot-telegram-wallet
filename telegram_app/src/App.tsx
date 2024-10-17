@@ -10,6 +10,7 @@ import {
   generateKeyPair,
   getEthBalance,
   getTokenData,
+  getUserFirstCalls,
   setUserSession,
 } from "./lib/utils";
 import WebApp from "@twa-dev/sdk";
@@ -97,6 +98,7 @@ const App: React.FC = () => {
 
   // History
   const [historySheetOpen, setHistorySheetOpen] = useState(false);
+  const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
     initializeApp();
@@ -411,6 +413,11 @@ const App: React.FC = () => {
     updateCopyTrades();
   };
 
+  const handleGetHistory = async (userId: string) => {
+    const history = await getUserFirstCalls(userId);
+    setHistory(history);
+  };
+
   const initializeApp = async () => {
     // Initialize Telegram API
     // TelegramApi.removeItems([`user_${WebApp.initDataUnsafe.user?.id}`]);
@@ -513,14 +520,20 @@ const App: React.FC = () => {
           const [key, value] = param.split("=");
           params[key] = value;
         });
-        const tokenCA = params["tokenCA"];
-        // Extract the openSwap and tokenCA parameters
 
-        if (tokenCA) {
+        // Extract the tokenCA parameters
+        if (params["tokenCA"]) {
+          const tokenCA = params["tokenCA"];
           setSwapSheetOpen(true);
           setTokenCa(tokenCA);
           handleGetTokenData(tokenCA);
         }
+        if (params["copyUser"]) {
+          const copyUser = params["copyUser"];
+          setHistorySheetOpen(true);
+          handleGetHistory(copyUser);
+        }
+        // Extract the openSwap and tokenCA parameters
       }
     }
   };
@@ -901,28 +914,41 @@ const App: React.FC = () => {
                         </span>
                         <div className="text-right">
                           <div className="text-sm font-medium">
-                            <div className="flex flex-col items-center">
+                            <div className="flex flex-col items-end">
                               {account.addressFormat ===
-                                "ADDRESS_FORMAT_SOLANA" && solBalance}
-                              {usdSolBalance ? (
-                                `USD ${usdSolBalance}`
-                              ) : (
-                                <Spinner />
+                                "ADDRESS_FORMAT_SOLANA" && (
+                                <>
+                                  <div>{solBalance} SOL</div>
+                                  <div>
+                                    {usdSolBalance ? (
+                                      `USD ${Number(usdSolBalance).toFixed(2)}`
+                                    ) : (
+                                      <Spinner />
+                                    )}
+                                  </div>
+                                </>
                               )}
-                            </div>
-                            <div className="flex flex-col items-center">
                               {account.addressFormat ===
-                                "ADDRESS_FORMAT_ETHEREUM" && ethBalance}
-                              {usdEthBalance ? (
-                                `USD ${usdEthBalance}`
-                              ) : (
-                                <Spinner />
+                                "ADDRESS_FORMAT_ETHEREUM" && (
+                                <>
+                                  <div>{ethBalance} ETH</div>
+                                  <div>
+                                    {usdEthBalance ? (
+                                      `USD ${Number(usdEthBalance).toFixed(2)}`
+                                    ) : (
+                                      <Spinner />
+                                    )}
+                                  </div>
+                                </>
                               )}
                             </div>
                           </div>
                         </div>
                       </div>
                       <div className="mt-4">
+                        <h3 className="text-lg font-semibold mb-2">
+                          Token Portfolio
+                        </h3>
                         {account.addressFormat === "ADDRESS_FORMAT_SOLANA" && (
                           <SolTokenBalances address={account.address} />
                         )}
