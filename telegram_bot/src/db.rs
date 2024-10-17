@@ -672,7 +672,7 @@ pub fn get_chat_call_count_with_period(connection: &Connection, chat_id: &str, p
 /// # Returns
 /// 
 /// A vector of calls
-pub fn get_all_user_firsts_calls_by_user_tg_id(connection: &Connection, user_id: &str) -> Vec<Call> {
+pub fn get_all_user_firsts_calls_by_user_tg_id(connection: &Arc<Mutex<Connection>>, user_id: &str) -> Vec<Call> {
     let query = "
         SELECT * FROM calls c1
         WHERE user_tg_id = ?
@@ -683,7 +683,8 @@ pub fn get_all_user_firsts_calls_by_user_tg_id(connection: &Connection, user_id:
         )
         ORDER BY time ASC
     ";
-    let mut stmt = connection.prepare(query).unwrap();
+    let conn = connection.lock().unwrap();
+    let mut stmt = conn.prepare(query).unwrap();
     stmt.bind((1, user_id)).unwrap();
     let mut calls = Vec::new();
     while let Ok(State::Row) = stmt.next() {

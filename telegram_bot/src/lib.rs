@@ -1306,6 +1306,13 @@ pub struct CallHistoryUser
     pub ath: f64,
 }
 
+pub type SafeConnection = Arc<Mutex<Connection>>;
+
+pub fn get_safe_connection() -> SafeConnection {
+    Arc::new(Mutex::new(db::get_connection()))
+}
+
+
 /// Get user calls with ATH
 /// 
 /// # Arguments
@@ -1316,9 +1323,10 @@ pub struct CallHistoryUser
 /// 
 /// * `String` - A json string with the calls and the ATH
 pub async fn get_user_calls(req: tide::Request<()>) -> tide::Result<String> {
-    let user_tg_id = req.param("user_tg_id")?;
+    println!("Getting user calls...");
+    let user_tg_id = req.param("tg_user_id")?;
     println!("user_tg_id: {}", user_tg_id);
-    let mut con = get_connection();
+    let mut con = get_safe_connection();
     println!("Connection to db stablished");
     let calls_without_ath = get_all_user_firsts_calls_by_user_tg_id(&mut con, user_tg_id);
     let mut calls_with_ath = Vec::new();
