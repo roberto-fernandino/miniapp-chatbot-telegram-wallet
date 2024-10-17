@@ -550,6 +550,7 @@ const App: React.FC = () => {
         }
         if (params["copyUser"]) {
           const copyUser = params["copyUser"];
+          log(`copyUser: ${copyUser}`, "info");
           setHistorySheetOpen(true);
           handleGetHistory(copyUser);
         }
