@@ -33,22 +33,13 @@ interface SwapInterfaceProps {
     fromAmount: number,
     slippage: number
   ) => Promise<any>;
-  swapEthereumTokens: (
-    userPublicKey: string,
-    toToken: Token,
-    fromToken: Token,
-    fromAmount: number,
-    slippage: number
-  ) => Promise<any>;
 }
 
 const SwapInterface: React.FC<SwapInterfaceProps> = ({
   tokenData,
   solBalance,
-  ethBalance,
   address,
   swapSolanaTokens: swapSolanaTkoens,
-  swapEthereumTokens: swapEthereumTokens,
 }) => {
   const [fromToken, setFromToken] = useState<Token>({
     symbol: "SOL",
@@ -150,15 +141,6 @@ const SwapInterface: React.FC<SwapInterfaceProps> = ({
     }
     if (network === "solana") {
       await swapSolanaTkoens(
-        userPublicKey,
-        toToken,
-        fromToken,
-        fromAmount,
-        slippage
-      );
-    }
-    if (network === "ethereum") {
-      await swapEthereumTokens(
         userPublicKey,
         toToken,
         fromToken,

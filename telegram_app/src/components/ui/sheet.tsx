@@ -6,11 +6,7 @@ interface BottomSheetProps {
   children: React.ReactNode;
 }
 
-const BottomSheet: React.FC<BottomSheetProps> = ({
-  isOpen,
-  onClose,
-  children,
-}) => {
+const Sheet: React.FC<BottomSheetProps> = ({ isOpen, onClose, children }) => {
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
@@ -49,4 +45,4 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   );
 };
 
-export default BottomSheet;
+export default Sheet;
