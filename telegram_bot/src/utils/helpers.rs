@@ -1,4 +1,5 @@
 use chrono::{TimeDelta, TimeZone};
+use crate::{there_is_valid_solana_address, there_is_valid_eth_address, get_valid_solana_address, get_valid_eth_address};
 use sqlite::Connection;
 use std::sync::{Arc, Mutex};
 use anyhow::Result;
@@ -20,7 +21,6 @@ use chrono::{NaiveDateTime, Utc, DateTime};
 /// 
 /// An Option containing the period or None if no period is found
 pub fn check_period(text: &str) -> Option<String> {
-    
     if text.ends_with("d") || text.ends_with("D") {
         Some("Days".to_string())
     } else if text.ends_with("w") || text.ends_with("W") {
@@ -166,7 +166,7 @@ pub async fn get_call_info(address: &String, con: &Arc<Mutex<Connection>>, msg: 
     let mut call_info_str = String::new();
     let is_first_call = is_first_call(&con,address.as_ref(), msg.chat.id.to_string().as_str());
     let token_pair_and_token_address  = get_pair_token_pair_and_token_address(address).await?;
-    let scanner_response = get_scanner_search(token_pair_and_token_address["pairAddress"].as_str().unwrap_or(""), token_pair_and_token_address["tokenAddress"].as_str().unwrap_or("")).await?;
+    let scanner_response = get_scanner_search(token_pair_and_token_address["pairAddress"].as_str().unwrap_or(""), token_pair_and_token_address["tokenAddress"].as_str().unwrap_or(""), token_pair_and_token_address["chainName"].as_str().unwrap_or("")).await?;
     let mkt_cap = scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
     if !is_first_call {
         let first_call = {
@@ -193,4 +193,31 @@ pub async fn get_call_info(address: &String, con: &Arc<Mutex<Connection>>, msg: 
         }
     } 
     Ok(call_info_str)
+}
+
+pub fn is_start_command(text: &str) -> bool {
+    text.starts_with("/start")
+}
+
+/// Handle the address
+/// 
+/// # Arguments
+/// 
+/// * `text` - The text to handle
+/// 
+/// # Returns
+/// 
+/// A tuple containing the address and the chain
+pub async fn address_handler(text: &str) -> Result<(String)> {
+    let is_solana_address = there_is_valid_solana_address(text);
+    let is_eth_address = there_is_valid_eth_address(text);
+    if is_solana_address {
+        let address = get_valid_solana_address(text);
+        Ok(address.expect("No valid address found"))
+    } else if is_eth_address {
+        let address = get_valid_eth_address(text);
+        Ok(address.expect("No valid address found"))
+    } else {
+        Err(anyhow::anyhow!("No valid address found"))
+    }
 }

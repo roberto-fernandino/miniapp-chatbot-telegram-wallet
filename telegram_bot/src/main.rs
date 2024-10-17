@@ -58,6 +58,12 @@ async fn handle_message(bot: Bot, msg: Message) -> Result<(), Box<dyn std::error
                 Err(e) => log::error!("Failed to leaderboard: {:?}", e),
             }
         }
+        else if utils::helpers::is_start_command(text) {
+            match start(&bot, &msg).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to start: {:?}", e),
+            }
+        }
         else if msg.chat.is_private() {
                 if text.starts_with("/start user_") {
                     // get the user id
@@ -71,22 +77,17 @@ async fn handle_message(bot: Bot, msg: Message) -> Result<(), Box<dyn std::error
                 }
         }
         // Check if there's a valid solana address in the message
-        else if there_is_valid_solana_address(text) {
+        else if there_is_valid_solana_address(text) || there_is_valid_eth_address(text) {
             // Get the valid solana address
-            let address = get_valid_solana_address(text);
-            let call_info_str = utils::helpers::get_call_info(&address.clone().expect("No address found"), &con, &msg).await?;
-            match address {
-                Some(address) => {
-                    // Call the address
-                    match call(&address, &bot, &msg, call_info_str).await {
-                        Ok(_) => (),
-                        Err(e) => log::error!("Failed to call: {:?}", e),
-                    }
-                }
-                None => {}
+            let address = utils::helpers::address_handler(text).await?;
+            let call_info_str = utils::helpers::get_call_info(&address.clone(), &con, &msg).await?;
+            // Call the address
+            match call(&address, &bot, &msg, call_info_str).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to call: {:?}", e),
             }
         }   
-
+        
     }
     Ok(())
 }

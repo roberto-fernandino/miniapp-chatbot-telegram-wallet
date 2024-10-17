@@ -1,7 +1,6 @@
 use std::sync::{Arc, Mutex};
-use teloxide::types::ReplyMarkup::InlineKeyboard;
 use reqwest::Url;
-use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo};
+use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 use chrono::Duration;
 use chrono::{DateTime, Utc};
 use teloxide::prelude::*;
@@ -26,7 +25,20 @@ use regex::Regex;
 pub fn there_is_valid_solana_address(message: &str) -> bool {
     let re = Regex::new(r"[1-9A-HJ-NP-Za-km-z]{32,44}").unwrap();
     re.is_match(message)
+}
 
+/// Check if there's a valid eth address in a text
+/// 
+/// # Arguments
+/// 
+/// * `message` - The message to check
+/// 
+/// # Returns
+/// 
+/// A boolean indicating if the address is a valid eth address
+pub fn there_is_valid_eth_address(message: &str) -> bool {
+    let re = Regex::new(r"(?i)0x[0-9a-f]{40}").unwrap();
+    re.is_match(message)
 }
 
 /// Get the valid solana address from a text
@@ -40,6 +52,25 @@ pub fn there_is_valid_solana_address(message: &str) -> bool {
 /// An Option containing the valid solana address
 pub fn get_valid_solana_address(text: &str) -> Option<String> {
     let re = Regex::new(r"[1-9A-HJ-NP-Za-km-z]{32,44}").unwrap();
+    if let Some(mat) = re.find(text) {
+        Some(mat.as_str().to_string())
+    } else {
+        None
+    }
+}
+
+
+/// Get valid eth address from a text
+/// 
+/// # Arguments
+/// 
+/// * `text` - The text to get the valid eth address from
+/// 
+/// # Returns
+/// 
+/// An Option containing the valid eth address
+pub fn get_valid_eth_address(text: &str) -> Option<String> {
+    let re = Regex::new(r"(?i)0x[0-9a-f]{40}").unwrap();
     if let Some(mat) = re.find(text) {
         Some(mat.as_str().to_string())
     } else {
@@ -75,7 +106,6 @@ pub async fn get_pair_token_pair_and_token_address(address: &str) -> Result<Valu
         .send()
         .await?;
     let json: serde_json::Value = response.json().await?;
-
     Ok(json)
 }
 
@@ -89,9 +119,9 @@ pub async fn get_pair_token_pair_and_token_address(address: &str) -> Result<Valu
 /// # Returns
 /// 
 /// A JSON object containing the scanner search
-pub async fn get_scanner_search(pair_address: &str, token_address: &str) -> Result<Value> {
+pub async fn get_scanner_search(pair_address: &str, token_address: &str, chain: &str) -> Result<Value> {
     let client = Client::new();
-    let url = format!("https://api-rs.dexcelerate.com/scanner/SOL/{}/{}/pair-stats", pair_address, token_address);
+    let url = format!("https://api-rs.dexcelerate.com/scanner/{}/{}/{}/pair-stats", chain, pair_address, token_address);
     log::info!("url: {:?}", url);
     let response = client.get(url)
         .send()
@@ -125,8 +155,8 @@ pub async fn get_scanner_search(pair_address: &str, token_address: &str) -> Resu
 /// # Returns
 /// 
 /// A JSON object containing the ATH
-pub async fn get_ath(timestamp: i64, token_address: &str) -> Result<Value> {
-    let url = format!("https://api-rs.dexcelerate.com/token/SOL/{}/ath?timestamp={}", token_address, timestamp);
+pub async fn get_ath(timestamp: i64, token_address: &str, chain: &str) -> Result<Value> {
+    let url = format!("https://api-rs.dexcelerate.com/token/{}/{}/ath?timestamp={}", chain, token_address, timestamp);
     let client = Client::new();
     let response = client.get(url)
         .send()
@@ -278,7 +308,7 @@ pub fn format_age(duration: Duration) -> String {
 /// # Returns
 /// 
 /// A string containing the formatted message
-pub fn call_message(con: &Arc<Mutex<Connection>>, ath_response: &Value, holders_response: &Value, scanner_response: &Value,  mut call_info_str: String, user: User) -> String {
+pub fn call_message(con: &Arc<Mutex<Connection>>, ath_response: &Value, holders_response: &Value, scanner_response: &Value,  mut call_info_str: String, user: User, chain: &str) -> String {
     // Main info
     let pair_address = scanner_response["pair"]["pairAddress"].as_str().unwrap_or("");
     let token_symbol = scanner_response["pair"]["token1Symbol"].as_str().unwrap_or("N/A").to_uppercase();
@@ -389,7 +419,14 @@ pub fn call_message(con: &Arc<Mutex<Connection>>, ath_response: &Value, holders_
         }
         links.push_str(&format!("<a href=\"{telegram}\">TG</a>"));
     }
-    let token_spawned_at_str = if token_address.contains("pump") { "💊" } else { "🟣" };
+    let token_spawned_at_str: String;
+    if chain == "solana" {
+        token_spawned_at_str = if token_address.contains("pump") { "💊".to_string() } else { "🟣".to_string() };
+    } else if chain == "ethereum" {
+        token_spawned_at_str = "🔷".to_string();
+    } else {
+        token_spawned_at_str = "❗️".to_string();
+    }
     let links_section = if links.len() > 0 {
         format!("🧰 More {links}\n\n")
     } else {
@@ -405,7 +442,7 @@ pub fn call_message(con: &Arc<Mutex<Connection>>, ath_response: &Value, holders_
         💦 Liq: <code>${liquidity}</code> \n\
         📊 Vol: <code>${volume}</code> 🕰️ Age: <code>{age}</code> \n\
         ⛰️  ATH: <code>${ath}</code> <code>[{ath_date}]</code>\n\
-        📉 1H: <code>{one_hour_change_str}%</code> . <code>${buy_volume}</code> 🅑 {buys} 🅢 {sells}\n\
+        🚀 1H: <code>{one_hour_change_str}%</code> . <code>${buy_volume}</code> 🅑 {buys} 🅢 {sells}\n\
         {holders_str}\n\
         LP: {lp} Mint:{verified}\n\
         {links_section}\
@@ -530,8 +567,9 @@ pub async fn pnl(msg: &teloxide::types::Message, bot: &teloxide::Bot) -> Result<
             Ok(token_pair_and_token) => {
             let pair_address = token_pair_and_token["pairAddress"].as_str().unwrap_or("");
             let token_address = token_pair_and_token["tokenAddress"].as_str().unwrap_or("");
+            let chain = token_pair_and_token["chainName"].as_str().unwrap_or("");
             // scan the pair address and token address 
-            match get_scanner_search(pair_address, token_address).await {
+            match get_scanner_search(pair_address, token_address, chain).await {
                 // if the scanner search is ok, get the mkt cap and symbol
                 Ok(scanner_search) => {
                     let mkt_cap = scanner_search["pair"]["fdv"].as_str().unwrap_or("0");
@@ -599,6 +637,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
         Ok(token_pair_and_token_address) => {
             let pair_address = token_pair_and_token_address["pairAddress"].as_str().unwrap_or("");
             let token_address = token_pair_and_token_address["tokenAddress"].as_str().unwrap_or("");
+            let chain = token_pair_and_token_address["chainName"].as_str().unwrap_or("");
             // Check if the pair address and token address are valid
             if pair_address.is_empty() || token_address.is_empty() {
                 log::error!("Invalid pair or token address");
@@ -622,14 +661,14 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                     user = db::get_user(&con, user_id_str);
                 }
                 // Get the scanner search
-                match get_scanner_search(pair_address, token_address).await {
+                match get_scanner_search(pair_address, token_address, chain).await {
                     Ok(scanner_search) => {
                         // Parse datetime
                         let created_datetime_str = scanner_search["pair"]["pairCreatedAt"].as_str().unwrap_or("");
                         let datetime: DateTime<Utc> = created_datetime_str.parse().expect("Failed to parse datetime.");
                         let unix_timestamp_milis = datetime.timestamp_millis();
 
-                        let ath_response = get_ath(unix_timestamp_milis, address).await?;
+                        let ath_response = get_ath(unix_timestamp_milis, address, chain).await?;
                         let holders_response = get_holders(address).await?;
                         let chat_id = msg.clone().chat.id.to_string();
                         // Add the call to the database
@@ -642,7 +681,8 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                             &scanner_search["pair"]["token1Symbol"].as_str().unwrap_or(""),
                             &scanner_search["pair"]["pairPrice1Usd"].as_str().unwrap_or("0"),
                             chat_id.as_str(),
-                            &msg.id.to_string()
+                            &msg.id.to_string(),
+                            chain
                         ) {
                             Ok(id) => {
                                 id
@@ -656,7 +696,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                         // BUTTONS MANAGEMENT
                         
                        
-                        let keyboard = create_call_keyboard(call_info_str.as_str(), call_id.to_string().as_str(), token_address);
+                        let keyboard = create_call_keyboard(call_info_str.as_str(), call_id.to_string().as_str(), token_address, user.clone().unwrap().tg_id.as_str());
                         
                         
                         // Send the call message
@@ -668,7 +708,8 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                                 &holders_response,
                                 &scanner_search,
                                 call_info_str,
-                                user.expect("User not found")
+                                user.expect("User not found"),
+                                chain
                             )
                         )
                         .reply_parameters(teloxide::types::ReplyParameters { message_id: msg.id, chat_id: None, allow_sending_without_reply: Some(true), quote: None, quote_parse_mode: None, quote_entities: None, quote_position: None })
@@ -781,8 +822,8 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot) ->
             // If the token is not in the set, add it and process the call
             let ath = get_ath(
                 utils::helpers::time_to_timestamp(call.time.as_str()).await, 
-                call.token_address.as_str()
-            ).await?;
+                call.token_address.as_str(),
+                call.chain.as_str()).await?;
 
             let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
 
@@ -919,7 +960,7 @@ pub async fn best_call_user(user_tg_id: &str) -> Result<Option<CallWithAth>> {
     let mut best_call: Option<CallWithAth> = None;
     let mut count = 0;
     for call in user_calls {
-        let ath = get_ath(utils::helpers::time_to_timestamp(call.time.as_str()).await, call.token_address.as_str()).await?;
+        let ath = get_ath(utils::helpers::time_to_timestamp(call.time.as_str()).await, call.token_address.as_str(), call.chain.as_str()).await?;
         let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
         let multiplier = ath_after_call / call.price.parse::<f64>().unwrap_or(0.0);
         
@@ -972,7 +1013,7 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
         }
         seen_tokens.insert(call.token_symbol.clone()); // Mark token as seen
 
-        let ath = get_ath(utils::helpers::time_to_timestamp(call.time.as_str()).await, call.token_address.as_str()).await?;
+        let ath = get_ath(utils::helpers::time_to_timestamp(call.time.as_str()).await, call.token_address.as_str(), call.chain.as_str()).await?;
         let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
         let multiplier = ath_after_call / call.price.parse::<f64>().unwrap_or(0.0);
         call_lb.push(CallWithAth {
@@ -1132,16 +1173,30 @@ pub async fn handle_callback_del_call(data: String, bot: &teloxide::Bot, query: 
 /// # Returns
 /// 
 /// A InlineKeyboardMarkup struct
-pub fn create_call_keyboard(call_info_str: &str, call_id: &str, token_address: &str) -> InlineKeyboardMarkup {
-    let mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app?start=tokenCA={}", token_address)).expect("Invalid URL");
-    log::info!("mini_app_url: {:?}", mini_app_url);
+pub fn create_call_keyboard(call_info_str: &str, call_id: &str, token_address: &str, user_tg_id: &str) -> InlineKeyboardMarkup {
+    let swap_mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app?start=tokenCA={}", token_address)).expect("Invalid Swap URL");
+    let copy_mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app?start=copyUser={}", user_tg_id)).expect("Invalid Copy Caller URL");
+    log::info!("mini_app_url: {:?}", swap_mini_app_url);
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
     // Call info == "" means that is firt call
     if call_info_str == "" {
-        buttons.push(vec![InlineKeyboardButton::callback("🔭 Just Scanning", format!("del_call:{}", call_id))]);
+        buttons.push(
+            vec![InlineKeyboardButton::callback("🔭 Just Scanning", format!("del_call:{}", call_id))
+            ]
+        );
     }
-    buttons.push(vec![InlineKeyboardButton::url("💳 Buy now", mini_app_url), InlineKeyboardButton::callback("Copy", format!("copy:{}", call_id))]);
-    buttons.push(vec![InlineKeyboardButton::callback("🔄 Refresh", format!("refresh:{}", call_id)), InlineKeyboardButton::callback("🆑 Clear", format!("clear:{}", call_id))]);
+    buttons.push(
+        vec![
+            InlineKeyboardButton::url("💳 Buy now", swap_mini_app_url), 
+            InlineKeyboardButton::url("Copy", copy_mini_app_url)
+        ]
+    );
+    buttons.push(
+        vec![
+            InlineKeyboardButton::callback("🔄 Refresh", format!("refresh:{}", call_id)), 
+            InlineKeyboardButton::callback("🆑 Clear", format!("clear_call:{}", call_id))
+            ]
+        );
     InlineKeyboardMarkup::new(buttons)
 }
 /// Create the call buttons
@@ -1172,16 +1227,18 @@ pub async fn handle_callback_refresh(data: String, bot: &teloxide::Bot, query: &
     let token_pair_token_address = get_pair_token_pair_and_token_address(&call.token_mint).await?;
     let pair_address = token_pair_token_address["pairAddress"].as_str().unwrap_or("");
     let token_address = token_pair_token_address["tokenAddress"].as_str().unwrap_or("");
+    let chain = token_pair_token_address["chainName"].as_str().unwrap_or("");
     let scanner_response = get_scanner_search(
         pair_address,
-        token_address
+        token_address,
+        chain
     ).await?;
 
     let created_datetime_str = scanner_response["pair"]["pairCreatedAt"].as_str().unwrap_or("");
     let datetime: DateTime<Utc> = created_datetime_str.parse().expect("Failed to parse datetime.");
     let unix_timestamp_milis = datetime.timestamp_millis();
 
-    let ath_response = get_ath(unix_timestamp_milis, &call.token_mint).await?;
+    let ath_response = get_ath(unix_timestamp_milis, &call.token_mint, &call.chain).await?;
     log::info!("ath_response: {:?}", ath_response);
     let holders_response = get_holders(token_address).await?;
     let user = db::get_user(&con, call.user_tg_id.as_str()).expect("User not found");
@@ -1197,6 +1254,7 @@ pub async fn handle_callback_refresh(data: String, bot: &teloxide::Bot, query: &
                     &scanner_response,
                     call_info_str,
                     user,
+                    chain
                 );
                 let keyboard = create_call_keyboard_after_just_scanning(call_id, call.token_address.as_str());
                 bot.edit_message_text(msg.chat.id, msg.id, call_message)
@@ -1220,9 +1278,8 @@ pub async fn handle_callback_refresh(data: String, bot: &teloxide::Bot, query: &
 }
 
 pub async fn handle_callback_clear_call(data: String, bot: &teloxide::Bot, query: &teloxide::types::CallbackQuery) -> Result<()> {
-    let call_id = data.strip_prefix("clear:").unwrap_or_default();
+    let call_id = data.strip_prefix("clear_call:").unwrap_or_default();
     let con = db::get_connection();
-    let call = db::get_call_by_id(&con, call_id.parse::<u64>().unwrap()).expect("Could not get call.");
     if let Some(ref message) = query.message {
         match message {
             teloxide::types::MaybeInaccessibleMessage::Regular(msg) => {
@@ -1231,5 +1288,10 @@ pub async fn handle_callback_clear_call(data: String, bot: &teloxide::Bot, query
             _ => {}
         }
     }
+    Ok(())
+}
+
+pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message) -> Result<()> {
+    bot.send_message(msg.chat.id, "Welcome to the bot! Please use the keyboard to interact with the bot.").await?;
     Ok(())
 }
