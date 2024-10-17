@@ -117,7 +117,7 @@ const App: React.FC = () => {
 
   // History
   const [historySheetOpen, setHistorySheetOpen] = useState(false);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<CallWithAth[]>([]);
 
   useEffect(() => {
     initializeApp();
@@ -434,6 +434,7 @@ const App: React.FC = () => {
 
   const handleGetHistory = async (userId: string) => {
     const history = await getUserFirstCalls(userId);
+    log(`history: ${JSON.stringify(history)}`, "info");
     setHistory(history);
   };
 
@@ -567,10 +568,7 @@ const App: React.FC = () => {
           const solPrice = await getSOLPrice();
           const usdValue = (parseFloat(solBalance) * solPrice).toFixed(2);
           setUsdSolBalance(usdValue);
-        } else {
-          log("User does not have a Solana address", "error");
         }
-
         // get eth balance
         if (userEthAddress) {
           const ethBalanace = await getEthBalance(userEthAddress);
@@ -578,8 +576,6 @@ const App: React.FC = () => {
           const ethPrice = await getETHPrice();
           const usdValue = (parseFloat(ethBalanace) * ethPrice).toFixed(2);
           setUsdEthBalance(usdValue);
-        } else {
-          log("User does not have a EVM address", "error");
         }
       } catch (error) {
         log(`Failed to update balance: ${error}`, "error");
@@ -890,7 +886,21 @@ const App: React.FC = () => {
                             <div
                               key={call.call.id}
                               className="flex flex-col items-center justify-center w-full mt-3 h-full"
-                            ></div>
+                            >
+                              <div>
+                                <p>{call.call.token_address}</p>
+                                <p>{call.call.price}</p>
+                                <p>{call.call.time}</p>
+                                <p>{call.call.user_tg_id}</p>
+                                <p>{call.call.mkt_cap}</p>
+                                <p>{call.call.message_id}</p>
+                                <p>{call.call.chat_id}</p>
+                                <p>{call.call.token_mint}</p>
+                                <p>{call.call.chain}</p>
+                                <p>{call.ath}</p>
+                                <p>{call.multiplier}</p>
+                              </div>
+                            </div>
                           ))}
                         </div>
                       </div>
