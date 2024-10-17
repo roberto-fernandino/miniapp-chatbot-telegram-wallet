@@ -546,3 +546,10 @@ export async function getTokenData(tokenMint: string) {
     throw error;
   }
 }
+
+export async function getUserFirstCalls(userId: string) {
+  const response = await axios.get(
+    `${BASE_URL_API}/get_user_first_calls/${userId}`
+  );
+  return response.data;
+}
