@@ -13,6 +13,7 @@ anyhow = "1.0.89"
 serde_json = "1.0.128"
 reqwest = { version = "0.12.8", features = ["json", "blocking"] }
 sqlite = "0.36.1"
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-native-tls", "macros"] }
 chrono = "0.4.38"
 tide = "0.16.0"
 serde = "1.0.210"

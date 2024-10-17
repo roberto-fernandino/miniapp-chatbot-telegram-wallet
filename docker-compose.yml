@@ -88,6 +88,10 @@ services:
       dockerfile: Dockerfile.telegram_bot
     env_file:
       - .env
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=app
     networks:
       - app-network
     container_name: telegram_bot
@@ -99,6 +103,29 @@ services:
       - telegram_app
       - solana_app
       - backend_app
+
+  db-master:
+    image: postgres
+    restart: always
+    ports:
+      - target: 5432
+        published: 5434
+        mode: host
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=app
+    volumes:
+      - ./master:/var/lib/postgresql/data
+      - type: tmpfs
+        target: /dev/shm
+        tmpfs:
+          size: 134217728 # 128MB
+    container_name: psql_miniapp
+    networks:
+      - app-network
 
 volumes:
   redis-data:

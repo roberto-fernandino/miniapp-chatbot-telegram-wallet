@@ -1,128 +1,162 @@
-use sqlite::Connection;
-use std::sync::{Arc, Mutex};
-use sqlite::State;
+use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
 use anyhow::Result;
-pub fn get_connection() -> Connection {
-    sqlite::open("/data/db.sqlite").unwrap()
-}
-use crate::utils::helpers::check_period_for_leaderboard;
-pub fn configure_db(connection: &Connection) {
-    connection.execute(
-        "CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tg_id TEXT NOT NULL UNIQUE,
-            username TEXT
-        );"
-    ).unwrap();
+use serde::Serialize;
+use chrono::{NaiveDateTime, Utc};
+use std::env;
+use dotenv::dotenv;
 
-    connection.execute(
-        "CREATE TABLE IF NOT EXISTS calls (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            mkt_cap TEXT,
-            token_address TEXT,
-            token_mint TEXT,
-            token_symbol TEXT,
-            price TEXT,
-            user_tg_id INTEGER,
-            chat_id TEXT,
-            message_id TEXT,
-            chain TEXT,
-            FOREIGN KEY (user_tg_id) REFERENCES users (tg_id)
-        );"
-    ).unwrap();
-}
-
-
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+/// Represents a user in the system.
+#[derive(Debug, Serialize)]
 pub struct User {
-    pub id: u64,
-    pub username: String,
+    pub id: i64,
+    pub username: Option<String>,
     pub tg_id: String,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone, serde::Serialize)]
+/// Represents a call in the system.
+#[derive(Debug, Serialize)]
 pub struct Call {
-    pub id: u64,
-    pub time: String,
+    pub id: i64,
+    pub time: NaiveDateTime,
     pub mkt_cap: String,
-    pub price: String,
     pub token_address: String,
     pub token_mint: String,
     pub token_symbol: String,
+    pub price: String,
     pub user_tg_id: String,
     pub chat_id: String,
     pub message_id: String,
     pub chain: String,
 }
 
-/// Get a user by telegram id
-/// 
-/// # Arguments
-/// 
-/// * `connection` - The database connection
-/// * `tg_id` - The user's telegram id
-/// 
-/// # Returns
-/// 
-/// An optional user
-pub fn get_user(connection: &Connection, tg_id: &str) -> Option<User> {
-    let query = "SELECT * FROM users WHERE tg_id = ?";
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, tg_id)).unwrap();
-    
-    if let Ok(State::Row) = stmt.next() {
-        Some(User {
-            id: stmt.read::<i64, _>("id").unwrap() as u64,
-            username: stmt.read::<String, _>("username").unwrap(),
-            tg_id: stmt.read::<String, _>("tg_id").unwrap(),
-        })
-    } else {
-        None
-    }
+/// Represents a call history with additional ATH data.
+#[derive(Debug, Serialize)]
+pub struct CallHistoryUser {
+    pub call: Call,
+    pub multiplier: f64,
+    pub ath: f64,
 }
 
-/// Add a user to the database
-/// 
-/// # Arguments
-/// 
-/// * `connection` - The database connection
-/// * `tg_id` - The user's telegram id
-/// * `username` - The user's username
-/// 
-/// # Returns
-/// 
-/// An empty result
-pub fn add_user(connection: &Connection, tg_id: &str, username: &str) -> Result<()> {
-    let query = "INSERT INTO users (tg_id, username) VALUES (?, ?)";
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, tg_id)).unwrap();
-    stmt.bind((2, username)).unwrap();
-    stmt.next().unwrap();
+/// Type alias for the PostgreSQL connection pool.
+pub type PgPoolType = Pool<Postgres>;
+
+/// Initializes and returns a PostgreSQL connection pool.
+pub async fn get_pool() -> Result<PgPoolType> {
+    // Load environment variables from `.env` file.
+    let database_url = env::var("DATABASE_URL")?;
+    
+    // Configure the connection pool.
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await?;
+    
+    Ok(pool)
+}
+
+/// Configures the database by creating necessary tables if they don't exist.
+pub async fn configure_db(pool: &PgPoolType) -> Result<()> {
+    // Create 'users' table.
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            tg_id TEXT NOT NULL UNIQUE,
+            username TEXT
+        );
+        "#
+    )
+    .execute(pool)
+    .await?;
+    
+    // Create 'calls' table.
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS calls (
+            id SERIAL PRIMARY KEY,
+            time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            mkt_cap TEXT,
+            token_address TEXT,
+            token_mint TEXT,
+            token_symbol TEXT,
+            price TEXT,
+            user_tg_id TEXT REFERENCES users(tg_id),
+            chat_id TEXT,
+            message_id TEXT,
+            chain TEXT
+        );
+        "#
+    )
+    .execute(pool)
+    .await?;
+    
     Ok(())
 }
 
+/// Retrieves a user by their Telegram ID.
+pub async fn get_user(pool: &PgPoolType, tg_id: &str) -> Result<Option<User>> {
+    let user = sqlx::query_as!(
+        User,
+        r#"
+        SELECT id, tg_id, username
+        FROM users
+        WHERE tg_id = $1
+        "#,
+        tg_id
+    )
+    .fetch_optional(pool)
+    .await?;
+    
+    Ok(user)
+}
 
-/// Add a call to the database
+/// Adds a new user to the database.
 /// 
 /// # Arguments
 /// 
-/// * `connection` - The database connection
-/// * `tg_id` - The user's telegram id
-/// * `mkt_cap` - The market cap of the token
-/// * `token_address` - The token address
-/// * `token_mint` - The token mint
-/// * `token_symbol` - The token symbol
-/// * `price` - The price of the token
-/// * `chat_id` - The chat id
-/// * `message_id` - The message id
-/// * `chain` - The chain of the token
-/// 
+/// * `pool` - The PostgreSQL connection pool.
+/// * `tg_id` - The user's Telegram ID.
+/// * `username` - The user's username.
+///
 /// # Returns
+///
+/// An empty result indicating success or an error.
+pub async fn add_user(pool: &PgPoolType, tg_id: &str, username: Option<&str>) -> Result<()> {
+    sqlx::query!(
+        r#"
+        INSERT INTO users (tg_id, username)
+        VALUES ($1, $2)
+        ON CONFLICT (tg_id) DO NOTHING
+        "#,
+        tg_id,
+        username
+    )
+    .execute(pool)
+    .await?;
+    
+    Ok(())
+}
+
+/// Adds a new call to the database and returns its ID.
 /// 
-/// The id of the call
-pub fn add_call(
-    connection: &Connection, 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool.
+/// * `tg_id` - The user's Telegram ID.
+/// * `mkt_cap` - The market capitalization of the token.
+/// * `token_address` - The token's address.
+/// * `token_mint` - The token's mint.
+/// * `token_symbol` - The token's symbol.
+/// * `price` - The price of the token.
+/// * `chat_id` - The chat ID.
+/// * `message_id` - The message ID.
+/// * `chain` - The blockchain chain.
+///
+/// # Returns
+///
+/// The ID of the newly created call.
+pub async fn add_call(
+    pool: &PgPoolType, 
     tg_id: &str, 
     mkt_cap: &str, 
     token_address: &str, 
@@ -132,575 +166,392 @@ pub fn add_call(
     chat_id: &str,
     message_id: &str,
     chain: &str
-) -> Result<u64> {
-    let query = "INSERT INTO calls (user_tg_id, mkt_cap, token_address, token_mint, token_symbol, price, chat_id, message_id, chain) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+) -> Result<i64> {
+    let record = sqlx::query!(
+        r#"
+        INSERT INTO calls (user_tg_id, mkt_cap, token_address, token_mint, token_symbol, price, chat_id, message_id, chain)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING id
+        "#,
+        tg_id,
+        mkt_cap,
+        token_address,
+        token_mint,
+        token_symbol,
+        price,
+        chat_id,
+        message_id,
+        chain
+    )
+    .fetch_one(pool)
+    .await?;
     
-    // Prepare and execute the INSERT statement
-    let mut stmt = connection.prepare(query)?;
-    stmt.bind((1, tg_id)).unwrap();
-    stmt.bind((2, mkt_cap)).unwrap();
-    stmt.bind((3, token_address)).unwrap();
-    stmt.bind((4, token_mint)).unwrap();
-    stmt.bind((5, token_symbol)).unwrap();
-    stmt.bind((6, price)).unwrap();
-    stmt.bind((7, chat_id)).unwrap();
-    stmt.bind((8, message_id)).unwrap();
-    stmt.bind((9, chain)).unwrap();
-    stmt.next().unwrap();  // Execute the insert
-
-    // Query to get the last inserted row ID using SQLite's built-in function
-    let mut stmt = connection.prepare("SELECT last_insert_rowid()")?;
-    stmt.next()?;  // Move to the result row
-    
-    // Get the last inserted row ID
-    let row_id: i64 = stmt.read(0)?;
-
-    Ok(row_id as u64)
+    Ok(record.id)
 }
 
-/// Get the first call of a token in a chat
-/// 
-/// # Arguments
-/// * `connection` - The database connection
-/// * `token_address` - The token address
-/// * `chat_id` - The chat id
-/// 
-/// # Returns
-/// 
-/// An optional first call
-pub fn get_first_call_by_token_address(connection: &Connection, token_address: &str, chat_id: &str) -> Option<Call> {
-    let query = "SELECT * FROM calls WHERE token_address = ? AND chat_id = ?";
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, token_address)).unwrap();
-    stmt.bind((2, chat_id)).unwrap();
-    if let Ok(State::Row) = stmt.next() {
-        Some(Call {
-            id: stmt.read::<i64, _>("id").unwrap() as u64,
-            time: stmt.read::<String, _>("time").unwrap(),
-            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
-            token_address: stmt.read::<String, _>("token_address").unwrap(),
-            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
-            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
-            price: stmt.read::<String, _>("price").unwrap(),
-            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
-            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
-            message_id: stmt.read::<String, _>("message_id").unwrap(),
-            chain: stmt.read::<String, _>("chain").unwrap(),
-        })
-    } else {
-        None
-    }
+/// Retrieves the first call of a token in a specific chat.
+pub async fn get_first_call_by_token_address(pool: &PgPoolType, token_address: &str, chat_id: &str) -> Result<Option<Call>> {
+    let call = sqlx::query_as!(
+        Call,
+        r#"
+        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+        FROM calls
+        WHERE token_address = $1 AND chat_id = $2
+        ORDER BY time ASC
+        LIMIT 1
+        "#,
+        token_address,
+        chat_id
+    )
+    .fetch_optional(pool)
+    .await?;
+    
+    Ok(call)
 }
 
-/// Get a call by id
+/// Retrieves a call by its ID.
+pub async fn get_call_by_id(pool: &PgPoolType, id: i64) -> Result<Option<Call>> {
+    let call = sqlx::query_as!(
+        Call,
+        r#"
+        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+        FROM calls
+        WHERE id = $1
+        "#,
+        id
+    )
+    .fetch_optional(pool)
+    .await?;
+    
+    Ok(call)
+}
+
+/// Retrieves all calls made in a specific chat.
+pub async fn get_all_calls_chat_id(pool: &PgPoolType, chat_id: &str) -> Result<Vec<Call>> {
+    let calls = sqlx::query_as!(
+        Call,
+        r#"
+        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+        FROM calls
+        WHERE chat_id = $1
+        ORDER BY time ASC
+        "#,
+        chat_id
+    )
+    .fetch_all(pool)
+    .await?;
+    
+    Ok(calls)
+}
+
+/// Retrieves all calls made in a channel in the last `x` days.
+pub async fn get_channel_calls_last_x_days(pool: &PgPoolType, chat_id: &str, days: u32) -> Result<Vec<Call>> {
+    let calls = sqlx::query_as!(
+        Call,
+        r#"
+        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+        FROM calls
+        WHERE time >= NOW() - INTERVAL '$1 days' AND chat_id = $2
+        ORDER BY time ASC
+        "#,
+        days,
+        chat_id
+    )
+    .fetch_all(pool)
+    .await?;
+    
+    Ok(calls)
+}
+
+/// Retrieves all calls made in a channel in the last `x` hours.
+pub async fn get_channel_calls_last_x_hours(pool: &PgPoolType, chat_id: &str, hours: u32) -> Result<Vec<Call>> {
+    let calls = sqlx::query_as!(
+        Call,
+        r#"
+        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+        FROM calls
+        WHERE time >= NOW() - INTERVAL '$1 hours' AND chat_id = $2
+        ORDER BY time ASC
+        "#,
+        hours,
+        chat_id
+    )
+    .fetch_all(pool)
+    .await?;
+    
+    Ok(calls)
+}
+
+/// Retrieves all calls made in a channel in the last `x` months.
+pub async fn get_channel_calls_last_x_months(pool: &PgPoolType, chat_id: &str, months: u32) -> Result<Vec<Call>> {
+    let calls = sqlx::query_as!(
+        Call,
+        r#"
+        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+        FROM calls
+        WHERE time >= NOW() - INTERVAL '$1 months' AND chat_id = $2
+        ORDER BY time ASC
+        "#,
+        months,
+        chat_id
+    )
+    .fetch_all(pool)
+    .await?;
+    
+    Ok(calls)
+}
+
+/// Retrieves all calls made by a specific user in the last `x` days.
 /// 
 /// # Arguments
 /// 
-/// * `connection` - The database connection
-/// * `id` - The call id
-/// 
+/// * `pool` - The PostgreSQL connection pool.
+/// * `tg_id` - The user's Telegram ID.
+/// * `days` - The number of days.
+///
 /// # Returns
 ///
-/// An optional call
-pub fn get_call_by_id(connection: &Connection, id: u64) -> Option<Call> {
-    let query = "SELECT * FROM calls WHERE id = ?";
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, id as i64)).unwrap();
+/// A vector of calls.
+pub async fn get_user_calls_last_x_days(pool: &PgPoolType, tg_id: &str, days: u32) -> Result<Vec<Call>> {
+    let calls = sqlx::query_as!(
+        Call,
+        r#"
+        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+        FROM calls
+        WHERE user_tg_id = $1 AND time >= NOW() - INTERVAL '$2 days'
+        ORDER BY time ASC
+        "#,
+        tg_id,
+        days
+    )
+    .fetch_all(pool)
+    .await?;
     
-    if let Ok(State::Row) = stmt.next() {
-        Some(Call {
-            id: stmt.read::<i64, _>("id").unwrap() as u64,
-            time: stmt.read::<String, _>("time").unwrap(),
-            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
-            price: stmt.read::<String, _>("price").unwrap(),
-            token_address: stmt.read::<String, _>("token_address").unwrap(),
-            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
-            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
-            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
-            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
-            message_id: stmt.read::<String, _>("message_id").unwrap(),
-            chain: stmt.read::<String, _>("chain").unwrap(),
-        })
-    } else {
-        None
-    }
+    Ok(calls)
 }
 
-/// Get all calls made in a channel
+/// Retrieves all calls made by a specific user in the last `x` hours.
 /// 
 /// # Arguments
 /// 
-/// * `connection` - The database connection
-/// * `chat_id` - The chat id
-/// 
+/// * `pool` - The PostgreSQL connection pool.
+/// * `tg_id` - The user's Telegram ID.
+/// * `hours` - The number of hours.
+///
 /// # Returns
 ///
-/// A vector of calls
-pub fn get_all_calls_chat_id(connection: &Connection, chat_id: &str) -> Vec<Call> {
-    let query = "SELECT * FROM calls WHERE chat_id = ?";
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, chat_id)).unwrap();
+/// A vector of calls.
+pub async fn get_user_calls_last_x_hours(pool: &PgPoolType, tg_id: &str, hours: u32) -> Result<Vec<Call>> {
+    let calls = sqlx::query_as!(
+        Call,
+        r#"
+        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+        FROM calls
+        WHERE user_tg_id = $1 AND time >= NOW() - INTERVAL '$2 hours'
+        ORDER BY time ASC
+        "#,
+        tg_id,
+        hours
+    )
+    .fetch_all(pool)
+    .await?;
     
-    let mut calls = Vec::new();
-    while let Ok(State::Row) = stmt.next() {
-        calls.push(Call {
-            id: stmt.read::<i64, _>("id").unwrap() as u64,
-            time: stmt.read::<String, _>("time").unwrap(),
-            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
-            price: stmt.read::<String, _>("price").unwrap(),
-            token_address: stmt.read::<String, _>("token_address").unwrap(),
-            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
-            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
-            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
-            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
-            message_id: stmt.read::<String, _>("message_id").unwrap(),
-            chain: stmt.read::<String, _>("chain").unwrap(),
-        });
-    }
-    calls
+    Ok(calls)
 }
 
-/// Get all calls made in a channel in the last x days
+/// Retrieves all calls made by a specific user in the last `x` months.
 /// 
 /// # Arguments
 /// 
-/// * `connection` - The database connection
-/// * `chat_id` - The chat id
-/// * `days` - The number of days to get the calls
-/// 
-/// # Returns
-/// 
-/// A vector of calls
-pub fn get_channel_calls_last_x_days(connection: &Connection, chat_id: &str, days: u32) -> Vec<Call> {
-    let query = format!("
-        SELECT * FROM calls 
-        WHERE time >= datetime('now', '-{days} day') AND chat_id = ?
-    ");
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, chat_id)).unwrap();
-    let mut calls = Vec::new();
-    while let Ok(State::Row) = stmt.next() {
-        calls.push(Call {
-            id: stmt.read::<i64, _>("id").unwrap() as u64,
-            time: stmt.read::<String, _>("time").unwrap(),
-            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
-            price: stmt.read::<String, _>("price").unwrap(),
-            token_address: stmt.read::<String, _>("token_address").unwrap(),
-            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
-            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
-            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
-            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
-            message_id: stmt.read::<String, _>("message_id").unwrap(),
-            chain: stmt.read::<String, _>("chain").unwrap(),
-        });
-    }
-    calls
-}
-
-/// Get all calls made in a channel in the last x hours
-/// 
-/// # Arguments
-/// 
-/// * `connection` - The database connection
-/// * `chat_id` - The chat id
-/// * `hours` - The number of hours to get the calls
-/// 
-/// # Returns
-/// 
-/// A vector of calls
-pub fn get_channel_calls_last_x_hours(connection: &Connection, chat_id: &str, hours: u32) -> Vec<Call> {
-    let query = format!("
-        SELECT * FROM calls 
-        WHERE time >= datetime('now', '-{hours} hour') AND chat_id = ?
-    ");
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, chat_id)).unwrap();
-    let mut calls = Vec::new();
-    while let Ok(State::Row) = stmt.next() {
-        calls.push(Call {
-            id: stmt.read::<i64, _>("id").unwrap() as u64,
-            time: stmt.read::<String, _>("time").unwrap(),
-            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
-            price: stmt.read::<String, _>("price").unwrap(),
-            token_address: stmt.read::<String, _>("token_address").unwrap(),
-            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
-            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
-            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
-            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
-            message_id: stmt.read::<String, _>("message_id").unwrap(),
-            chain: stmt.read::<String, _>("chain").unwrap(),
-        });
-    }
-    calls
-}
-
-/// Get all calls made in a channel in the last x months
-/// 
-/// # Arguments
-/// 
-/// * `connection` - The database connection
-/// * `chat_id` - The chat id
-/// * `months` - The number of months to get the calls
-/// 
-/// # Returns
-/// 
-/// A vector of calls
-pub fn get_channel_calls_last_x_months(connection: &Connection, chat_id: &str, months: u32) -> Vec<Call> {
-    let query = format!("
-        SELECT * FROM calls 
-        WHERE time >= datetime('now', '-{months} month') AND chat_id = ?
-    ");
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, chat_id)).unwrap();
-    let mut calls = Vec::new();
-    while let Ok(State::Row) = stmt.next() {
-        calls.push(Call {
-            id: stmt.read::<i64, _>("id").unwrap() as u64,
-            time: stmt.read::<String, _>("time").unwrap(),
-            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
-            price: stmt.read::<String, _>("price").unwrap(),
-            token_address: stmt.read::<String, _>("token_address").unwrap(),
-            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
-            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
-            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
-            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
-            message_id: stmt.read::<String, _>("message_id").unwrap(),
-            chain: stmt.read::<String, _>("chain").unwrap(),
-        });
-    }
-    calls
-}
-
-/// Get all calls made in a channel in the last x years
+/// * `pool` - The PostgreSQL connection pool.
+/// * `tg_id` - The user's Telegram ID.
+/// * `months` - The number of months.
 ///
-/// # Arguments
-/// 
-/// * `connection` - The database connection
-/// * `chat_id` - The chat id
-/// * `years` - The number of years to get the calls
-/// 
 /// # Returns
-/// 
-/// A vector of calls
-pub fn get_channel_calls_last_x_years(connection: &Connection, chat_id: &str, years: u32) -> Vec<Call> {
-    let query = format!("
-        SELECT * FROM calls 
-        WHERE time >= datetime('now', '-{years} year') AND chat_id = ?
-    ");
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, chat_id)).unwrap();
-    let mut calls = Vec::new();
-    while let Ok(State::Row) = stmt.next() {
-        calls.push(Call {
-            id: stmt.read::<i64, _>("id").unwrap() as u64,
-            time: stmt.read::<String, _>("time").unwrap(),
-            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
-            price: stmt.read::<String, _>("price").unwrap(),
-            token_address: stmt.read::<String, _>("token_address").unwrap(),
-            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
-            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
-            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
-            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
-            message_id: stmt.read::<String, _>("message_id").unwrap(),
-            chain: stmt.read::<String, _>("chain").unwrap(),
-        });
-    }
-    calls
-}
-
-
-
-
-/// Get all calls made by a user
-/// 
-/// # Arguments
-/// 
-/// * `connection` - The database connection
-/// * `user_tg_id` - The user's telegram id
-/// 
-/// # Returns
-/// 
-/// A vector of calls
-pub fn get_all_calls_user_tg_id(connection: &Connection, user_tg_id: &str) -> Vec<Call> {
-    let query = "SELECT * FROM calls WHERE user_tg_id = ?";
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, user_tg_id)).unwrap();
-    let mut calls = Vec::new();
-    while let Ok(State::Row) = stmt.next() {
-        calls.push(Call {
-            id: stmt.read::<i64, _>("id").unwrap() as u64,
-            time: stmt.read::<String, _>("time").unwrap(),
-            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
-            price: stmt.read::<String, _>("price").unwrap(),
-            token_address: stmt.read::<String, _>("token_address").unwrap(),
-            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
-            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
-            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
-            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
-            message_id: stmt.read::<String, _>("message_id").unwrap(),
-            chain: stmt.read::<String, _>("chain").unwrap(),
-        });
-    }
-    calls
-}
-
-/// Check if a call was already made in a chat
-/// 
-/// # Arguments
-/// 
-/// * `connection` - The database connection
-/// * `token_address` - The token address
-/// * `chat_id` - The chat id
-/// 
-/// # Returns
-// 
-/// A boolean indicating if the call was already made
-pub fn is_first_call(connection: &Arc<Mutex<Connection>>, token_address: &str, chat_id: &str) -> bool {
-    // Define the query
-    let query = "SELECT COUNT(*) FROM calls WHERE token_address = ? AND chat_id = ?";
-
-    // Prepare the statement
-    let conn = connection.lock().unwrap();
-    let mut stmt = conn.prepare(query).unwrap();
-
-    // Bind the parameters
-    stmt.bind((1, token_address)).unwrap();
-    stmt.bind((2, chat_id)).unwrap();
-
-    // Execute the query and check if it's the first call
-    let result = stmt.next().unwrap();
+///
+/// A vector of calls.
+pub async fn get_user_calls_last_x_months(pool: &PgPoolType, tg_id: &str, months: u32) -> Result<Vec<Call>> {
+    let calls = sqlx::query_as!(
+        Call,
+        r#"
+        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+        FROM calls
+        WHERE user_tg_id = $1 AND time >= NOW() - INTERVAL '$2 months'
+        ORDER BY time ASC
+        "#,
+        tg_id,
+        months
+    )
+    .fetch_all(pool)
+    .await?;
     
-    if result == sqlite::State::Row {
-        let count: i64 = stmt.read::<i64, _>(0).unwrap();
-        count == 0  // Check if the count is 0 for the first call
-    } else {
-        false
-    }
+    Ok(calls)
 }
 
-
-/// Get the first call of a token in a chat
-/// 
-/// # Arguments
-/// 
-/// * `connection` - The database connection
-/// * `token_address` - The token address
-/// * `chat_id` - The chat id
-/// 
-/// # Returns
-/// 
-/// An optional call
-pub fn get_first_call_token_chat(connection: &Connection, token_address: &str, chat_id: &str) -> Option<Call> {
-    let query = "SELECT * FROM calls WHERE token_address = ? AND chat_id = ? ORDER BY time ASC LIMIT 1";
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, token_address)).unwrap();
-    stmt.bind((2, chat_id)).unwrap();
-    if let Ok(State::Row) = stmt.next() {
-        Some(Call {
-            id: stmt.read::<i64, _>("id").unwrap() as u64,
-            time: stmt.read::<String, _>("time").unwrap(),
-            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
-            price: stmt.read::<String, _>("price").unwrap(),
-            token_address: stmt.read::<String, _>("token_address").unwrap(),
-            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
-            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
-            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
-            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
-            message_id: stmt.read::<String, _>("message_id").unwrap(),
-            chain: stmt.read::<String, _>("chain").unwrap(),
-        })
-    } else {
-        None
-    }
+/// Retrieves the first call for each token addressed by a user.
+pub async fn get_all_user_firsts_calls_by_user_tg_id(pool: &PgPoolType, user_id: &str) -> Result<Vec<Call>> {
+    let calls = sqlx::query_as!(
+        Call,
+        r#"
+        SELECT DISTINCT ON (token_address)
+            id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+        FROM calls
+        WHERE user_tg_id = $1
+        ORDER BY token_address, time ASC
+        "#,
+        user_id
+    )
+    .fetch_all(pool)
+    .await?;
+    
+    Ok(calls)
 }
 
-/// Delete a call from the database
-/// 
-/// # Arguments
-/// 
-/// * `connection` - The database connection
-/// * `call_id` - The call id
-/// 
-/// # Returns
-/// 
-/// Ok(()) if the call was deleted
-pub fn delete_call(connection: &Connection, call_id: u64) -> Result<()> {
-    let query = "DELETE FROM calls WHERE id = ?";
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, call_id as i64)).unwrap();
-    stmt.next().unwrap();
+/// Deletes a call by its ID.
+pub async fn delete_call(pool: &PgPoolType, call_id: i64) -> Result<()> {
+    sqlx::query!(
+        r#"
+        DELETE FROM calls
+        WHERE id = $1
+        "#,
+        call_id
+    )
+    .execute(pool)
+    .await?;
+    
     Ok(())
 }
 
-/// Get the number of calls a user made in the last 24 hours
-/// 
-/// # Arguments
-/// 
-/// * `connection` - The database connection
-/// * `user_tg_id` - The user's telegram id
-/// 
-/// # Returns
-/// 
-/// The number of calls made by the user in the last 24 hours
-pub fn get_qtd_calls_user_made_in_24hrs(connection: &Arc<Mutex<Connection>>, user_tg_id: &str) -> usize {
-    let conn = connection.lock().unwrap();
-    let query = "SELECT COUNT(*) FROM calls WHERE user_tg_id = ? AND time >= datetime('now', '-24 hour')";
-    let mut stmt = conn.prepare(query).unwrap();
-    stmt.bind((1, user_tg_id)).unwrap();
-    if let Ok(State::Row) = stmt.next() {
-        stmt.read::<i64, _>(0).unwrap() as usize
-    } else {
-        0
-    }
+/// Clears all calls made by a user in a specific chat.
+pub async fn clear_calls(pool: &PgPoolType, tg_id: &str, chat_id: &str) -> Result<()> {
+    sqlx::query!(
+        r#"
+        DELETE FROM calls
+        WHERE user_tg_id = $1 AND chat_id = $2
+        "#,
+        tg_id,
+        chat_id
+    )
+    .execute(pool)
+    .await?;
+    
+    Ok(())
 }
 
-
-/// Get the user from a call by the call_id
+/// Retrieves the number of distinct tokens a user has called within a specific period.
 /// 
 /// # Arguments
 /// 
-/// * `connection` - The database connection
-/// * `call_id` - The call id
-/// 
+/// * `pool` - The PostgreSQL connection pool.
+/// * `user_tg_id` - The user's Telegram ID.
+/// * `chat_id` - The chat ID.
+/// * `period` - The period string (e.g., "7 days").
+///
 /// # Returns
-/// 
-/// An optional user
-pub fn get_user_from_call(connection: &Connection, call_id: &str) -> Option<User> {
-    let query = "SELECT users.id, users.username, users.tg_id 
-                 FROM calls 
-                 JOIN users ON calls.user_tg_id = users.tg_id 
-                 WHERE calls.id = ?";
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, call_id)).unwrap();
-    if let Ok(State::Row) = stmt.next() {
-        Some(User {
-            id: stmt.read::<i64, _>("id").unwrap() as u64,
-            username: stmt.read::<String, _>("username").unwrap(),
-            tg_id: stmt.read::<String, _>("tg_id").unwrap(),
-        })
-    } else {
-        None
-    }
+///
+/// The count of distinct tokens.
+pub async fn get_distinct_token_count(pool: &PgPoolType, user_tg_id: &str, chat_id: &str, period: &str) -> Result<i64> {
+    let count = sqlx::query!(
+        r#"
+        SELECT COUNT(DISTINCT token_symbol) as count
+        FROM calls
+        WHERE user_tg_id = $1
+          AND chat_id = $2
+          AND time >= NOW() - INTERVAL $3
+        "#,
+        user_tg_id,
+        chat_id,
+        period
+    )
+    .fetch_one(pool)
+    .await?
+    .count
+    .unwrap_or(0);
+    
+    Ok(count)
 }
 
-
-/// Get the user call count for a user
+/// Retrieves the total number of calls in a chat within a specific period.
 /// 
 /// # Arguments
 /// 
-/// * `connection` - The database connection
-/// * `user_tg_id` - The user's telegram id
-/// * `chat_id` - The chat id
-/// * `period` - The period to get the call count
-/// 
+/// * `pool` - The PostgreSQL connection pool.
+/// * `chat_id` - The chat ID.
+/// * `period` - The period string (e.g., "7 days").
+///
 /// # Returns
-/// 
-/// The number of calls made by the user in the last period
-pub fn get_user_call_count_for_user_chat_with_period(connection: &Connection, user_tg_id: &str, chat_id: &str, period: &str) -> usize {
-    let (number, unit) = match check_period_for_leaderboard(period) {
-        Some(p) => p,
-        None => return 0, // Invalid period
-    };
-
-    let time_expr = match unit {
-        "h" => format!("-{} hours", number),
-        "d" => format!("-{} days", number),
-        "w" => format!("-{} weeks", number),
-        "y" => format!("-{} years", number),
-        _ => return 0, // Invalid unit
-    };
-
-    let query = "SELECT COUNT(DISTINCT token_symbol) 
-        FROM calls 
-        WHERE user_tg_id = ? 
-        AND chat_id = ? 
-        AND datetime(time) >= datetime('now', ?)";
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, user_tg_id)).unwrap();
-    stmt.bind((2, chat_id)).unwrap();
-    stmt.bind((3, time_expr.as_str())).unwrap();
-
-
-    if let Ok(State::Row) = stmt.next() {
-        stmt.read::<i64, _>(0).unwrap() as usize
-    } else {
-        0
-    }
+///
+/// The total number of calls.
+pub async fn get_total_calls_in_chat(pool: &PgPoolType, chat_id: &str, period: &str) -> Result<i64> {
+    let count = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as count
+        FROM calls
+        WHERE chat_id = $1
+          AND time >= NOW() - INTERVAL $2
+        "#,
+        chat_id,
+        period
+    )
+    .fetch_one(pool)
+    .await?
+    .count
+    .unwrap_or(0);
+    
+    Ok(count)
 }
 
-/// Get the number of calls in a chat in the last period
-/// 
-/// # Arguments
-/// 
-/// * `connection` - The database connection
-/// * `chat_id` - The chat id
-/// * `period` - The period to get the call count
-/// 
-/// # Returns
-/// 
-/// The number of calls made in the last period
-pub fn get_chat_call_count_with_period(connection: &Connection, chat_id: &str, period: &str) -> usize {
-    let (number, unit) = match check_period_for_leaderboard(period) {
-        Some(p) => p,
-        None => return 0, // Invalid period
-    };
-    let time_expr = match unit {
-        "h" => format!("-{} hours", number),
-        "d" => format!("-{} days", number),
-        "w" => format!("-{} weeks", number),
-        "y" => format!("-{} years", number),
-        _ => return 0, // Invalid unit
-    };
-    let query = "SELECT COUNT(*) FROM calls WHERE chat_id = ? AND datetime(time) >= datetime('now', ?)";
-    let mut stmt = connection.prepare(query).unwrap();
-    stmt.bind((1, chat_id)).unwrap();
-    stmt.bind((2, time_expr.as_str())).unwrap();
-    if let Ok(State::Row) = stmt.next() {
-        stmt.read::<i64, _>(0).unwrap() as usize
-    } else {
-        0
-    }
+/// Retrieves the number of calls a user has made in the last 24 hours.
+pub async fn get_qtd_calls_user_made_in_24hrs(pool: &PgPoolType, user_tg_id: &str) -> Result<i64> {
+    let count = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as count
+        FROM calls
+        WHERE user_tg_id = $1 AND time >= NOW() - INTERVAL '24 HOURS'
+        "#,
+        user_tg_id
+    )
+    .fetch_one(pool)
+    .await?
+    .count
+    .unwrap_or(0);
+    
+    Ok(count)
 }
 
-/// Get all the users first calls
-/// 
-/// # Arguments
-/// 
-/// * `connection` - The database connection
-/// * `user_id` - The user's telegram id
-/// 
-/// # Returns
-/// 
-/// A vector of calls
-pub fn get_all_user_firsts_calls_by_user_tg_id(connection: &Arc<Mutex<Connection>>, user_id: &str) -> Vec<Call> {
-    let query = "
-        SELECT * FROM calls c1
-        WHERE user_tg_id = ?
-        AND time = (
-            SELECT MIN(time) FROM calls c2
-            WHERE c2.user_tg_id = c1.user_tg_id
-            AND c2.token_address = c1.token_address
-        )
-        ORDER BY time ASC
-    ";
-    let conn = connection.lock().unwrap();
-    let mut stmt = conn.prepare(query).unwrap();
-    stmt.bind((1, user_id)).unwrap();
-    let mut calls = Vec::new();
-    while let Ok(State::Row) = stmt.next() {
-        calls.push(Call {
-            id: stmt.read::<i64, _>("id").unwrap() as u64,
-            time: stmt.read::<String, _>("time").unwrap(),
-            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
-            price: stmt.read::<String, _>("price").unwrap(),
-            token_address: stmt.read::<String, _>("token_address").unwrap(),
-            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
-            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
-            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
-            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
-            message_id: stmt.read::<String, _>("message_id").unwrap(),
-            chain: stmt.read::<String, _>("chain").unwrap(),
-        });
-    }
-    calls
+/// Checks if a call is the first one in a chat for a given token.
+pub async fn is_first_call(pool: &PgPoolType, token_address: &str, chat_id: &str) -> Result<bool> {
+    let count = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as count
+        FROM calls
+        WHERE token_address = $1 AND chat_id = $2
+        "#,
+        token_address,
+        chat_id
+    )
+    .fetch_one(pool)
+    .await?
+    .count
+    .unwrap_or(0);
+    
+    Ok(count == 0)
+}
+
+/// Retrieves the user associated with a specific call.
+pub async fn get_user_from_call(pool: &PgPoolType, call_id: i64) -> Result<Option<User>> {
+    let user = sqlx::query_as!(
+        User,
+        r#"
+        SELECT u.id, u.tg_id, u.username
+        FROM users u
+        JOIN calls c ON c.user_tg_id = u.tg_id
+        WHERE c.id = $1
+        "#,
+        call_id
+    )
+    .fetch_optional(pool)
+    .await?;
+    
+    Ok(user)
 }
