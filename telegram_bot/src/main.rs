@@ -143,7 +143,7 @@ async fn handle_callback_query(bot: Bot, query: CallbackQuery) -> Result<(), Box
 async fn run_tide_server() {
     let mut app = tide::new();
     println!("Tide bot server running.");
-    app.at("/user_call/:tg_user_id").get(get_user_calls);
+    app.at("/user_calls/:tg_user_id").get(get_user_calls);
     log::info!("Starting Tide server on port 2020...");
     if let Err(e) = app.listen("0.0.0.0:2020").await {
         log::error!("Failed to start Tide server: {}", e);

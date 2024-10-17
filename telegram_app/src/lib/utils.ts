@@ -50,6 +50,8 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 const BASE_URL_API = "https://srv617785.hstgr.cloud/api";
+const BOT_API_URL = "https://srv617785.hstgr.cloud/bot_api";
+
 export interface CopyTradeWalletData {
   user_id: string;
   wallet_id: string;
@@ -548,6 +550,6 @@ export async function getTokenData(tokenMint: string) {
 }
 
 export async function getUserFirstCalls(userId: string) {
-  const response = await axios.get(`${BASE_URL_API}/user_calls/${userId}`);
+  const response = await axios.get(`${BOT_API_URL}/user_calls/${userId}`);
   return response.data;
 }
