@@ -2692,6 +2692,7 @@ name = "telegram_bot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-std",
  "chrono",
  "log",
  "pretty_env_logger",

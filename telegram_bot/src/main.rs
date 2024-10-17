@@ -8,7 +8,7 @@ use crate::get_user_calls;
 use telegram_bot::format_number;
 use std::sync::{Arc, Mutex};
 use sqlite::Connection;
-use tokio::spawn;
+use std::thread;
 
 pub type SafeConnection = Arc<Mutex<Connection>>;
 
@@ -20,8 +20,10 @@ pub fn get_safe_connection() -> SafeConnection {
 async fn main() {
     pretty_env_logger::init();
     log::info!("Starting bot...");
-    tokio::spawn(async {
-        run_tide_server().await;
+
+     // Spawn the Tide server on a separate thread using async-std runtime
+    thread::spawn(|| {
+        async_std::task::block_on(run_tide_server());
     });
 
     let bot = Bot::from_env();
