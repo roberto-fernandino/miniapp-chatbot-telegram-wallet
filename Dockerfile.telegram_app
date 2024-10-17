@@ -1,10 +1,10 @@
 FROM node:lts-alpine
 
-COPY ./telegram_app ./telegram_app
+COPY ./telegram_app ./app
 
-WORKDIR /telegram_app
+WORKDIR /app
 
-RUN cd /telegram_app && \
+RUN cd /app && \
  npm install && \
  npm install -g vite
 
