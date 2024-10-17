@@ -1,6 +1,7 @@
 use anyhow::Result;
-use crate::routes::{index, set_copy_trade_wallet, get_copy_trades, delete_copy_trade_wallet, set_user_session};
+use crate::routes::{index, set_copy_trade_wallet, get_copy_trades, delete_copy_trade_wallet, set_user_session, get_user_calls};
 mod routes;
+mod db;
 mod utils;
 
 #[tokio::main]
@@ -13,6 +14,7 @@ async fn main() -> Result<()> {
     app.at("/delete_copy_trade_wallet/:user_id/:copy_trade_address").delete(delete_copy_trade_wallet);
     app.at("/get_copy_trades/:user_id").get(get_copy_trades);
     app.at("/set_user_session").post(set_user_session);
+    app.at("/user_calls/:user_tg_id").get(get_user_calls);
     app.listen("0.0.0.0:8000").await?;
 
     Ok(())
