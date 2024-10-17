@@ -1317,7 +1317,9 @@ pub struct CallHistoryUser
 /// * `String` - A json string with the calls and the ATH
 pub async fn get_user_calls(req: tide::Request<()>) -> tide::Result<String> {
     let user_tg_id = req.param("user_tg_id")?;
+    println!("user_tg_id: {}", user_tg_id);
     let mut con = get_connection();
+    println!("Connection to db stablished");
     let calls_without_ath = get_all_user_firsts_calls_by_user_tg_id(&mut con, user_tg_id);
     let mut calls_with_ath = Vec::new();
     for call in calls_without_ath {
@@ -1332,7 +1334,7 @@ pub async fn get_user_calls(req: tide::Request<()>) -> tide::Result<String> {
         };
         calls_with_ath.push(call_with_ath);
     }
-    println!("{:?}", calls_with_ath);
+    println!("calls_with_ath: {:?}", calls_with_ath);
     Ok(serde_json::to_string(&calls_with_ath)?)
 }
 
