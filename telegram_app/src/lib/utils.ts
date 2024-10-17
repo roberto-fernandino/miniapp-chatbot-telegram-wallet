@@ -548,6 +548,6 @@ export async function getTokenData(tokenMint: string) {
 }
 
 export async function getUserFirstCalls(userId: string) {
-  const response = await axios.get(`${BASE_URL_API}/users_calls/${userId}`);
+  const response = await axios.get(`${BASE_URL_API}/user_calls/${userId}`);
   return response.data;
 }
