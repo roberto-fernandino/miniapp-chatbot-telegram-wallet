@@ -1,4 +1,6 @@
 use std::sync::{Arc, Mutex};
+use crate::utils::helpers::time_to_timestamp;
+use serde::Serialize;
 use reqwest::Url;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 use chrono::Duration;
@@ -10,7 +12,7 @@ use anyhow::Result;
 use serde_json::Value;
 mod utils;
 mod db;
-use db::{get_user_from_call, Call, User};
+use db::{get_user_from_call, Call, User, get_connection, get_all_user_firsts_calls_by_user_tg_id};
 use regex::Regex;
 
 /// Check if there's a valid solana address in a text
@@ -1295,3 +1297,42 @@ pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message) -> Resul
     bot.send_message(msg.chat.id, "Welcome to the bot! Please use the keyboard to interact with the bot.").await?;
     Ok(())
 }
+
+#[derive(Debug, Serialize)]
+pub struct CallHistoryUser
+ {
+    pub call: Call,
+    pub multiplier: f64,
+    pub ath: f64,
+}
+
+/// Get user calls with ATH
+/// 
+/// # Arguments
+/// 
+/// * `req` - The request object
+/// 
+/// # Returns
+/// 
+/// * `String` - A json string with the calls and the ATH
+pub async fn get_user_calls(req: tide::Request<()>) -> tide::Result<String> {
+    let user_tg_id = req.param("user_tg_id")?;
+    let mut con = get_connection();
+    let calls_without_ath = get_all_user_firsts_calls_by_user_tg_id(&mut con, user_tg_id);
+    let mut calls_with_ath = Vec::new();
+    for call in calls_without_ath {
+        let ath = get_ath(time_to_timestamp(&call.time).await, &call.token_address, &call.chain).await?;
+        let ath_price = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+        let multiplier = ath_price / call.price.parse::<f64>().unwrap_or(0.0);
+        let call_with_ath = CallHistoryUser
+         {
+            call,
+            multiplier,
+            ath: ath_price,
+        };
+        calls_with_ath.push(call_with_ath);
+    }
+    println!("{:?}", calls_with_ath);
+    Ok(serde_json::to_string(&calls_with_ath)?)
+}
+

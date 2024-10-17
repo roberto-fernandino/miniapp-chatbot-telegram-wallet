@@ -4,9 +4,11 @@ use teloxide::{dispatching::UpdateFilterExt, Bot};
 mod utils;
 mod db;
 use telegram_bot::*;
+use crate::get_user_calls;
 use telegram_bot::format_number;
 use std::sync::{Arc, Mutex};
 use sqlite::Connection;
+use tokio::spawn;
 
 pub type SafeConnection = Arc<Mutex<Connection>>;
 
@@ -18,6 +20,9 @@ pub fn get_safe_connection() -> SafeConnection {
 async fn main() {
     pretty_env_logger::init();
     log::info!("Starting bot...");
+    tokio::spawn(async {
+        run_tide_server().await;
+    });
 
     let bot = Bot::from_env();
     db::configure_db(&db::get_connection());
@@ -133,4 +138,14 @@ async fn handle_callback_query(bot: Bot, query: CallbackQuery) -> Result<(), Box
     }
     
     Ok(())
+}
+
+async fn run_tide_server() {
+    let mut app = tide::new();
+    println!("Tide bot server running.");
+    app.at("/user_call/:tg_user_id").get(get_user_calls);
+    log::info!("Starting Tide server on port 2020...");
+    if let Err(e) = app.listen("0.0.0.0:2020").await {
+        log::error!("Failed to start Tide server: {}", e);
+    }
 }

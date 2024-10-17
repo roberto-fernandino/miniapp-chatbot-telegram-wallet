@@ -12,23 +12,6 @@ pub async fn get_redis_connection() -> Result<Connection> {
 }
 
 
-/// Check the period for a leaderboard command
-/// 
-/// # Arguments
-/// 
-/// * `text` - The command text to check
-/// 
-/// # Returns
-/// 
-/// An Option containing a tuple of the number and unit
-pub fn check_period_for_leaderboard(text: &str) -> Option<(u32, &str)> {
-    let re = regex::Regex::new(r"(\d+)([hdwy])$").unwrap();
-    re.captures(text).and_then(|cap| {
-        let number = cap.get(1)?.as_str().parse::<u32>().ok()?;
-        let unit = cap.get(2)?.as_str();
-        Some((number, unit))
-    })
-}
 
 
 /// Get the ATH of a token

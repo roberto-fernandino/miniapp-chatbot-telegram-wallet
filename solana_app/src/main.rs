@@ -1,7 +1,5 @@
 use anyhow::Result;
-use crate::modules::jupiter::check_jupiter_swap;
 use futures_util::SinkExt;
-use modules::jupiter::info_jupiter_swap;
 use tide::Request;
 use tide::Response;
 use tide::StatusCode;
@@ -9,7 +7,6 @@ use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio_tungstenite::WebSocketStream;
 use futures::stream::SplitSink;
-use utils::helpers::decode_signature_get_transaction;
 use std::sync::Arc;
 use solana_client::rpc_client::RpcClient;
 use solana_app::{init_rpc_client, get_redis_connection, get_copy_trade_wallets, subscribe_to_account_transaction, handle_incoming_messages};
@@ -21,7 +18,6 @@ mod utils;
 use tokio::sync::broadcast;
 use futures::lock::Mutex;
 mod modules;
-use utils::helpers::get_account_involved_in_transaction;
 use std::time::Duration;
 
 #[tokio::main]

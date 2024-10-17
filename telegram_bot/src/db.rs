@@ -41,7 +41,7 @@ pub struct User {
     pub tg_id: String,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone, serde::Serialize)]
 pub struct Call {
     pub id: u64,
     pub time: String,
@@ -660,4 +660,46 @@ pub fn get_chat_call_count_with_period(connection: &Connection, chat_id: &str, p
     } else {
         0
     }
+}
+
+/// Get all the users first calls
+/// 
+/// # Arguments
+/// 
+/// * `connection` - The database connection
+/// * `user_id` - The user's telegram id
+/// 
+/// # Returns
+/// 
+/// A vector of calls
+pub fn get_all_user_firsts_calls_by_user_tg_id(connection: &Connection, user_id: &str) -> Vec<Call> {
+    let query = "
+        SELECT * FROM calls c1
+        WHERE user_tg_id = ?
+        AND time = (
+            SELECT MIN(time) FROM calls c2
+            WHERE c2.user_tg_id = c1.user_tg_id
+            AND c2.token_address = c1.token_address
+        )
+        ORDER BY time ASC
+    ";
+    let mut stmt = connection.prepare(query).unwrap();
+    stmt.bind((1, user_id)).unwrap();
+    let mut calls = Vec::new();
+    while let Ok(State::Row) = stmt.next() {
+        calls.push(Call {
+            id: stmt.read::<i64, _>("id").unwrap() as u64,
+            time: stmt.read::<String, _>("time").unwrap(),
+            mkt_cap: stmt.read::<String, _>("mkt_cap").unwrap(),
+            price: stmt.read::<String, _>("price").unwrap(),
+            token_address: stmt.read::<String, _>("token_address").unwrap(),
+            token_mint: stmt.read::<String, _>("token_mint").unwrap(),
+            token_symbol: stmt.read::<String, _>("token_symbol").unwrap(),
+            user_tg_id: stmt.read::<String, _>("user_tg_id").unwrap(),
+            chat_id: stmt.read::<String, _>("chat_id").unwrap(),
+            message_id: stmt.read::<String, _>("message_id").unwrap(),
+            chain: stmt.read::<String, _>("chain").unwrap(),
+        });
+    }
+    calls
 }
