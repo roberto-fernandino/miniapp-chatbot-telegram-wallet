@@ -39,6 +39,25 @@ import { DEFAULT_SOLANA_ACCOUNTS } from "@turnkey/sdk-browser";
 import EthTokenBalances from "./components/ui/ethTokenBalances";
 import { swapSolanaTokens } from "./lib/solana";
 
+interface Call {
+  id?: number;
+  time: string;
+  mkt_cap: string;
+  price: string;
+  token_address: string;
+  token_mint: string;
+  token_symbol: string;
+  user_tg_id: string;
+  chat_id: string;
+  message_id: string;
+  chain: string;
+}
+
+interface CallWithAth {
+  call: Call;
+  multiplier: number;
+  ath: number;
+}
 const App: React.FC = () => {
   // User information
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -861,6 +880,26 @@ const App: React.FC = () => {
                     isOpen={historySheetOpen}
                     onClose={() => setHistorySheetOpen(false)}
                   >
+                    <>
+                      <div className="flex flex-col items-center justify-center w-full mt-3 h-full">
+                        <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 text-transparent bg-clip-text">
+                          Calls History
+                        </h2>
+                        <div className="flex flex-col items-center justify-center w-full mt-3 h-full">
+                          {history.map((call) => (
+                            <div
+                              key={call.call.id}
+                              className="flex flex-col items-center justify-center w-full mt-3 h-full"
+                            ></div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  </Sheet>
+                  <Sheet
+                    isOpen={historySheetOpen}
+                    onClose={() => setHistorySheetOpen(false)}
+                  >
                     <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 text-transparent bg-clip-text">
                       History
                     </h3>
@@ -921,7 +960,7 @@ const App: React.FC = () => {
                                   <div>{solBalance} SOL</div>
                                   <div>
                                     {usdSolBalance ? (
-                                      `USD ${Number(usdSolBalance).toFixed(2)}`
+                                      `${Number(usdSolBalance).toFixed(2)} USD `
                                     ) : (
                                       <Spinner />
                                     )}
@@ -934,7 +973,7 @@ const App: React.FC = () => {
                                   <div>{ethBalance} ETH</div>
                                   <div>
                                     {usdEthBalance ? (
-                                      `USD ${Number(usdEthBalance).toFixed(2)}`
+                                      `${Number(usdEthBalance).toFixed(2)} USD `
                                     ) : (
                                       <Spinner />
                                     )}
@@ -946,9 +985,6 @@ const App: React.FC = () => {
                         </div>
                       </div>
                       <div className="mt-4">
-                        <h3 className="text-lg font-semibold mb-2">
-                          Token Portfolio
-                        </h3>
                         {account.addressFormat === "ADDRESS_FORMAT_SOLANA" && (
                           <SolTokenBalances address={account.address} />
                         )}
