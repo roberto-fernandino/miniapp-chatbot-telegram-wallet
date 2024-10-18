@@ -11,7 +11,7 @@ use serde_json::Value;
 mod utils;
 mod db;
 use crate::utils::helpers::time_to_timestamp;
-use db::{get_user_from_call, Call, User, get_all_user_firsts_calls_by_user_tg_id};
+use db::{add_user, get_all_user_firsts_calls_by_user_tg_id, get_user_from_call, Call, User};
 use regex::Regex;
 use sqlx::Pool;
 use sqlx::Postgres;
@@ -646,6 +646,10 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                 let user_id_str = user_id.as_str();
                 // Get the user
                 let user = db::get_user(&pool, user_id_str).await;
+                if user.is_err() {
+                    add_user(pool, user_id_str, Some(msg.from.clone().unwrap().username.clone().unwrap_or("Unknown".to_string()).as_str())).await?;
+                    log::error!("User not found in database");
+                }
                 // If the user is not in the database, add them
                 match user {
                     Err(_) => {
