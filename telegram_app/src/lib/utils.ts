@@ -553,3 +553,24 @@ export async function getUserFirstCalls(userId: string) {
   const response = await axios.get(`${BOT_API_URL}/user_calls/${userId}`);
   return response.data;
 }
+
+export function formatNumber(value: number): string {
+  if (value >= 1_000_000) {
+    return (value / 1_000_000).toFixed(2) + "M";
+  } else if (value >= 1_000) {
+    return (value / 1_000).toFixed(2) + "K";
+  } else {
+    return value.toString();
+  }
+}
+
+export function formatTime(isoString: string): string {
+  const date = new Date(isoString);
+  return date.toLocaleString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
