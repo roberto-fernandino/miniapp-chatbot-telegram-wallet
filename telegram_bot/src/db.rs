@@ -9,7 +9,7 @@ use std::env;
 /// Represents a user in the system.
 #[derive(Debug, Serialize, Clone)]
 pub struct User {
-    pub id: i64,
+    pub id: i32,
     pub username: Option<String>,
     pub tg_id: String,
 }
@@ -17,8 +17,8 @@ pub struct User {
 /// Represents a call in the system.
 #[derive(Debug, Serialize, Clone)]
 pub struct Call {
-    pub id: i64,
-    pub time: NaiveDateTime,
+    pub id: i32,
+    pub time: String,
     pub mkt_cap: String,
     pub token_address: String,
     pub token_mint: String,
@@ -118,6 +118,7 @@ pub async fn add_user(pool: &PgPool, tg_id: &str, username: Option<&str>) -> Res
 /// The ID of the newly created call.
 pub async fn add_call(
     pool: &PgPool, 
+    time: &str,
     tg_id: &str, 
     mkt_cap: &str, 
     token_address: &str, 
@@ -126,10 +127,15 @@ pub async fn add_call(
     price: &str, 
     chat_id: &str,
     message_id: &str,
-    chain: &str
-) -> Result<i64> {
-    let q = "INSERT INTO calls (user_tg_id, mkt_cap, token_address, token_mint, token_symbol, price, chat_id, message_id, chain) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id";
+    chain: &str,
+    username: Option<&str>
+) -> Result<i32> {
+    if !user_exists(pool, tg_id).await? {
+        add_user(pool, tg_id, username).await?;
+    }
+    let q = "INSERT INTO calls (time, user_tg_id, mkt_cap, token_address, token_mint, token_symbol, price, chat_id, message_id, chain) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id";
     let result = sqlx::query_scalar(q)
+    .bind(time)
     .bind(tg_id)
     .bind(mkt_cap)
     .bind(token_address)
@@ -157,7 +163,7 @@ pub async fn get_first_call_by_token_address(pool: &PgPool, token_address: &str,
     
     Ok(Call {
         id: call.get("id"),
-        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        time: call.get("time"),
         mkt_cap: call.get("mkt_cap"),
         token_address: call.get("token_address"),
         token_mint: call.get("token_mint"),
@@ -178,10 +184,10 @@ pub async fn get_call_by_id(pool: &PgPool, id: i64) -> Result<Call> {
    .bind(id)
    .fetch_one(pool)
    .await?;
-
+  
    Ok(Call {
         id: call.get("id"),
-        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        time: call.get("time"),
         mkt_cap: call.get("mkt_cap"),
         token_address: call.get("token_address"),
         token_mint: call.get("token_mint"),
@@ -201,20 +207,24 @@ pub async fn get_all_calls_chat_id(pool: &PgPool, chat_id: &str) -> Result<Vec<C
     .bind(chat_id)
     .fetch_all(pool)
     .await?;
-
-    Ok(calls.iter().map(|call| Call {
-        id: call.get("id"),
-        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
-        mkt_cap: call.get("mkt_cap"),
-        token_address: call.get("token_address"),
-        token_mint: call.get("token_mint"),
-        token_symbol: call.get("token_symbol"),
-        price: call.get("price"),
-        user_tg_id: call.get("user_tg_id"),
-        chat_id: call.get("chat_id"),
-        message_id: call.get("message_id"),
-        chain: call.get("chain"),
-    }).collect())
+    let mut calls_vec: Vec<Call> = Vec::new();
+    for call in calls {
+        let time_str: &str = call.get("time");
+        calls_vec.push(Call {
+            id: call.get("id"),
+            time: time_str.to_string(),
+            mkt_cap: call.get("mkt_cap"),
+            token_address: call.get("token_address"),
+            token_mint: call.get("token_mint"),
+            token_symbol: call.get("token_symbol"),
+            price: call.get("price"),
+            user_tg_id: call.get("user_tg_id"),
+            chat_id: call.get("chat_id"),
+            message_id: call.get("message_id"),
+            chain: call.get("chain"),
+        });
+    }
+    Ok(calls_vec)
 }
 
 /// Retrieves all calls made in a channel in the last `x` days.
@@ -229,20 +239,24 @@ pub async fn get_channel_calls_last_x_days(pool: &PgPool, chat_id: &str, days: i
     .bind(chat_id)
     .fetch_all(pool)
     .await?;
-
-    Ok(calls.iter().map(|call| Call {
-        id: call.get("id"),
-        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
-        mkt_cap: call.get("mkt_cap"),
-        token_address: call.get("token_address"),
-        token_mint: call.get("token_mint"),
-        token_symbol: call.get("token_symbol"),
-        price: call.get("price"),
-        user_tg_id: call.get("user_tg_id"),
-        chat_id: call.get("chat_id"),
-        message_id: call.get("message_id"),
-        chain: call.get("chain"),
-    }).collect())
+    let mut calls_vec: Vec<Call> = Vec::new();
+    for call in calls {
+        let time_str: &str = call.get("time");
+        calls_vec.push(Call {
+            id: call.get("id"),
+            time: time_str.to_string(),
+            mkt_cap: call.get("mkt_cap"),
+            token_address: call.get("token_address"),
+            token_mint: call.get("token_mint"),
+            token_symbol: call.get("token_symbol"),
+            price: call.get("price"),
+            user_tg_id: call.get("user_tg_id"),
+            chat_id: call.get("chat_id"),
+            message_id: call.get("message_id"),
+            chain: call.get("chain"),
+        });
+    }           
+    Ok(calls_vec)
 }
 
 /// Retrieves all calls made in a channel in the last `x` hours.
@@ -257,20 +271,24 @@ pub async fn get_channel_calls_last_x_hours(pool: &PgPool, chat_id: &str, hours:
     .bind(chat_id)
     .fetch_all(pool)
     .await?;
-
-    Ok(calls.iter().map(|call| Call {
-        id: call.get("id"),
-        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
-        mkt_cap: call.get("mkt_cap"),
-        token_address: call.get("token_address"),
-        token_mint: call.get("token_mint"),
-        token_symbol: call.get("token_symbol"),
-        price: call.get("price"),
-        user_tg_id: call.get("user_tg_id"),
-        chat_id: call.get("chat_id"),
-        message_id: call.get("message_id"),
-        chain: call.get("chain"),
-    }).collect())
+    let mut calls_vec: Vec<Call> = Vec::new();
+    for call in calls {
+        let time_str: &str = call.get("time");
+        calls_vec.push(Call {
+            id: call.get("id"),
+            time: time_str.to_string(),
+            mkt_cap: call.get("mkt_cap"),
+            token_address: call.get("token_address"),
+            token_mint: call.get("token_mint"),             
+            token_symbol: call.get("token_symbol"),
+            price: call.get("price"),
+            user_tg_id: call.get("user_tg_id"),
+            chat_id: call.get("chat_id"),
+            message_id: call.get("message_id"),
+            chain: call.get("chain"),
+        });
+    }   
+    Ok(calls_vec)
 }
 
 /// Retrieves all calls made in a channel in the last `x` months.
@@ -285,20 +303,24 @@ pub async fn get_channel_calls_last_x_months(pool: &PgPool, chat_id: &str, month
     .bind(chat_id)
     .fetch_all(pool)
     .await?;
-
-    Ok(channels.iter().map(|call| Call {
-        id: call.get("id"),
-        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
-        mkt_cap: call.get("mkt_cap"),
-        token_address: call.get("token_address"),
-        token_mint: call.get("token_mint"),
-        token_symbol: call.get("token_symbol"),
-        price: call.get("price"),
-        user_tg_id: call.get("user_tg_id"),
-        chat_id: call.get("chat_id"),
-        message_id: call.get("message_id"),
-        chain: call.get("chain"),
-    }).collect())
+    let mut calls_vec: Vec<Call> = Vec::new();
+    for call in channels {
+        let time_str: &str = call.get("time");
+        calls_vec.push(Call {
+            id: call.get("id"),
+            time: time_str.to_string(),
+            mkt_cap: call.get("mkt_cap"),
+            token_address: call.get("token_address"),
+            token_mint: call.get("token_mint"),
+            token_symbol: call.get("token_symbol"),
+            price: call.get("price"),
+            user_tg_id: call.get("user_tg_id"),
+            chat_id: call.get("chat_id"),
+            message_id: call.get("message_id"),
+            chain: call.get("chain"),
+        });
+    }   
+    Ok(calls_vec)
 }
 
 /// Retrieves all calls made by a specific user in the last `x` years.
@@ -323,19 +345,24 @@ pub async fn get_user_calls_last_x_years(pool: &PgPool, tg_id: &str, years: i32)
     .bind(years)
     .fetch_all(pool)
     .await?;
-    Ok(calls.iter().map(|call| Call {
-        id: call.get("id"),
-        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
-        mkt_cap: call.get("mkt_cap"),
-        token_address: call.get("token_address"),
-        token_mint: call.get("token_mint"),
-        token_symbol: call.get("token_symbol"),
-        price: call.get("price"),
-        user_tg_id: call.get("user_tg_id"),
-        chat_id: call.get("chat_id"),
-        message_id: call.get("message_id"),
-        chain: call.get("chain"),
-    }).collect())
+    let mut calls_vec: Vec<Call> = Vec::new();
+    for call in calls {
+        let time_str: &str = call.get("time");
+        calls_vec.push(Call {
+            id: call.get("id"),
+            time: time_str.to_string(),
+            mkt_cap: call.get("mkt_cap"),
+            token_address: call.get("token_address"),
+            token_mint: call.get("token_mint"),
+            token_symbol: call.get("token_symbol"),
+            price: call.get("price"),
+            user_tg_id: call.get("user_tg_id"),
+            chat_id: call.get("chat_id"),
+            message_id: call.get("message_id"),
+            chain: call.get("chain"),
+        });
+    }   
+    Ok(calls_vec)
 }
 
 /// Retrieves all calls made by a specific user in the last `x` hours.
@@ -361,19 +388,24 @@ pub async fn get_user_calls_last_x_hours(pool: &PgPool, tg_id: &str, hours: i32)
     .fetch_all(pool)
     .await?;
 
-    Ok(calls.iter().map(|call| Call {
-        id: call.get("id"),
-        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
-        mkt_cap: call.get("mkt_cap"),
-        token_address: call.get("token_address"),
-        token_mint: call.get("token_mint"),
-        token_symbol: call.get("token_symbol"),
-        price: call.get("price"),
-        user_tg_id: call.get("user_tg_id"),
-        chat_id: call.get("chat_id"),
-        message_id: call.get("message_id"),
-        chain: call.get("chain"),
-    }).collect())
+    let mut calls_vec: Vec<Call> = Vec::new();
+    for call in calls {
+        let time_str: &str = call.get("time");
+        calls_vec.push(Call {
+            id: call.get("id"),
+            time: time_str.to_string(),
+            mkt_cap: call.get("mkt_cap"),
+            token_address: call.get("token_address"),
+            token_mint: call.get("token_mint"),     
+            token_symbol: call.get("token_symbol"),
+            price: call.get("price"),
+            user_tg_id: call.get("user_tg_id"),
+            chat_id: call.get("chat_id"),
+            message_id: call.get("message_id"),
+            chain: call.get("chain"),
+        });
+    }   
+    Ok(calls_vec)
 }
 
 /// Retrieves all calls made by a specific user in the last `x` months.
@@ -398,20 +430,24 @@ pub async fn get_user_calls_last_x_months(pool: &PgPool, tg_id: &str, months: i3
     .bind(months)
     .fetch_all(pool)
     .await?;
-
-    Ok(calls.iter().map(|call| Call {
-        id: call.get("id"),
-        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
-        mkt_cap: call.get("mkt_cap"),
-        token_address: call.get("token_address"),
-        token_mint: call.get("token_mint"),
-        token_symbol: call.get("token_symbol"),
-        price: call.get("price"),
-        user_tg_id: call.get("user_tg_id"),
-        chat_id: call.get("chat_id"),
-        message_id: call.get("message_id"),
-        chain: call.get("chain"),
-    }).collect())
+    let mut calls_vec: Vec<Call> = Vec::new();
+    for call in calls {
+        let time_str: &str = call.get("time");
+        calls_vec.push(Call {
+            id: call.get("id"),
+            time: time_str.to_string(),
+            mkt_cap: call.get("mkt_cap"),
+            token_address: call.get("token_address"),
+            token_mint: call.get("token_mint"),
+            token_symbol: call.get("token_symbol"),
+            price: call.get("price"),
+            user_tg_id: call.get("user_tg_id"),
+            chat_id: call.get("chat_id"),
+            message_id: call.get("message_id"),
+            chain: call.get("chain"),
+        });
+    }   
+    Ok(calls_vec)
 }
 
 /// Retrieves the first call for each token addressed by a user.
@@ -427,19 +463,24 @@ pub async fn get_all_user_firsts_calls_by_user_tg_id(pool: &PgPool, user_id: &st
     .fetch_all(pool)
     .await?;
 
-    Ok(calls.iter().map(|call| Call {
-        id: call.get("id"),
-        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
-        mkt_cap: call.get("mkt_cap"),
-        token_address: call.get("token_address"),
-        token_mint: call.get("token_mint"),
-        token_symbol: call.get("token_symbol"),
-        price: call.get("price"),
-        user_tg_id: call.get("user_tg_id"),
-        chat_id: call.get("chat_id"),
-        message_id: call.get("message_id"),
-        chain: call.get("chain"),
-    }).collect())
+    let mut calls_vec: Vec<Call> = Vec::new();
+    for call in calls {
+        let time_str: &str = call.get("time");
+        calls_vec.push(Call {
+            id: call.get("id"),
+            time: time_str.to_string(),
+            mkt_cap: call.get("mkt_cap"),
+            token_address: call.get("token_address"),
+            token_mint: call.get("token_mint"),
+            token_symbol: call.get("token_symbol"),
+            price: call.get("price"),
+            user_tg_id: call.get("user_tg_id"),
+            chat_id: call.get("chat_id"),
+            message_id: call.get("message_id"),
+            chain: call.get("chain"),
+        });
+    }   
+    Ok(calls_vec)
 }
 
 /// Deletes a call by its ID.
@@ -613,9 +654,10 @@ pub async fn get_first_call_token_chat(
         .fetch_one(pool)
         .await?;
 
+    let time_str: &str = call.get("time");
     Ok(Call {
         id: call.get("id"),
-        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        time: time_str.to_string(),
         mkt_cap: call.get("mkt_cap"),
         price: call.get("price"),
         token_address: call.get("token_address"),
@@ -728,17 +770,40 @@ pub async fn get_all_calls_user_tg_id(pool: &PgPool, user_tg_id: &str) -> Result
         .fetch_all(pool)
         .await?;
     
-    Ok(calls.iter().map(|call| Call {
-        id: call.get("id"),
-        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
-        mkt_cap: call.get("mkt_cap"),
-        price: call.get("price"),
-        token_address: call.get("token_address"),
-        token_mint: call.get("token_mint"),
-        token_symbol: call.get("token_symbol"),
-        user_tg_id: call.get("user_tg_id"),
-        chat_id: call.get("chat_id"),
-        message_id: call.get("message_id"),
-        chain: call.get("chain"),
-    }).collect())
+    let mut calls_vec: Vec<Call> = Vec::new();
+    for call in calls {
+        let time_str: &str = call.get("time");
+        calls_vec.push(Call {
+            id: call.get("id"),
+            time: time_str.to_string(),
+            mkt_cap: call.get("mkt_cap"),
+            price: call.get("price"),
+            token_address: call.get("token_address"),
+            token_mint: call.get("token_mint"),
+            token_symbol: call.get("token_symbol"),
+            user_tg_id: call.get("user_tg_id"),
+            chat_id: call.get("chat_id"),
+            message_id: call.get("message_id"),
+            chain: call.get("chain"),
+        });
+    }   
+    Ok(calls_vec)
+}
+
+// Checks if a user exists in the database by their Telegram ID.
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool.
+/// * `user_tg_id` - The user's Telegram ID.
+///
+/// # Returns
+///
+/// A result indicating whether the user exists or an error.
+pub async fn user_exists(pool: &PgPool, user_tg_id: &str) -> Result<bool, sqlx::Error> {
+    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users WHERE tg_id = $1")
+        .bind(user_tg_id)
+        .fetch_one(pool)
+        .await?; // Await the result here
+    Ok(count.0 > 0)
 }
