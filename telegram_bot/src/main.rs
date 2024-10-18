@@ -4,13 +4,10 @@ use teloxide::{dispatching::UpdateFilterExt, Bot};
 mod utils;
 mod db;
 use telegram_bot::*;
-use crate::db::get_user_calls;
 use telegram_bot::format_number;
 use std::sync::Arc;
 use sqlx::Pool;
 use sqlx::Postgres;
-use tokio::sync::Mutex;
-use std::env;
 
 pub type SafePool = Arc<Pool<Postgres>>;
 
@@ -40,10 +37,10 @@ async fn main() {
     let bot = Bot::from_env();
 
     let handler = dptree::entry()
-        .branch(Update::filter_message().endpoint(|bot: Bot, msg: Message| async move {
+        .branch(Update::filter_message().endpoint(|bot: Bot, msg: Message, pool: SafePool| async move {
             handle_message(bot, msg, pool.clone()).await
         }))
-        .branch(Update::filter_callback_query().endpoint(|bot: Bot, q: CallbackQuery| async move {
+        .branch(Update::filter_callback_query().endpoint(|bot: Bot, q: CallbackQuery, pool: SafePool| async move {
             handle_callback_query(bot, q, pool.clone()).await
         }));
 
@@ -64,13 +61,13 @@ async fn handle_message(
     if let Some(text) = msg.text() {
         if is_pnl_command(text) {
             log::info!("Message is a pnl command");
-            match pnl(&msg, &bot, &pool).await {
+            match pnl(&msg, &bot, pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to pnl: {:?}", e),
             }
         }
         else if utils::helpers::is_lb_command(text) {
-            match leaderboard(&msg, &bot, &pool).await {
+            match leaderboard(&msg, &bot, pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to leaderboard: {:?}", e),
             }
@@ -88,13 +85,13 @@ async fn handle_callback_query(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if let Some(data) = query.data.as_ref() {
         if data.starts_with("del_call:") {
-            match handle_callback_del_call(data.to_string(), &bot, &query, &pool).await {
+            match handle_callback_del_call(data.to_string(), &bot, &query, pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to delete call: {:?}", e),
             }
         } 
         else if data.starts_with("refresh:") {
-            match handle_callback_refresh(data.to_string(), &bot, &query, &pool).await {
+            match handle_callback_refresh(data.to_string(), &bot, &query, pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to refresh: {:?}", e),
             }
