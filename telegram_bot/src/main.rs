@@ -8,6 +8,7 @@ use telegram_bot::format_number;
 use std::sync::Arc;
 use sqlx::Pool;
 use sqlx::Postgres;
+use sqlx::postgres::PgPoolOptions;
 
 pub type SafePool = Arc<Pool<Postgres>>;
 
@@ -23,15 +24,17 @@ async fn main() {
     log::info!("Starting bot...");
 
     // Initialize the PostgreSQL connection pool.
-    let pool = get_safe_pool().await;
+     let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL is not set"))
+        .await
+        .expect("Failed to create pool");
 
-    // Configure the database (create tables if they don't exist).
-    db::configure_db(&pool).await.expect("Failed to configure the database");
 
     // Spawn the Tide server on a separate task using Tokio runtime.
     let tide_pool = pool.clone();
     tokio::spawn(async move {
-        run_tide_server(tide_pool).await;
+        run_tide_server(Arc::new(tide_pool)).await;
     });
 
     let bot = Bot::from_env();

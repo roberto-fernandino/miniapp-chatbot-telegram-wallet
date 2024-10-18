@@ -53,44 +53,7 @@ pub async fn get_pool() -> Result<PgPool> {
     Ok(pool)
 }
 
-/// Configures the database by creating necessary tables if they don't exist.
-pub async fn configure_db(pool: &PgPool) -> Result<()> {
-    // Create 'users' table.
-    sqlx::query(
-        r#"
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            tg_id TEXT NOT NULL UNIQUE,
-            username TEXT
-        );
-        "#
-    )
-    .execute(pool)
-    .await?;
-    
-    // Create 'calls' table.
-    sqlx::query(
-        r#"
-        CREATE TABLE IF NOT EXISTS calls (
-            id SERIAL PRIMARY KEY,
-            time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            mkt_cap TEXT,
-            token_address TEXT,
-            token_mint TEXT,
-            token_symbol TEXT,
-            price TEXT,
-            user_tg_id TEXT REFERENCES users(tg_id),
-            chat_id TEXT,
-            message_id TEXT,
-            chain TEXT
-        );
-        "#
-    )
-    .execute(pool)
-    .await?;
-    
-    Ok(())
-}
+
 
 /// Retrieves a user by their Telegram ID.
 pub async fn get_user(pool: &PgPool, tg_id: &str) -> Result<User> {
