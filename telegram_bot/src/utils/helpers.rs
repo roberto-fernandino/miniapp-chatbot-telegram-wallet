@@ -180,21 +180,19 @@ pub async fn get_call_info(address: &String, pool: &PgPool, msg: &Message) -> Re
 
         // Calculating the % change
         let first_call = first_call.await.expect("First call not found");
-        let first_call_mkt_cap = first_call.clone().unwrap().mkt_cap.parse::<f64>().unwrap_or(0.0);
+        let first_call_mkt_cap = first_call.mkt_cap.parse::<f64>().unwrap_or(0.0);
         let percentage_change = format_number(((mkt_cap - first_call_mkt_cap) / first_call_mkt_cap) * 100.0);
 
 
         // Calculating the age of the call
-        let timestamp = async_time_to_timestamp(first_call.clone().unwrap().time).await;
+        let timestamp = async_time_to_timestamp(first_call.time).await;
         let call_time = Utc.timestamp_millis_opt(timestamp).unwrap();
         let current_time = Utc::now();
         let time_delta: TimeDelta = current_time.signed_duration_since(call_time);
-        if let Some(first_call) = first_call{
-            let user_called_first = {
+        let user_called_first = {
                 get_user(&pool, first_call.user_tg_id.as_str()).await.expect("User not found")
             };
-            call_info_str.push_str(&format!("😈 <a href=\"https://t.me/sj_copyTradebot?start=user_{}\"><i><b>{}</b></i></a> @ {} <b>[{}%]</b> ({})", first_call.user_tg_id,  user_called_first.expect("Couldn't get the user").username.unwrap_or("Unknown".to_string()), format_number(first_call.mkt_cap.parse::<f64>().unwrap_or(0.0)), percentage_change, format_age(time_delta)));
-        }
+        call_info_str.push_str(&format!("😈 <a href=\"https://t.me/sj_copyTradebot?start=user_{}\"><i><b>{}</b></i></a> @ {} <b>[{}%]</b> ({})", first_call.user_tg_id,  user_called_first.username.unwrap_or("Unknown".to_string()), format_number(first_call.mkt_cap.parse::<f64>().unwrap_or(0.0)), percentage_change, format_age(time_delta)));
     } 
     Ok(call_info_str)
 }
