@@ -910,16 +910,16 @@ const App: React.FC = () => {
                           {history.calls.map((callWithAth) => (
                             <div
                               key={callWithAth.call.id}
-                              className="mb-4 p-4 bg-gray-800 rounded-lg shadow-md text-white"
+                              className="mb-4 p-4 bg-gray-800 rounded-lg shadow-md text-white w-full"
                             >
                               <div className="flex justify-between items-center mb-2">
                                 <span className="font-semibold">
                                   {callWithAth.call.token_symbol} /
                                   {callWithAth.call.chain}
                                 </span>
-                                <span className="text-sm text-green-400">
+                                <span className="text-sm text-green-400 ml-3">
                                   ATH: ${callWithAth.ath.toLocaleString()} [
-                                  {(callWithAth.multiplier * 100).toFixed(2)}%]
+                                  {callWithAth.multiplier.toFixed(2)}]
                                 </span>
                               </div>
                               <div className="flex justify-between items-center mb-2">
