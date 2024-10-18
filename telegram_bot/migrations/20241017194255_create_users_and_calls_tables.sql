@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Create 'calls' table
 CREATE TABLE IF NOT EXISTS calls (
     id SERIAL PRIMARY KEY,
-    time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    time TEXT,
     mkt_cap TEXT,
     token_address TEXT,
     token_mint TEXT,
