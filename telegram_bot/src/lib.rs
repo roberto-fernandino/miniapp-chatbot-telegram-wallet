@@ -1308,9 +1308,9 @@ pub struct CallHistoryUser
 /// # Returns
 /// 
 /// * `String` - A json string with the calls and the ATH
-pub async fn get_user_calls(req: tide::Request<()>, pool: SafePool) -> tide::Result<String> {
+pub async fn get_user_calls(req: axum::extract::Path<i64>, pool: SafePool) -> Result<String> {
     println!("Getting user calls...");
-    let user_tg_id = req.param("tg_user_id")?.to_string();
+    let user_tg_id = req.0.to_string();
     println!("user_tg_id: {}", user_tg_id);
 
    

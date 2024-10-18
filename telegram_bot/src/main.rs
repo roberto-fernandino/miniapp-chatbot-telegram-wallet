@@ -1,4 +1,10 @@
 use teloxide::prelude::*;
+use axum::extract::State;
+use axum::{
+       routing::get,
+       Router,
+   };
+use std::net::SocketAddr;
 use teloxide::types::{CallbackQuery, Message};
 use teloxide::{dispatching::UpdateFilterExt, Bot};
 mod utils;
@@ -26,9 +32,9 @@ async fn main() {
 
     let shared_pool = Arc::new(pool);
     // Spawn the Tide server on a separate task using Tokio runtime.
-    let tide_pool = shared_pool.clone();
+    let axum_pool = shared_pool.clone();
     tokio::spawn(async move {
-        run_tide_server(tide_pool).await;
+        run_axum_server(axum_pool).await;
     });
 
     let bot = Bot::from_env();
@@ -135,16 +141,28 @@ async fn handle_callback_query(
     Ok(())
 }
 
-/// Runs the Tide server.
-async fn run_tide_server(pool: SafePool) {
-    let mut app = tide::new();
-    println!("Tide bot server running.");
-    app.at("/user_calls/:tg_user_id").get(move |req| {
-        let pool = pool.clone();
-        async move { get_user_calls(req, pool).await }
-    });
-    log::info!("Starting Tide server on port 2020...");
-    if let Err(e) = app.listen("0.0.0.0:2020").await {
-        log::error!("Failed to start Tide server: {}", e);
-    }
-}
+async fn get_user_calls_handler(
+       axum::extract::Path(tg_user_id): axum::extract::Path<i64>,
+       State(pool): axum::extract::State<SafePool>, // Added State parameter
+   ) -> Result<String, String> {
+       let calls = db::get_all_user_firsts_calls_by_user_tg_id(&pool, tg_user_id.to_string().as_str()).await.expect("Failed to get calls");
+       println!("calls: {:?}", calls);
+       Ok(serde_json::to_string(&calls).expect("Failed to convert calls to string"))
+   }
+
+async fn run_axum_server(pool: SafePool) {
+       let app = Router::new().route(
+           "/user_calls/:tg_user_id",
+           get(get_user_calls_handler),
+       ).with_state(pool);
+   
+       let addr = SocketAddr::new("0.0.0.0".parse().unwrap(), 2020); // Updated to use SocketAddr::new
+       println!("Axum server running on {:?}", addr);
+   
+       axum::Server::bind(&addr)
+           .serve(app.into_make_service())
+           .await
+           .unwrap();
+   }
+   
+
