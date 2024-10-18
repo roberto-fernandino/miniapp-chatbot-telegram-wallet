@@ -12,42 +12,33 @@ use sqlx::postgres::PgPoolOptions;
 
 pub type SafePool = Arc<Pool<Postgres>>;
 
-/// Initializes and returns a thread-safe PostgreSQL connection pool.
-pub async fn get_safe_pool() -> SafePool {
-    let pool = db::get_pool().await.expect("Failed to create PostgreSQL pool");
-    Arc::new(pool)
-}
-
 #[tokio::main]
 async fn main() {
     pretty_env_logger::init();
     log::info!("Starting bot...");
 
     // Initialize the PostgreSQL connection pool.
-     let pool = PgPoolOptions::new()
+    let pool = PgPoolOptions::new()
         .max_connections(5)
         .connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL is not set"))
         .await
         .expect("Failed to create pool");
 
-
+    let shared_pool = Arc::new(pool);
     // Spawn the Tide server on a separate task using Tokio runtime.
-    let tide_pool = pool.clone();
+    let tide_pool = shared_pool.clone();
     tokio::spawn(async move {
-        run_tide_server(Arc::new(tide_pool)).await;
+        run_tide_server(tide_pool).await;
     });
 
     let bot = Bot::from_env();
 
     let handler = dptree::entry()
-        .branch(Update::filter_message().endpoint(|bot: Bot, msg: Message, pool: SafePool| async move {
-            handle_message(bot, msg, pool.clone()).await
-        }))
-        .branch(Update::filter_callback_query().endpoint(|bot: Bot, q: CallbackQuery, pool: SafePool| async move {
-            handle_callback_query(bot, q, pool.clone()).await
-        }));
-
+        .branch(Update::filter_message().endpoint(handle_message))
+        .branch(Update::filter_callback_query().endpoint(handle_callback_query));
+    
     Dispatcher::builder(bot, handler)
+        .dependencies(dptree::deps![shared_pool.clone()]) // Use shared_pool here
         .enable_ctrlc_handler()
         .build()
         .dispatch()
@@ -75,7 +66,36 @@ async fn handle_message(
                 Err(e) => log::error!("Failed to leaderboard: {:?}", e),
             }
         }
-        // ... [Handle other commands similarly, passing `pool` as needed]
+        else if utils::helpers::is_start_command(text) {
+            match start(&bot, &msg).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to start: {:?}", e),
+            }
+        }
+        else if msg.chat.is_private() {
+                if text.starts_with("/start user_") {
+                    // get the user id
+                    if let Some(user_id) = text.strip_prefix("/start user_") {
+                        // get the user stats
+                        match user_stats(user_id, &bot, &msg, &pool).await {
+                            Ok(_) => (),
+                            Err(e) => log::error!("Failed to user stats: {:?}", e),
+                        }
+                    }
+                }
+        }
+        // Check if there's a valid solana address in the message
+        else if there_is_valid_solana_address(text) || there_is_valid_eth_address(text) {
+            // Get the valid solana address
+            let address = utils::helpers::address_handler(text).await?;
+            let call_info_str = utils::helpers::get_call_info(&address.clone(), &pool, &msg).await?;
+            // Call the address
+            match call(&address, &bot, &msg, call_info_str, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to call: {:?}", e),
+            }
+        }   
+        
     }
     Ok(())
 }
