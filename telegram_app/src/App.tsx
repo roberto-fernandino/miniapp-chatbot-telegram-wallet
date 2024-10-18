@@ -443,6 +443,8 @@ const App: React.FC = () => {
       const historyResponse = await getUserFirstCalls(userId);
       const history: HistoryResponse = JSON.parse(historyResponse);
       log(`history: ${JSON.stringify(history)}`, "info");
+      log(`calls: ${JSON.stringify(history.calls)}`, "info");
+      log(`username: ${JSON.stringify(history.username)}`, "info");
       setHistory(history);
     } catch (error) {
       log(`Failed to parse history response ${error}`, "error");
