@@ -675,7 +675,8 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                         // Add the call to the database
                         let call_id = match db::add_call(
                             &pool, 
-                            user_id_str, 
+                            &chrono::Utc::now().to_rfc3339(),
+                            user_id_str,
                             &scanner_search["pair"]["fdv"].as_str().unwrap_or("0"), 
                             token_address,
                             address,
@@ -683,7 +684,8 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                             &scanner_search["pair"]["pairPrice1Usd"].as_str().unwrap_or("0"),
                             chat_id.as_str(),
                             &msg.id.to_string(),
-                            chain
+                            chain,
+                            Some(msg.from.clone().unwrap().username.clone().unwrap_or("Unknown".to_string()).as_str())
                         ).await {
                             Ok(id) => {
                                 id
@@ -821,9 +823,9 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot, po
         if unique_tokens.insert(call.token_address.clone()) {
             // If the token is not in the set, add it and process the call
             let ath = get_ath(
-                utils::helpers::async_time_to_timestamp(call.time.clone()).await, 
-                call.token_address.as_str(),
-                call.chain.as_str()).await?;
+                utils::helpers::async_time_to_timestamp(call.clone().time).await.expect("Failed to parse datetime."), 
+                call.clone().token_address.as_str(),
+                call.clone().chain.as_str()).await?;
 
             let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
 
@@ -958,9 +960,9 @@ pub async fn best_call_user(user_tg_id: &str, pool: &SafePool) -> Result<Option<
     let mut best_call: Option<CallWithAth> = None;
     let mut count = 0;
     for call in user_calls {
-        let ath = get_ath(utils::helpers::async_time_to_timestamp(call.time).await, call.token_address.as_str(), call.chain.as_str()).await?;
+        let ath = get_ath(utils::helpers::async_time_to_timestamp(call.clone().time).await.expect("Failed to parse datetime."), call.clone().token_address.as_str(), call.clone().chain.as_str()).await?;
         let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
-        let multiplier = ath_after_call / call.price.parse::<f64>().unwrap_or(0.0);
+        let multiplier = ath_after_call / call.clone().price.parse::<f64>().unwrap_or(0.0);
         
         if count == 0 {
             best_call = Some(CallWithAth {
@@ -971,7 +973,7 @@ pub async fn best_call_user(user_tg_id: &str, pool: &SafePool) -> Result<Option<
         } else if let Some(ref current_best) = best_call {
             if multiplier > current_best.multiplier {
                 best_call = Some(CallWithAth {
-                    call: call,
+                    call: call.clone(),
                     ath_after_call: ath_after_call,
                     multiplier: multiplier,
                 });
@@ -1002,16 +1004,16 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
     let mut call_lb = Vec::new();   
     let mut seen_tokens = std::collections::HashSet::new(); // Track seen tokens
     for call in user_calls {
-        if seen_tokens.contains(&call.token_symbol.clone()) {
+        if seen_tokens.contains(&call.clone().token_symbol.clone()) {
             continue; // Skip if token has already been processed
         }
-        seen_tokens.insert(call.token_symbol.clone()); // Mark token as seen
+        seen_tokens.insert(call.clone().token_symbol.clone()); // Mark token as seen
 
-        let ath = get_ath(utils::helpers::async_time_to_timestamp(call.time).await, call.token_address.as_str(), call.chain.as_str()).await?;
+        let ath = get_ath(utils::helpers::async_time_to_timestamp(call.clone().time).await.expect("Failed to parse datetime."), call.clone().token_address.as_str(), call.clone().chain.as_str()).await?;
         let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
-        let multiplier = ath_after_call / call.price.parse::<f64>().unwrap_or(0.0);
+        let multiplier = ath_after_call / call.clone().price.parse::<f64>().unwrap_or(0.0);
         call_lb.push(CallWithAth {
-            call: call,
+            call: call.clone(),
             ath_after_call: ath_after_call,
             multiplier: multiplier,
         });
@@ -1312,11 +1314,11 @@ pub async fn get_user_calls(req: tide::Request<()>, pool: SafePool) -> tide::Res
         let calls_without_ath = get_all_user_firsts_calls_by_user_tg_id(&pool, user_tg_id.as_str()).await?;
         let mut calls_with_ath = Vec::new();
         for call in calls_without_ath {
-            let ath = get_ath(utils::helpers::async_time_to_timestamp(call.time).await, &call.token_address, &call.chain).await?;
+            let ath = get_ath(utils::helpers::async_time_to_timestamp(call.clone().time).await.expect("Failed to parse datetime."), &call.clone().token_address, &call.clone().chain).await?;
             let ath_price = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
-            let multiplier = ath_price / call.price.parse::<f64>().unwrap_or(0.0);
+            let multiplier = ath_price / call.clone().price.parse::<f64>().unwrap_or(0.0);
             let call_with_ath = CallHistoryUser {
-                call,
+                call: call.clone(),
                 multiplier,
                 ath: ath_price,
             };
