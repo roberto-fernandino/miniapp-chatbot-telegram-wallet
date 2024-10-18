@@ -1,4 +1,6 @@
-use sqlx::{PgPool, Postgres, postgres::PgPoolOptions};
+use sqlx::{PgPool, postgres::PgPoolOptions};
+use crate::utils::helpers::check_period_for_leaderboard;
+use sqlx::Row;
 use anyhow::Result;
 use serde::Serialize;
 use chrono::{NaiveDateTime, Utc};
@@ -91,20 +93,19 @@ pub async fn configure_db(pool: &PgPool) -> Result<()> {
 }
 
 /// Retrieves a user by their Telegram ID.
-pub async fn get_user(pool: &PgPool, tg_id: &str) -> Result<Option<User>> {
-    let user = sqlx::query_as!(
-        User,
-        r#"
-        SELECT id, tg_id, username
-        FROM users
-        WHERE tg_id = $1
-        "#,
-        tg_id
-    )
-    .fetch_optional(pool)
+pub async fn get_user(pool: &PgPool, tg_id: &str) -> Result<User> {
+    let q = "SELECT * FROM users WHERE tg_id = $1";
+    let row = sqlx::query(q) 
+    .bind(tg_id)
+    .fetch_one(pool)
     .await?;
-    
-    Ok(user)
+
+    Ok(User {
+        id: row.get("id"),
+        tg_id: row.get("tg_id"),
+        username: row.get("username"),
+    })
+
 }
 
 /// Adds a new user to the database.
@@ -119,17 +120,17 @@ pub async fn get_user(pool: &PgPool, tg_id: &str) -> Result<Option<User>> {
 ///
 /// An empty result indicating success or an error.
 pub async fn add_user(pool: &PgPool, tg_id: &str, username: Option<&str>) -> Result<()> {
-    sqlx::query!(
-        r#"
-        INSERT INTO users (tg_id, username)
-        VALUES ($1, $2)
-        ON CONFLICT (tg_id) DO NOTHING
-        "#,
-        tg_id,
-        username
-    )
+    let q = "INSERT INTO users (tg_id, username) VALUES ($1, $2) ON CONFLICT (tg_id) DO NOTHING";
+
+    let result = sqlx::query(q)
+    .bind(tg_id)
+    .bind(username)
     .execute(pool)
     .await?;
+  
+    if result.rows_affected() == 0 {
+        return Err(anyhow::anyhow!("No rows were affected"));
+    }
     
     Ok(())
 }
@@ -164,138 +165,177 @@ pub async fn add_call(
     message_id: &str,
     chain: &str
 ) -> Result<i64> {
-    let record = sqlx::query!(
-        r#"
-        INSERT INTO calls (user_tg_id, mkt_cap, token_address, token_mint, token_symbol, price, chat_id, message_id, chain)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING id
-        "#,
-        tg_id,
-        mkt_cap,
-        token_address,
-        token_mint,
-        token_symbol,
-        price,
-        chat_id,
-        message_id,
-        chain
-    )
+    let q = "INSERT INTO calls (user_tg_id, mkt_cap, token_address, token_mint, token_symbol, price, chat_id, message_id, chain) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id";
+    let result = sqlx::query_scalar(q)
+    .bind(tg_id)
+    .bind(mkt_cap)
+    .bind(token_address)
+    .bind(token_mint)
+    .bind(token_symbol)
+    .bind(price)
+    .bind(chat_id)
+    .bind(message_id)
+    .bind(chain)
     .fetch_one(pool)
     .await?;
     
-    Ok(record.id)
+    Ok(result)
 }
+
 
 /// Retrieves the first call of a token in a specific chat.
-pub async fn get_first_call_by_token_address(pool: &PgPool, token_address: &str, chat_id: &str) -> Result<Option<Call>> {
-    let call = sqlx::query_as!(
-        Call,
-        r#"
-        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
-        FROM calls
-        WHERE token_address = $1 AND chat_id = $2
-        ORDER BY time ASC
-        LIMIT 1
-        "#,
-        token_address,
-        chat_id
-    )
-    .fetch_optional(pool)
+pub async fn get_first_call_by_token_address(pool: &PgPool, token_address: &str, chat_id: &str) -> Result<Call> {
+    let q = "SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain FROM calls WHERE token_address = $1 AND chat_id = $2 ORDER BY time ASC LIMIT 1";
+    let call = sqlx::query(q)
+    .bind(token_address)
+    .bind(chat_id)
+    .fetch_one(pool)
     .await?;
     
-    Ok(call)
+    Ok(Call {
+        id: call.get("id"),
+        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        mkt_cap: call.get("mkt_cap"),
+        token_address: call.get("token_address"),
+        token_mint: call.get("token_mint"),
+        token_symbol: call.get("token_symbol"),
+        price: call.get("price"),
+        user_tg_id: call.get("user_tg_id"),
+        chat_id: call.get("chat_id"),
+        message_id: call.get("message_id"),
+        chain: call.get("chain"),
+    })
 }
 
+
 /// Retrieves a call by its ID.
-pub async fn get_call_by_id(pool: &PgPool, id: i64) -> Result<Option<Call>> {
-    let call = sqlx::query_as!(
-        Call,
-        r#"
-        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
-        FROM calls
-        WHERE id = $1
-        "#,
-        id
-    )
-    .fetch_optional(pool)
-    .await?;
-    
-    Ok(call)
+pub async fn get_call_by_id(pool: &PgPool, id: i64) -> Result<Call> {
+   let q = "SELECT * FROM calls WHERE id = $1";
+   let call = sqlx::query(q)
+   .bind(id)
+   .fetch_one(pool)
+   .await?;
+
+   Ok(Call {
+        id: call.get("id"),
+        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        mkt_cap: call.get("mkt_cap"),
+        token_address: call.get("token_address"),
+        token_mint: call.get("token_mint"),
+        token_symbol: call.get("token_symbol"),
+        price: call.get("price"),
+        user_tg_id: call.get("user_tg_id"),
+        chat_id: call.get("chat_id"),
+        message_id: call.get("message_id"),
+        chain: call.get("chain"),
+   })
 }
 
 /// Retrieves all calls made in a specific chat.
 pub async fn get_all_calls_chat_id(pool: &PgPool, chat_id: &str) -> Result<Vec<Call>> {
-    let calls = sqlx::query_as!(
-        Call,
-        r#"
-        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
-        FROM calls
-        WHERE chat_id = $1
-        ORDER BY time ASC
-        "#,
-        chat_id
-    )
+    let q = "SELECT * FROM calls WHERE chat_id = $1 ORDER BY time DESC";
+    let calls = sqlx::query(q) 
+    .bind(chat_id)
     .fetch_all(pool)
     .await?;
-    
-    Ok(calls)
+
+    Ok(calls.iter().map(|call| Call {
+        id: call.get("id"),
+        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        mkt_cap: call.get("mkt_cap"),
+        token_address: call.get("token_address"),
+        token_mint: call.get("token_mint"),
+        token_symbol: call.get("token_symbol"),
+        price: call.get("price"),
+        user_tg_id: call.get("user_tg_id"),
+        chat_id: call.get("chat_id"),
+        message_id: call.get("message_id"),
+        chain: call.get("chain"),
+    }).collect())
 }
 
 /// Retrieves all calls made in a channel in the last `x` days.
-pub async fn get_channel_calls_last_x_days(pool: &PgPool, chat_id: &str, days: u32) -> Result<Vec<Call>> {
-    let calls = sqlx::query_as!(
-        Call,
-        r#"
-        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+pub async fn get_channel_calls_last_x_days(pool: &PgPool, chat_id: &str, days: i32) -> Result<Vec<Call>> {
+    let q = "SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
         FROM calls
         WHERE time >= NOW() - INTERVAL '$1 days' AND chat_id = $2
-        ORDER BY time ASC
-        "#,
-        days,
-        chat_id
-    )
+        ORDER BY time ASC";
+
+    let calls = sqlx::query(q)
+    .bind(days)
+    .bind(chat_id)
     .fetch_all(pool)
     .await?;
-    
-    Ok(calls)
+
+    Ok(calls.iter().map(|call| Call {
+        id: call.get("id"),
+        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        mkt_cap: call.get("mkt_cap"),
+        token_address: call.get("token_address"),
+        token_mint: call.get("token_mint"),
+        token_symbol: call.get("token_symbol"),
+        price: call.get("price"),
+        user_tg_id: call.get("user_tg_id"),
+        chat_id: call.get("chat_id"),
+        message_id: call.get("message_id"),
+        chain: call.get("chain"),
+    }).collect())
 }
 
 /// Retrieves all calls made in a channel in the last `x` hours.
-pub async fn get_channel_calls_last_x_hours(pool: &PgPool, chat_id: &str, hours: u32) -> Result<Vec<Call>> {
-    let calls = sqlx::query_as!(
-        Call,
-        r#"
-        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+pub async fn get_channel_calls_last_x_hours(pool: &PgPool, chat_id: &str, hours: i32) -> Result<Vec<Call>> {
+    let q = "SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
         FROM calls
         WHERE time >= NOW() - INTERVAL '$1 hours' AND chat_id = $2
-        ORDER BY time ASC
-        "#,
-        hours,
-        chat_id
-    )
+        ORDER BY time ASC";
+
+    let calls = sqlx::query(q)
+    .bind(hours)
+    .bind(chat_id)
     .fetch_all(pool)
     .await?;
-    
-    Ok(calls)
+
+    Ok(calls.iter().map(|call| Call {
+        id: call.get("id"),
+        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        mkt_cap: call.get("mkt_cap"),
+        token_address: call.get("token_address"),
+        token_mint: call.get("token_mint"),
+        token_symbol: call.get("token_symbol"),
+        price: call.get("price"),
+        user_tg_id: call.get("user_tg_id"),
+        chat_id: call.get("chat_id"),
+        message_id: call.get("message_id"),
+        chain: call.get("chain"),
+    }).collect())
 }
 
 /// Retrieves all calls made in a channel in the last `x` months.
-pub async fn get_channel_calls_last_x_months(pool: &PgPool, chat_id: &str, months: u32) -> Result<Vec<Call>> {
-    let calls = sqlx::query_as!(
-        Call,
-        r#"
-        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+pub async fn get_channel_calls_last_x_months(pool: &PgPool, chat_id: &str, months: i32) -> Result<Vec<Call>> {
+   let q = " SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
         FROM calls
         WHERE time >= NOW() - INTERVAL '$1 months' AND chat_id = $2
-        ORDER BY time ASC
-        "#,
-        months,
-        chat_id
-    )
+        ORDER BY time ASC";
+
+    let channels = sqlx::query(q)
+    .bind(months)
+    .bind(chat_id)
     .fetch_all(pool)
     .await?;
-    
-    Ok(calls)
+
+    Ok(channels.iter().map(|call| Call {
+        id: call.get("id"),
+        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        mkt_cap: call.get("mkt_cap"),
+        token_address: call.get("token_address"),
+        token_mint: call.get("token_mint"),
+        token_symbol: call.get("token_symbol"),
+        price: call.get("price"),
+        user_tg_id: call.get("user_tg_id"),
+        chat_id: call.get("chat_id"),
+        message_id: call.get("message_id"),
+        chain: call.get("chain"),
+    }).collect())
 }
 
 /// Retrieves all calls made by a specific user in the last `x` years.
@@ -309,22 +349,30 @@ pub async fn get_channel_calls_last_x_months(pool: &PgPool, chat_id: &str, month
 /// # Returns
 ///
 /// A vector of calls.
-pub async fn get_user_calls_last_x_years(pool: &PgPool, tg_id: &str, years: u32) -> Result<Vec<Call>> {
-    let calls = sqlx::query_as!(
-        Call,
-        r#"
-        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+pub async fn get_user_calls_last_x_years(pool: &PgPool, tg_id: &str, years: i32) -> Result<Vec<Call>> {
+    let q = "SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
         FROM calls
         WHERE user_tg_id = $1 AND time >= NOW() - INTERVAL '$2 years'
-        ORDER BY time ASC
-        "#,
-        tg_id,
-        years
-    )
+        ORDER BY time ASC";
+
+    let calls = sqlx::query(q)
+    .bind(tg_id)
+    .bind(years)
     .fetch_all(pool)
     .await?;
-    
-    Ok(calls)
+    Ok(calls.iter().map(|call| Call {
+        id: call.get("id"),
+        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        mkt_cap: call.get("mkt_cap"),
+        token_address: call.get("token_address"),
+        token_mint: call.get("token_mint"),
+        token_symbol: call.get("token_symbol"),
+        price: call.get("price"),
+        user_tg_id: call.get("user_tg_id"),
+        chat_id: call.get("chat_id"),
+        message_id: call.get("message_id"),
+        chain: call.get("chain"),
+    }).collect())
 }
 
 /// Retrieves all calls made by a specific user in the last `x` hours.
@@ -338,22 +386,31 @@ pub async fn get_user_calls_last_x_years(pool: &PgPool, tg_id: &str, years: u32)
 /// # Returns
 ///
 /// A vector of calls.
-pub async fn get_user_calls_last_x_hours(pool: &PgPool, tg_id: &str, hours: u32) -> Result<Vec<Call>> {
-    let calls = sqlx::query_as!(
-        Call,
-        r#"
-        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+pub async fn get_user_calls_last_x_hours(pool: &PgPool, tg_id: &str, hours: i32) -> Result<Vec<Call>> {
+   let q = " SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
         FROM calls
         WHERE user_tg_id = $1 AND time >= NOW() - INTERVAL '$2 hours'
-        ORDER BY time ASC
-        "#,
-        tg_id,
-        hours
-    )
+        ORDER BY time ASC";
+
+    let calls = sqlx::query(q)
+    .bind(tg_id)
+    .bind(hours)
     .fetch_all(pool)
     .await?;
-    
-    Ok(calls)
+
+    Ok(calls.iter().map(|call| Call {
+        id: call.get("id"),
+        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        mkt_cap: call.get("mkt_cap"),
+        token_address: call.get("token_address"),
+        token_mint: call.get("token_mint"),
+        token_symbol: call.get("token_symbol"),
+        price: call.get("price"),
+        user_tg_id: call.get("user_tg_id"),
+        chat_id: call.get("chat_id"),
+        message_id: call.get("message_id"),
+        chain: call.get("chain"),
+    }).collect())
 }
 
 /// Retrieves all calls made by a specific user in the last `x` months.
@@ -367,68 +424,86 @@ pub async fn get_user_calls_last_x_hours(pool: &PgPool, tg_id: &str, hours: u32)
 /// # Returns
 ///
 /// A vector of calls.
-pub async fn get_user_calls_last_x_months(pool: &PgPool, tg_id: &str, months: u32) -> Result<Vec<Call>> {
-    let calls = sqlx::query_as!(
-        Call,
-        r#"
-        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
+pub async fn get_user_calls_last_x_months(pool: &PgPool, tg_id: &str, months: i32) -> Result<Vec<Call>> {
+    let q = " SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
         FROM calls
         WHERE user_tg_id = $1 AND time >= NOW() - INTERVAL '$2 months'
-        ORDER BY time ASC
-        "#,
-        tg_id,
-        months
-    )
+        ORDER BY time ASC";
+
+    let calls = sqlx::query(q)
+    .bind(tg_id)
+    .bind(months)
     .fetch_all(pool)
     .await?;
-    
-    Ok(calls)
+
+    Ok(calls.iter().map(|call| Call {
+        id: call.get("id"),
+        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        mkt_cap: call.get("mkt_cap"),
+        token_address: call.get("token_address"),
+        token_mint: call.get("token_mint"),
+        token_symbol: call.get("token_symbol"),
+        price: call.get("price"),
+        user_tg_id: call.get("user_tg_id"),
+        chat_id: call.get("chat_id"),
+        message_id: call.get("message_id"),
+        chain: call.get("chain"),
+    }).collect())
 }
 
 /// Retrieves the first call for each token addressed by a user.
 pub async fn get_all_user_firsts_calls_by_user_tg_id(pool: &PgPool, user_id: &str) -> Result<Vec<Call>> {
-    let calls = sqlx::query_as!(
-        Call,
-        r#"
-        SELECT DISTINCT ON (token_address)
+    let q = "SELECT DISTINCT ON (token_address)
             id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
         FROM calls
         WHERE user_tg_id = $1
-        ORDER BY token_address, time ASC
-        "#,
-        user_id
-    )
+        ORDER BY token_address, time ASC";
+
+    let calls = sqlx::query(q)
+    .bind(user_id)
     .fetch_all(pool)
     .await?;
-    
-    Ok(calls)
+
+    Ok(calls.iter().map(|call| Call {
+        id: call.get("id"),
+        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        mkt_cap: call.get("mkt_cap"),
+        token_address: call.get("token_address"),
+        token_mint: call.get("token_mint"),
+        token_symbol: call.get("token_symbol"),
+        price: call.get("price"),
+        user_tg_id: call.get("user_tg_id"),
+        chat_id: call.get("chat_id"),
+        message_id: call.get("message_id"),
+        chain: call.get("chain"),
+    }).collect())
 }
 
 /// Deletes a call by its ID.
 pub async fn delete_call(pool: &PgPool, call_id: i64) -> Result<()> {
-    sqlx::query!(
-        r#"
+    sqlx::query(
+        "
         DELETE FROM calls
         WHERE id = $1
-        "#,
-        call_id
+        "
     )
+    .bind(call_id)
     .execute(pool)
     .await?;
     
     Ok(())
 }
 
-/// Clears all calls made by a user in a specific chat.
-pub async fn clear_calls(pool: &PgPool, tg_id: &str, chat_id: &str) -> Result<()> {
-    sqlx::query!(
-        r#"
+/// Delete all calls made by a user in a specific chat.
+pub async fn delete_all_calls(pool: &PgPool, tg_id: &str, chat_id: &str) -> Result<()> {
+    sqlx::query(
+        "
         DELETE FROM calls
         WHERE user_tg_id = $1 AND chat_id = $2
-        "#,
-        tg_id,
-        chat_id
+        "
     )
+    .bind(tg_id)
+    .bind(chat_id)
     .execute(pool)
     .await?;
     
@@ -447,24 +522,28 @@ pub async fn clear_calls(pool: &PgPool, tg_id: &str, chat_id: &str) -> Result<()
 /// # Returns
 ///
 /// The count of distinct tokens.
-pub async fn get_distinct_token_count(pool: &PgPool, user_tg_id: &str, chat_id: &str, period: &str) -> Result<i64> {
-    let count = sqlx::query!(
-        r#"
-        SELECT COUNT(DISTINCT token_symbol) as count
+pub async fn get_distinct_token_count(
+    pool: &PgPool,
+    user_tg_id: &str,
+    chat_id: &str,
+    period: &str,
+) -> Result<i64> {
+    let q = "
+        SELECT COUNT(DISTINCT token_symbol) AS count
         FROM calls
         WHERE user_tg_id = $1
           AND chat_id = $2
-          AND time >= NOW() - INTERVAL $3
-        "#,
-        user_tg_id,
-        chat_id,
-        period
-    )
-    .fetch_one(pool)
-    .await?
-    .count
-    .unwrap_or(0);
-    
+          AND time >= NOW() - $3::interval
+    ";
+
+    // Use `query_scalar` to directly fetch the count as `i64`
+    let count: i64 = sqlx::query_scalar(q)
+        .bind(user_tg_id)
+        .bind(chat_id)
+        .bind(period)
+        .fetch_one(pool)
+        .await?;
+
     Ok(count)
 }
 
@@ -480,84 +559,82 @@ pub async fn get_distinct_token_count(pool: &PgPool, user_tg_id: &str, chat_id: 
 ///
 /// The total number of calls.
 pub async fn get_total_calls_in_chat(pool: &PgPool, chat_id: &str, period: &str) -> Result<i64> {
-    let count = sqlx::query!(
-        r#"
-        SELECT COUNT(*) as count
+    let q = "
+        SELECT COUNT(*) AS count
         FROM calls
         WHERE chat_id = $1
-          AND time >= NOW() - INTERVAL $2
-        "#,
-        chat_id,
-        period
-    )
+          AND time >= NOW() - $2::interval
+    ";
+
+    // Use `query_scalar` to directly fetch the count as `i64`
+    let count: i64 = sqlx::query_scalar(q)
+    .bind(chat_id)
+    .bind(period)
     .fetch_one(pool)
-    .await?
-    .count
-    .unwrap_or(0);
-    
+    .await?;
+
     Ok(count)
 }
 
 /// Retrieves the number of calls a user has made in the last 24 hours.
 pub async fn get_qtd_calls_user_made_in_24hrs(pool: &PgPool, user_tg_id: &str) -> Result<i64> {
-    let count = sqlx::query!(
-        r#"
+    let q = "
         SELECT COUNT(*) as count
         FROM calls
-        WHERE user_tg_id = $1 AND time >= NOW() - INTERVAL '24 HOURS'
-        "#,
-        user_tg_id
-    )
+        WHERE user_tg_id = $1 AND time >= NOW() - INTERVAL '24 hours'
+        ";
+
+    let count: i64 = sqlx::query_scalar(q)
+    .bind(user_tg_id)
     .fetch_one(pool)
-    .await?
-    .count
-    .unwrap_or(0);
-    
+    .await?;
+   
     Ok(count)
 }
 
 /// Checks if a call is the first one in a chat for a given token.
 pub async fn is_first_call(pool: &PgPool, token_address: &str, chat_id: &str) -> Result<bool> {
-    let count = sqlx::query!(
-        r#"
+    let q = "
         SELECT COUNT(*) as count
         FROM calls
         WHERE token_address = $1 AND chat_id = $2
-        "#,
-        token_address,
-        chat_id
-    )
+        ";
+
+    let count: i64 = sqlx::query_scalar(q)
+    .bind(token_address)
+    .bind(chat_id)
     .fetch_one(pool)
-    .await?
-    .count
-    .unwrap_or(0);
-    
+    .await?;
+
     Ok(count == 0)
 }
 
 /// Retrieves the user associated with a specific call.
-pub async fn get_user_from_call(pool: &PgPool, call_id: i64) -> Result<Option<User>> {
-    let user = sqlx::query_as!(
-        User,
-        r#"
+pub async fn get_user_from_call(pool: &PgPool, call_id: i64) -> Result<User> {
+    let q = "
         SELECT u.id, u.tg_id, u.username
         FROM users u
         JOIN calls c ON c.user_tg_id = u.tg_id
         WHERE c.id = $1
-        "#,
-        call_id
-    )
-    .fetch_optional(pool)
+        ";
+
+    let user = sqlx::query(q)
+    .bind(call_id)
+    .fetch_one(pool)
     .await?;
-    
-    Ok(user)
+
+    Ok(User {
+        id: user.get("id"),
+        tg_id: user.get("tg_id"),
+        username: user.get("username"),
+    })
 }
 
 pub async fn get_first_call_token_chat(
     pool: &PgPool,
     token_address: &str,
     chat_id: &str,
-) -> Result<Option<Call>> {
+) -> Result<Call> {
     let query = r#"
         SELECT id, time, mkt_cap, price, token_address, token_mint, token_symbol, 
                user_tg_id, chat_id, message_id, chain
@@ -567,13 +644,25 @@ pub async fn get_first_call_token_chat(
         LIMIT 1
     "#;
 
-    let call = sqlx::query_as::<_, Call>(query)
+    let call = sqlx::query(query)
         .bind(token_address)
         .bind(chat_id)
-        .fetch_optional(pool)
+        .fetch_one(pool)
         .await?;
 
-    Ok(call)
+    Ok(Call {
+        id: call.get("id"),
+        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        mkt_cap: call.get("mkt_cap"),
+        price: call.get("price"),
+        token_address: call.get("token_address"),
+        token_mint: call.get("token_mint"),
+        token_symbol: call.get("token_symbol"),
+        user_tg_id: call.get("user_tg_id"),
+        chat_id: call.get("chat_id"),
+        message_id: call.get("message_id"),
+        chain: call.get("chain"),
+    })
 }
 
 /// Get the user call count for a user
@@ -607,22 +696,20 @@ pub async fn get_user_call_count_for_user_chat_with_period(
         _ => return Ok(0), // Invalid unit
     };
 
-    let count = sqlx::query!(
-        r#"
+    let count: i64 = sqlx::query_scalar(
+        "
         SELECT COUNT(DISTINCT token_symbol) as count
         FROM calls
         WHERE user_tg_id = $1
           AND chat_id = $2
           AND time >= NOW() - INTERVAL $3
-        "#,
-        user_tg_id,
-        chat_id,
-        interval
+        "
     )
+    .bind(user_tg_id)
+    .bind(chat_id)
+    .bind(interval)
     .fetch_one(pool)
-    .await?
-    .count
-    .unwrap_or(0);
+    .await?;
 
     Ok(count)
 }
@@ -656,46 +743,39 @@ pub async fn get_chat_call_count_with_period(
         _ => return Ok(0), // Invalid unit
     };
 
-    let count = sqlx::query!(
-        r#"
+    let count: i64 = sqlx::query_scalar(
+        "
         SELECT COUNT(*) as count
         FROM calls
         WHERE chat_id = $1
           AND time >= NOW() - INTERVAL $2
-        "#,
-        chat_id,
-        interval
+        ",
     )
+    .bind(chat_id)
+    .bind(interval)
     .fetch_one(pool)
-    .await?
-    .count
-    .unwrap_or(0);
+    .await?;
 
     Ok(count)
 }
-
-/// Get all calls made by a user
-/// 
-/// # Arguments
-/// 
-/// * `pool` - The PostgreSQL connection pool
-/// * `user_tg_id` - The user's Telegram ID
-/// 
-/// # Returns
-/// 
-/// A vector of calls
 pub async fn get_all_calls_user_tg_id(pool: &PgPool, user_tg_id: &str) -> Result<Vec<Call>> {
-    let calls = sqlx::query_as!(
-        Call,
-        r#"
-        SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
-        FROM calls
-        WHERE user_tg_id = $1
-        "#,
-        user_tg_id
-    )
-    .fetch_all(pool)
-    .await?;
+    let query = "SELECT id, time, mkt_cap, price, token_address, token_mint, token_symbol, user_tg_id, chat_id, message_id, chain FROM calls WHERE user_tg_id = $1";
+    let calls = sqlx::query(query)
+        .bind(user_tg_id)
+        .fetch_all(pool)
+        .await?;
     
-    Ok(calls)
+    Ok(calls.iter().map(|call| Call {
+        id: call.get("id"),
+        time: NaiveDateTime::parse_from_str(call.get("time"), "%Y-%m-%d %H:%M:%S").unwrap(),
+        mkt_cap: call.get("mkt_cap"),
+        price: call.get("price"),
+        token_address: call.get("token_address"),
+        token_mint: call.get("token_mint"),
+        token_symbol: call.get("token_symbol"),
+        user_tg_id: call.get("user_tg_id"),
+        chat_id: call.get("chat_id"),
+        message_id: call.get("message_id"),
+        chain: call.get("chain"),
+    }).collect())
 }

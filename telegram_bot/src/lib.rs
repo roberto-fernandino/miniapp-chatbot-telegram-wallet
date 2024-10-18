@@ -479,27 +479,23 @@ pub struct PnlCall {
 /// 
 /// A Result containing the PNL call or an error
 pub async fn check_pnl_call(pool: &SafePool, mkt_cap: &str, token_address: &str, chat_id: &str) -> Result<PnlCall> {
-     let call: Option<Call> = db::get_first_call_by_token_address(&pool, token_address, chat_id).await?;
-     if let Some(call) = call {
-        let mkt_cap_i = call.mkt_cap.parse::<f64>().unwrap_or(0.0);
-        let mkt_cap_n = mkt_cap.parse::<f64>().unwrap_or(0.0);
-        
-        let percent = if mkt_cap_i != 0.0 {
-            ((mkt_cap_n - mkt_cap_i) / mkt_cap_i) * 100.0
-        } else {
-            0.0
-        };
-        let percent_str = format!("{:.2}", percent);
-
-        Ok(PnlCall {
-            percent: percent_str,
-            token_address: call.token_address,
-            mkt_cap: mkt_cap.to_string(),
-            call_id: call.id as u64,
-        })
+    let call: Call = db::get_first_call_by_token_address(&pool, token_address, chat_id).await?;
+    
+    let mkt_cap_i = call.mkt_cap.parse::<f64>().unwrap_or(0.0);
+    let mkt_cap_n = mkt_cap.parse::<f64>().unwrap_or(0.0);
+    
+    let percent = if mkt_cap_i != 0.0 {
+        ((mkt_cap_n - mkt_cap_i) / mkt_cap_i) * 100.0
     } else {
-        Err(anyhow::anyhow!("Call not found"))
-    }
+        0.0
+    };
+    let percent_str = format!("{:.2}", percent);
+    Ok(PnlCall {
+        percent: percent_str,
+        token_address: call.token_address,
+        mkt_cap: mkt_cap.to_string(),
+        call_id: call.id as u64,
+    })
 }
 
 
@@ -517,9 +513,8 @@ pub async fn check_pnl_call(pool: &SafePool, mkt_cap: &str, token_address: &str,
 /// A string containing the formatted PNL message
 pub async fn pnl_message(pool: &SafePool, pnl_call: PnlCall, symbol: &str, pair_address: &str) -> String {
     let call = db::get_call_by_id(&pool, pnl_call.call_id as i64).await.expect("Call not found");
-    let call = call.unwrap(); // Store the result of unwrap in a separate variable
-    let user = db::get_user(&pool, call.clone().user_tg_id.as_str()).await.expect("User not found");
-    let mkt_cap_called = format_number(call.clone().mkt_cap.parse::<f64>().unwrap_or(0.0));
+    let user = db::get_user(&pool, call.user_tg_id.as_str()).await.expect("User not found");
+    let mkt_cap_called = format_number(call.mkt_cap.parse::<f64>().unwrap_or(0.0));
     let win_loss;
     let percent = pnl_call.percent.parse::<f64>().unwrap_or(0.0);
     let multiplier = if percent >= 0.0 {
@@ -546,7 +541,7 @@ pub async fn pnl_message(pool: &SafePool, pnl_call: PnlCall, symbol: &str, pair_
     💰 Called at: <code>{}</code>\n\
     Called by: @{}\n\
     🏆 <a href=\"https://app.dexcelerate.com/terminal/SOL/{pair_address}\">See on #1 dex</a>\n\
-    ",  mkt_cap_called, user.unwrap().username.unwrap_or("N/A".to_string()))
+    ",  mkt_cap_called, user.username.unwrap_or("N/A".to_string()))
     
 }
 
@@ -650,18 +645,21 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                 let user_id = msg.clone().from.unwrap().id.to_string();
                 let user_id_str = user_id.as_str();
                 // Get the user
-                let mut user = db::get_user(&pool, user_id_str).await?;
+                let user = db::get_user(&pool, user_id_str).await;
                 // If the user is not in the database, add them
-                if user.is_none() {
-                    match db::add_user(&pool, user_id_str, Some(msg.from.clone().unwrap().username.clone().unwrap_or("Unknown".to_string()).as_str())).await {
-                        Ok(_) => {
-                            log::info!("User added to database");
-                        }
-                        Err(e) => {
-                            log::error!("Failed to add user to database: {:?}", e);
+                match user {
+                    Err(_) => {
+                        // User not found, attempt to add them
+                        match db::add_user(&pool, user_id_str, Some(msg.from.clone().unwrap().username.clone().unwrap_or("Unknown".to_string()).as_str())).await {
+                            Ok(_) => {
+                                log::info!("User added to database");
+                            }
+                            Err(e) => {
+                                log::error!("Failed to add user to database: {:?}", e);
+                            }
                         }
                     }
-                    user = db::get_user(&pool, user_id_str).await?;
+                    Ok(_) => {}
                 }
                 // Get the scanner search
                 match get_scanner_search(pair_address, token_address, chain).await {
@@ -699,7 +697,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                         // BUTTONS MANAGEMENT
                         
                        
-                        let keyboard = create_call_keyboard(call_info_str.as_str(), call_id.to_string().as_str(), token_address, user.clone().unwrap().tg_id.as_str());
+                        let keyboard = create_call_keyboard(call_info_str.as_str(), call_id.to_string().as_str(), token_address, user_id_str);
                         
                         
                         // Send the call message
@@ -792,23 +790,23 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot, po
            if period == "Hours" {
                 let hours = utils::helpers::extract_hours(msg.text().unwrap()).unwrap_or(0);
                 period_str = format!("{hours}h");
-                calls = db::get_channel_calls_last_x_hours(&pool, chat_id.as_str(), hours).await?;
+                calls = db::get_channel_calls_last_x_hours(&pool, chat_id.as_str(), hours as i32).await?;
                 log::info!("Calls: {:?}", calls.len());
            }
            if period == "Days"  {
                 let days = utils::helpers::extract_days(msg.text().unwrap()).unwrap_or(0);
                 period_str = format!("{days}d");
-                calls = db::get_channel_calls_last_x_days(&pool, chat_id.as_str(), days).await?;
+                calls = db::get_channel_calls_last_x_days(&pool, chat_id.as_str(), days as i32).await?;
            }
            if period == "Months" {
                 let months = utils::helpers::extract_months(msg.text().unwrap()).unwrap_or(0);
                 period_str = format!("{months}m");
-                calls = db::get_channel_calls_last_x_months(&pool, chat_id.as_str(), months).await?;
+                calls = db::get_channel_calls_last_x_months(&pool, chat_id.as_str(), months as i32).await?;
             }
             if period == "Years"{
                 let years = utils::helpers::extract_years(msg.text().unwrap()).unwrap_or(0);
                 period_str = format!("{years}y");
-                calls = db::get_user_calls_last_x_years(&pool, chat_id.as_str(), years).await?;
+                calls = db::get_user_calls_last_x_years(&pool, chat_id.as_str(), years as i32).await?;
            }
         }
         None => {
@@ -845,7 +843,7 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot, po
     lb = lb.into_iter().take(10).collect();
 
 
-    bot.send_message(msg.chat.id, leaderboard_message(lb, period_str, msg.chat.first_name().unwrap_or(""), &pool).await)
+    bot.send_message(msg.chat.id, leaderboard_message(lb, period_str, msg.chat.first_name().unwrap_or(""), &pool).await?)
     .reply_parameters(teloxide::types::ReplyParameters { message_id: msg.id, chat_id: None, allow_sending_without_reply: Some(true), quote: None, quote_parse_mode: None, quote_entities: None, quote_position: None })
     .parse_mode(teloxide::types::ParseMode::Html).await?;
 
@@ -893,7 +891,7 @@ fn get_user_average_multiplier(lb: &[CallWithAth], user_tg_id: String) -> f64 {
 /// # Returns
 /// 
 /// A String representing the leaderboard message
-pub async fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, channel_name: &str, pool: &SafePool) -> String {
+pub async fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, channel_name: &str, pool: &SafePool) -> Result<String> {
     let mut learderboard_string = String::new();
     let mut count = 1;
     let mut hits = 0;
@@ -901,11 +899,11 @@ pub async fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, chann
     let mut mvp_average_multiplier = 0.0;
     for call in &lb {
         let multiplier = call.ath_after_call / call.call.price.parse::<f64>().unwrap_or(0.0);
-        let user = db::get_user(&pool, call.call.user_tg_id.as_str()).await.expect("User not found").expect("User not found");
+        let user = db::get_user(&pool, call.call.user_tg_id.as_str()).await?;
         let user_tg_id = user.tg_id;
         let username = user.username.unwrap_or("Unknown".to_string());
-        let calls_count_user = db::get_user_call_count_for_user_chat_with_period(&pool, call.call.user_tg_id.as_str(), call.call.chat_id.as_str(), period_str.as_str()).await.expect("User not found");
-        let calls_count_chat = db::get_chat_call_count_with_period(&pool, call.call.chat_id.as_str(), period_str.as_str()).await.expect("Chat not found");
+        let calls_count_user = db::get_user_call_count_for_user_chat_with_period(&pool, call.call.user_tg_id.as_str(), call.call.chat_id.as_str(), period_str.as_str()).await?;
+        let calls_count_chat = db::get_chat_call_count_with_period(&pool, call.call.chat_id.as_str(), period_str.as_str()).await?;
         if multiplier > 2.0 {
             hits += 1;
         }
@@ -935,7 +933,7 @@ pub async fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, chann
     let hit_rate = hits as f64 / count as f64 * 100.0;
     mvp_string.push_str(&format!("├ <code>Hit rate:</code>      <b>{:.2}%</b>\n", hit_rate));
     mvp_string.push_str(&format!("└ <code>Return:</code>         <b>{:.2}x</b>\n", mvp_average_multiplier));
-    format!("
+    Ok(format!("
     {mvp_string}\n\
     <blockquote>\
     {learderboard_string}\
@@ -943,7 +941,7 @@ pub async fn leaderboard_message(lb: Vec<CallWithAth>, period_str: String, chann
     • TOKEN PNL » /pnl <i>token_address</i>\n\
     • LEADERBOARD » /lb <i>Period</i>\n\n\
     🏆 <a href=\"https://app.dexcelerate.com/scanner\">Watch and trade automatically with #1 dex</a>\n
-    ")
+    "))
 }
 
 /// Get the best call for a user
@@ -998,10 +996,7 @@ pub async fn best_call_user(user_tg_id: &str, pool: &SafePool) -> Result<Option<
 pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool) -> Result<()> {
     log::info!("User stats called");
     let user_calls = db::get_all_calls_user_tg_id(&pool, user_tg_id).await?;
-    let user = match db::get_user(&pool, user_tg_id).await? {
-        Some(user) => user,
-        None => return Err(anyhow::Error::msg("User not found")),
-    };
+    let user = db::get_user(&pool, user_tg_id).await?;
     let username = user.username.unwrap_or("Unknown".to_string());
     let calls_count = user_calls.len();
     let mut call_lb = Vec::new();   
@@ -1100,8 +1095,8 @@ pub async fn handle_callback_del_call(data: String, bot: &teloxide::Bot, query: 
     // Extract the call ID
     let user_tg_id =  query.from.id.to_string();
     let call_id = data.strip_prefix("del_call:").unwrap_or_default();
-    let call_user = get_user_from_call(&pool, call_id.parse::<i64>().expect("Could not parse call id, maybe the value is not a number or to big.")).await.expect("Could not get user from call.").expect("User not found.");
-    let call = db::get_call_by_id(&pool, call_id.parse::<i64>().expect("Could not parse call id, maybe the value is not a number or to big.")).await.expect("Could not get call.").expect("Call not found.");
+    let call_user = get_user_from_call(&pool, call_id.parse::<i64>().expect("Could not parse call id, maybe the value is not a number or to big.")).await?;
+    let call = db::get_call_by_id(&pool, call_id.parse::<i64>().expect("Could not parse call id, maybe the value is not a number or to big.")).await?;
     if call_user.tg_id == user_tg_id {
         if let Ok(call_id_num) = call_id.parse::<i64>() {
             // Attempt to delete the call
@@ -1219,7 +1214,7 @@ pub fn create_call_keyboard_after_just_scanning(call_id: &str, token_address: &s
 
 pub async fn handle_callback_refresh(data: String, bot: &teloxide::Bot, query: &teloxide::types::CallbackQuery, pool: SafePool) -> Result<()> {
     let call_id = data.strip_prefix("refresh:").unwrap_or_default();
-    let call = db::get_call_by_id(&pool, call_id.parse::<i64>().expect("Could not parse call id, maybe the value is not a number or to big.")).await.expect("Could not get call.").expect("Call not found.");
+    let call = db::get_call_by_id(&pool, call_id.parse::<i64>().expect("Could not parse call id, maybe the value is not a number or to big.")).await?;
     let token_pair_token_address = get_pair_token_pair_and_token_address(&call.token_mint).await?;
     let pair_address = token_pair_token_address["pairAddress"].as_str().unwrap_or("");
     let token_address = token_pair_token_address["tokenAddress"].as_str().unwrap_or("");
@@ -1237,7 +1232,7 @@ pub async fn handle_callback_refresh(data: String, bot: &teloxide::Bot, query: &
     let ath_response = get_ath(unix_timestamp_milis, &call.token_mint, &call.chain).await?;
     log::info!("ath_response: {:?}", ath_response);
     let holders_response = get_holders(token_address).await?;
-    let user = db::get_user(&pool, call.user_tg_id.as_str()).await.expect("User not found.").expect("User not found.");
+    let user = db::get_user(&pool, call.user_tg_id.as_str()).await?;
     if let Some(ref message) = query.message {
         match message {
             teloxide::types::MaybeInaccessibleMessage::Regular(msg) => {
@@ -1297,12 +1292,6 @@ pub struct CallHistoryUser
     pub ath: f64,
 }
 
-pub type SafeConnection = Arc<Mutex<Connection>>;
-
-pub fn get_safe_connection() -> SafeConnection {
-    Arc::new(Mutex::new(db::get_connection()))
-}
-
 
 /// Get user calls with ATH
 /// 
@@ -1320,10 +1309,10 @@ pub async fn get_user_calls(req: tide::Request<()>, pool: SafePool) -> tide::Res
     println!("Connection to db stablished");
 
     let calls_with_ath = tokio::spawn(async move {
-        let calls_without_ath = get_all_user_firsts_calls_by_user_tg_id(&pool, user_tg_id.as_str());
+        let calls_without_ath = get_all_user_firsts_calls_by_user_tg_id(&pool, user_tg_id.as_str()).await?;
         let mut calls_with_ath = Vec::new();
         for call in calls_without_ath {
-            let ath = get_ath(time_to_timestamp(&call.time), &call.token_address, &call.chain).await?;
+            let ath = get_ath(utils::helpers::async_time_to_timestamp(call.time).await, &call.token_address, &call.chain).await?;
             let ath_price = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
             let multiplier = ath_price / call.price.parse::<f64>().unwrap_or(0.0);
             let call_with_ath = CallHistoryUser {
