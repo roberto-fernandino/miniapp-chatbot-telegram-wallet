@@ -439,11 +439,16 @@ const App: React.FC = () => {
   };
 
   const handleGetHistory = async (userId: string) => {
-    const historyResponse = await getUserFirstCalls(userId);
-    const history: HistoryResponse = JSON.parse(historyResponse);
-    log(`history: ${JSON.stringify(history)}`, "info");
-    setHistory(history);
+    try {
+      const historyResponse = await getUserFirstCalls(userId);
+      const history: HistoryResponse = JSON.parse(historyResponse);
+      log(`history: ${JSON.stringify(history)}`, "info");
+      setHistory(history);
+    } catch (error) {
+      log(`Failed to parse history response ${error}`, "error");
+    }
   };
+
   const initializeApp = async () => {
     // Initialize Telegram API
     // TelegramApi.removeItems([`user_${WebApp.initDataUnsafe.user?.id}`]);
