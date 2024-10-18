@@ -1319,13 +1319,22 @@ pub async fn get_user_calls(user_tg_id: i64, pool: SafePool) -> Result<String> {
     let mut calls_with_ath = Vec::new();
     let user = db::get_user(&pool, user_tg_id.to_string().as_str()).await?;
     for call in calls_without_ath {
+        // getting token information
+        let response = get_pair_token_pair_and_token_address(&call.clone().token_address).await?;
+        let token_address = response["tokenAddress"].as_str().unwrap_or("");
+        let pair_address = response["pairAddress"].as_str().unwrap_or("");
+        let chain = response["chainName"].as_str().unwrap_or("");
+        let scanner_response = get_scanner_search(pair_address, token_address, chain).await?;
         let ath = get_ath(utils::helpers::async_time_to_timestamp(call.clone().time).await.expect("Failed to parse datetime."), &call.clone().token_address, &call.clone().chain).await?;
         let ath_price = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+        let total_supply = scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+
+        let ath_mkt_cap = ath_price * total_supply;
         let multiplier = ath_price / call.clone().price.parse::<f64>().unwrap_or(0.0);
         let call_with_ath = CallHistoryUser {
             call: call.clone(),
             multiplier,
-            ath: ath_price,
+            ath: ath_mkt_cap,
         };
         calls_with_ath.push(call_with_ath);
     }
