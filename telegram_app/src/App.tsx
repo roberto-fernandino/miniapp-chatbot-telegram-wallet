@@ -918,15 +918,6 @@ const App: React.FC = () => {
                       </div>
                     </>
                   </Sheet>
-                  <Sheet
-                    isOpen={historySheetOpen}
-                    onClose={() => setHistorySheetOpen(false)}
-                  >
-                    <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 text-transparent bg-clip-text">
-                      History
-                    </h3>
-                    {history ? <></> : <p>No history available</p>}
-                  </Sheet>
                   {userAccounts.map((account) => (
                     <div
                       key={account.walletId}
