@@ -139,10 +139,17 @@ pub fn extract_years(command: &str) -> Option<u32> {
 /// 
 /// # Returns
 /// 
-/// An i64 timestamp
-pub async fn async_time_to_timestamp(time: NaiveDateTime) -> i64 {
-    let datetime: DateTime<Utc> = DateTime::from_naive_utc_and_offset(time, Utc);
-    datetime.timestamp_millis()
+/// A Result containing an i64 timestamp or a Box<dyn std::error::Error>
+pub async fn async_time_to_timestamp(time: String) -> Result<i64, Box<dyn std::error::Error>> {
+    // Parse the RFC 3339 formatted string into a DateTime<Utc>
+    let datetime: DateTime<Utc> = DateTime::parse_from_rfc3339(&time)
+        .map_err(|e| {
+            eprintln!("Failed to parse datetime: {}", e);
+            e // Propagate the error
+        })?
+        .with_timezone(&Utc); // Convert to UTC if necessary
+
+    Ok(datetime.timestamp_millis())
 }
 
 pub fn time_to_timestamp(time: &str) -> i64 {
@@ -184,7 +191,7 @@ pub async fn get_call_info(address: &String, pool: &PgPool, msg: &Message) -> Re
 
 
         // Calculating the age of the call
-        let timestamp = async_time_to_timestamp(first_call.time).await;
+        let timestamp = async_time_to_timestamp(first_call.time).await.expect("Failed to parse datetime.");
         let call_time = Utc.timestamp_millis_opt(timestamp).unwrap();
         let current_time = Utc::now();
         let time_delta: TimeDelta = current_time.signed_duration_since(call_time);
