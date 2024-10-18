@@ -145,7 +145,7 @@ async fn get_user_calls_handler(
        axum::extract::Path(tg_user_id): axum::extract::Path<i64>,
        State(pool): axum::extract::State<SafePool>, // Added State parameter
    ) -> Result<String, String> {
-       let calls = db::get_all_user_firsts_calls_by_user_tg_id(&pool, tg_user_id.to_string().as_str()).await.expect("Failed to get calls");
+      let calls = get_user_calls(tg_user_id, pool).await.expect("Failed to get calls");
        println!("calls: {:?}", calls);
        Ok(serde_json::to_string(&calls).expect("Failed to convert calls to string"))
    }

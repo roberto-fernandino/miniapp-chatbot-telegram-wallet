@@ -1299,6 +1299,12 @@ pub struct CallHistoryUser
 }
 
 
+#[derive(Debug, Serialize)]
+pub struct ResponsePaylod {
+    pub calls: Vec<CallHistoryUser>,
+    pub username: String,
+}
+
 /// Get user calls with ATH
 /// 
 /// # Arguments
@@ -1308,26 +1314,22 @@ pub struct CallHistoryUser
 /// # Returns
 /// 
 /// * `String` - A json string with the calls and the ATH
-pub async fn get_user_calls(req: axum::extract::Path<i64>, pool: SafePool) -> Result<String> {
-    println!("Getting user calls...");
-    let user_tg_id = req.0.to_string();
-    println!("user_tg_id: {}", user_tg_id);
-
-   
-        let calls_without_ath = get_all_user_firsts_calls_by_user_tg_id(&pool, user_tg_id.as_str()).await?;
-        let mut calls_with_ath = Vec::new();
-        for call in calls_without_ath {
-            let ath = get_ath(utils::helpers::async_time_to_timestamp(call.clone().time).await.expect("Failed to parse datetime."), &call.clone().token_address, &call.clone().chain).await?;
-            let ath_price = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
-            let multiplier = ath_price / call.clone().price.parse::<f64>().unwrap_or(0.0);
-            let call_with_ath = CallHistoryUser {
-                call: call.clone(),
-                multiplier,
-                ath: ath_price,
-            };
-            calls_with_ath.push(call_with_ath);
-        }
-        println!("calls_with_ath: {:?}", calls_with_ath);
-    Ok(serde_json::to_string(&calls_with_ath)?)
+pub async fn get_user_calls(user_tg_id: i64, pool: SafePool) -> Result<String> {
+    let calls_without_ath = db::get_all_user_firsts_calls_by_user_tg_id(&pool, user_tg_id.to_string().as_str()).await?;
+    let mut calls_with_ath = Vec::new();
+    let user = db::get_user(&pool, user_tg_id.to_string().as_str()).await?;
+    for call in calls_without_ath {
+        let ath = get_ath(utils::helpers::async_time_to_timestamp(call.clone().time).await.expect("Failed to parse datetime."), &call.clone().token_address, &call.clone().chain).await?;
+        let ath_price = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+        let multiplier = ath_price / call.clone().price.parse::<f64>().unwrap_or(0.0);
+        let call_with_ath = CallHistoryUser {
+            call: call.clone(),
+            multiplier,
+            ath: ath_price,
+        };
+        calls_with_ath.push(call_with_ath);
+    }
+    println!("calls_with_ath: {:?}", calls_with_ath);
+    Ok(serde_json::to_string(&ResponsePaylod { calls: calls_with_ath, username: user.username.clone().unwrap_or("Unknown username".to_string()) })?)
 }
 
