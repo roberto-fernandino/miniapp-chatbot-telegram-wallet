@@ -903,6 +903,26 @@ const App: React.FC = () => {
                     <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 text-transparent bg-clip-text">
                       History
                     </h3>
+                    {history ? (
+                      <>
+                        <span>@{history.username}</span>
+                        <div>
+                          {history.calls.map((callWithAth) => (
+                            <div key={callWithAth.call.id} className="mb-4">
+                              <p>Token: {callWithAth.call.token_symbol}</p>
+                              <p>Price: {callWithAth.call.price}</p>
+                              <p>Time: {callWithAth.call.time}</p>
+                              <p>Market Cap: {callWithAth.call.mkt_cap}</p>
+                              <p>Chain: {callWithAth.call.chain}</p>
+                              <p>ATH: {callWithAth.ath}</p>
+                              <p>Multiplier: {callWithAth.multiplier}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <p>No history available</p>
+                    )}
                   </Sheet>
                   {userAccounts.map((account) => (
                     <div
