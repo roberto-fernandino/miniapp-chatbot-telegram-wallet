@@ -1312,9 +1312,8 @@ pub async fn get_user_calls(req: tide::Request<()>, pool: SafePool) -> tide::Res
     println!("Getting user calls...");
     let user_tg_id = req.param("tg_user_id")?.to_string();
     println!("user_tg_id: {}", user_tg_id);
-    println!("Connection to db stablished");
 
-    let calls_with_ath = tokio::spawn(async move {
+   
         let calls_without_ath = get_all_user_firsts_calls_by_user_tg_id(&pool, user_tg_id.as_str()).await?;
         let mut calls_with_ath = Vec::new();
         for call in calls_without_ath {
@@ -1328,10 +1327,7 @@ pub async fn get_user_calls(req: tide::Request<()>, pool: SafePool) -> tide::Res
             };
             calls_with_ath.push(call_with_ath);
         }
-        Ok::<Vec<CallHistoryUser>, anyhow::Error>(calls_with_ath)
-    }).await??;
-
-    println!("calls_with_ath: {:?}", calls_with_ath);
+        println!("calls_with_ath: {:?}", calls_with_ath);
     Ok(serde_json::to_string(&calls_with_ath)?)
 }
 
