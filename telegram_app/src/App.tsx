@@ -918,7 +918,7 @@ const App: React.FC = () => {
                                   {callWithAth.call.chain}
                                 </span>
                                 <span className="text-sm text-green-400 ml-3">
-                                  ATH: ${callWithAth.ath.toLocaleString()} [
+                                  ATH: ${formatNumber(callWithAth.ath)} [
                                   {callWithAth.multiplier.toFixed(2)}x]
                                 </span>
                               </div>
