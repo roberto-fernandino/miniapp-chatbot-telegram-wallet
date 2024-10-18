@@ -893,11 +893,7 @@ const App: React.FC = () => {
                           Calls History
                         </h2>
                         <div className="flex flex-col items-center justify-center w-full mt-3 h-full">
-                          {history?.calls.map((callWithAth) => (
-                            <div key={callWithAth.call.id} className="mb-4">
-                              <p>Token: {callWithAth.call.token_symbol}</p>
-                            </div>
-                          ))}
+                          {JSON.stringify(history?.calls)}
                         </div>
                       </div>
                     </>
