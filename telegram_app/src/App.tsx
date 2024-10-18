@@ -40,13 +40,13 @@ import EthTokenBalances from "./components/ui/ethTokenBalances";
 import { swapSolanaTokens } from "./lib/solana";
 
 interface Call {
-  id?: number;
+  id: number;
   time: string;
   mkt_cap: string;
-  price: string;
   token_address: string;
   token_mint: string;
-  token_symbol: string;
+  token_symbol: string; // Added token_symbol
+  price: string;
   user_tg_id: string;
   chat_id: string;
   message_id: string;
@@ -58,6 +58,12 @@ interface CallWithAth {
   multiplier: number;
   ath: number;
 }
+
+interface HistoryResponse {
+  calls: CallWithAth[];
+  username: string;
+}
+
 const App: React.FC = () => {
   // User information
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -117,7 +123,7 @@ const App: React.FC = () => {
 
   // History
   const [historySheetOpen, setHistorySheetOpen] = useState(false);
-  const [history, setHistory] = useState<CallWithAth[]>([]);
+  const [history, setHistory] = useState<HistoryResponse | null>(null);
 
   useEffect(() => {
     initializeApp();
@@ -433,11 +439,10 @@ const App: React.FC = () => {
   };
 
   const handleGetHistory = async (userId: string) => {
-    const history = await getUserFirstCalls(userId);
-    log(`history: ${JSON.stringify(history)}`, "info");
+    const historyResponse = await getUserFirstCalls(userId);
+    const history: HistoryResponse = JSON.parse(historyResponse);
     setHistory(history);
   };
-
   const initializeApp = async () => {
     // Initialize Telegram API
     // TelegramApi.removeItems([`user_${WebApp.initDataUnsafe.user?.id}`]);
@@ -881,24 +886,25 @@ const App: React.FC = () => {
                         <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 text-transparent bg-clip-text">
                           Calls History
                         </h2>
+                        <span>@{history?.username}</span>
                         <div className="flex flex-col items-center justify-center w-full mt-3 h-full">
-                          {history.map((call) => (
+                          {history?.calls.map((callWithAth) => (
                             <div
-                              key={call.call.id}
+                              key={callWithAth.call.id}
                               className="flex flex-col items-center justify-center w-full mt-3 h-full"
                             >
                               <div>
-                                <p>{call.call.token_address}</p>
-                                <p>{call.call.price}</p>
-                                <p>{call.call.time}</p>
-                                <p>{call.call.user_tg_id}</p>
-                                <p>{call.call.mkt_cap}</p>
-                                <p>{call.call.message_id}</p>
-                                <p>{call.call.chat_id}</p>
-                                <p>{call.call.token_mint}</p>
-                                <p>{call.call.chain}</p>
-                                <p>{call.ath}</p>
-                                <p>{call.multiplier}</p>
+                                <p>{callWithAth.call.token_address}</p>
+                                <p>{callWithAth.call.price}</p>
+                                <p>{callWithAth.call.time}</p>
+                                <p>{callWithAth.call.user_tg_id}</p>
+                                <p>{callWithAth.call.mkt_cap}</p>
+                                <p>{callWithAth.call.message_id}</p>
+                                <p>{callWithAth.call.chat_id}</p>
+                                <p>{callWithAth.call.token_mint}</p>
+                                <p>{callWithAth.call.chain}</p>
+                                <p>{callWithAth.ath}</p>
+                                <p>{callWithAth.multiplier}</p>
                               </div>
                             </div>
                           ))}
