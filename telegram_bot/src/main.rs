@@ -15,6 +15,8 @@ use std::sync::Arc;
 use sqlx::Pool;
 use sqlx::Postgres;
 use sqlx::postgres::PgPoolOptions;
+use axum::Json;
+use axum::http::StatusCode;
 
 pub type SafePool = Arc<Pool<Postgres>>;
 
@@ -142,13 +144,20 @@ async fn handle_callback_query(
 }
 
 async fn get_user_calls_handler(
-       axum::extract::Path(tg_user_id): axum::extract::Path<i64>,
-       State(pool): axum::extract::State<SafePool>, // Added State parameter
-   ) -> Result<String, String> {
-      let calls = get_user_calls(tg_user_id, pool).await.expect("Failed to get calls");
-       println!("calls: {:?}", calls);
-       Ok(serde_json::to_string(&calls).expect("Failed to convert calls to string"))
-   }
+    axum::extract::Path(tg_user_id): axum::extract::Path<i64>,
+    State(pool): axum::extract::State<SafePool>,
+) -> Result<(StatusCode, Json<String>), (StatusCode, String)> {
+    match get_user_calls(tg_user_id, pool).await {
+        Ok(calls) => {
+            println!("calls: {:?}", calls);
+            match serde_json::to_string(&calls) {
+                Ok(json) => Ok((StatusCode::OK, Json(json))),
+                Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to serialize calls: {}", e)))
+            }
+        },
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to get calls: {}", e)))
+    }
+}
 
 async fn run_axum_server(pool: SafePool) {
        let app = Router::new().route(
