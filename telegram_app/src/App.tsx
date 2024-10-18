@@ -441,6 +441,7 @@ const App: React.FC = () => {
   const handleGetHistory = async (userId: string) => {
     const historyResponse = await getUserFirstCalls(userId);
     const history: HistoryResponse = JSON.parse(historyResponse);
+    log(`history: ${JSON.stringify(history)}`, "info");
     setHistory(history);
   };
   const initializeApp = async () => {
