@@ -442,14 +442,10 @@ const App: React.FC = () => {
     try {
       const historyResponse = await getUserFirstCalls(userId);
       const parsedResponse = JSON.parse(historyResponse);
-      log(`parsedResponse: ${JSON.stringify(parsedResponse)}`, "info");
       const history =
         typeof parsedResponse === "string"
           ? JSON.parse(parsedResponse)
           : parsedResponse;
-      log(`history: ${JSON.stringify(history)}`, "info");
-      log(`calls: ${JSON.stringify(history.calls)}`, "info");
-      log(`username: ${JSON.stringify(history.username)}`, "info");
       setHistory(history);
     } catch (error) {
       log(`Failed to parse history response ${error}`, "error");
@@ -900,7 +896,17 @@ const App: React.FC = () => {
                           Calls History
                         </h2>
                         <div className="flex flex-col items-center justify-center w-full mt-3 h-full">
-                          {JSON.stringify(history?.calls)}
+                          {history?.calls.map((callWithAth) => (
+                            <div key={callWithAth.call.id} className="mb-4">
+                              <p>Token: {callWithAth.call.token_symbol}</p>
+                              <p>Address: {callWithAth.call.token_address}</p>
+                              <p>Price: {callWithAth.call.price}</p>
+                              <p>Time: {callWithAth.call.time}</p>
+                              <p>Market Cap: {callWithAth.call.mkt_cap}</p>
+                              <p>Chain: {callWithAth.call.chain}</p>
+                              <p>ATH: {callWithAth.ath}</p>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </>
