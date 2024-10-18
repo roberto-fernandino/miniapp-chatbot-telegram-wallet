@@ -919,7 +919,7 @@ const App: React.FC = () => {
                                 </span>
                                 <span className="text-sm text-green-400 ml-3">
                                   ATH: ${callWithAth.ath.toLocaleString()} [
-                                  {callWithAth.multiplier.toFixed(2)}]
+                                  {callWithAth.multiplier.toFixed(2)}x]
                                 </span>
                               </div>
                               <div className="flex justify-between items-center mb-2">
@@ -1034,7 +1034,6 @@ const App: React.FC = () => {
               )}
             </CardContent>
           </Card>
-
           <Card className="mb-4">
             <CardHeader className="flex justify-between flex-row">
               <CardTitle>Copy Trade</CardTitle>
