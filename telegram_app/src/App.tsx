@@ -887,29 +887,7 @@ const App: React.FC = () => {
                         <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 text-transparent bg-clip-text">
                           Calls History
                         </h2>
-                        <span>@{history?.username}</span>
-                        <div className="flex flex-col items-center justify-center w-full mt-3 h-full">
-                          {history?.calls.map((callWithAth) => (
-                            <div
-                              key={callWithAth.call.id}
-                              className="flex flex-col items-center justify-center w-full mt-3 h-full"
-                            >
-                              <div>
-                                <p>{callWithAth.call.token_address}</p>
-                                <p>{callWithAth.call.price}</p>
-                                <p>{callWithAth.call.time}</p>
-                                <p>{callWithAth.call.user_tg_id}</p>
-                                <p>{callWithAth.call.mkt_cap}</p>
-                                <p>{callWithAth.call.message_id}</p>
-                                <p>{callWithAth.call.chat_id}</p>
-                                <p>{callWithAth.call.token_mint}</p>
-                                <p>{callWithAth.call.chain}</p>
-                                <p>{callWithAth.ath}</p>
-                                <p>{callWithAth.multiplier}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                        <div className="flex flex-col items-center justify-center w-full mt-3 h-full"></div>
                       </div>
                     </>
                   </Sheet>
