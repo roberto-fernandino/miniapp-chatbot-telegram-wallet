@@ -3,7 +3,7 @@ use crate::utils::helpers::check_period_for_leaderboard;
 use sqlx::Row;
 use anyhow::Result;
 use serde::Serialize;
-use chrono::{NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use std::env;
 
 /// Represents a user in the system.
