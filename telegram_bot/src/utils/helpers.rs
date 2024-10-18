@@ -1,7 +1,6 @@
 use chrono::{TimeDelta, TimeZone};
 use sqlx::PgPool;
 use crate::{there_is_valid_solana_address, there_is_valid_eth_address, get_valid_solana_address, get_valid_eth_address};
-use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use crate::{format_age, format_number};
 use crate::db::*;
@@ -210,7 +209,7 @@ pub fn is_start_command(text: &str) -> bool {
 /// # Returns
 /// 
 /// A tuple containing the address and the chain
-pub async fn address_handler(text: &str) -> Result<(String)> {
+pub async fn address_handler(text: &str) -> Result<String> {
     let is_solana_address = there_is_valid_solana_address(text);
     let is_eth_address = there_is_valid_eth_address(text);
     if is_solana_address {

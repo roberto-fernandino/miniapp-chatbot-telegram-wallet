@@ -117,8 +117,6 @@ async fn handle_callback_query(
 
 /// Runs the Tide server.
 async fn run_tide_server(pool: SafePool) {
-    use tide::prelude::*; // For serde_json
-
     let mut app = tide::new();
     println!("Tide bot server running.");
     app.at("/user_calls/:tg_user_id").get(move |req| {
