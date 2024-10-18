@@ -123,7 +123,10 @@ const App: React.FC = () => {
 
   // History
   const [historySheetOpen, setHistorySheetOpen] = useState(false);
-  const [history, setHistory] = useState<HistoryResponse | null>(null);
+  const [history, setHistory] = useState<HistoryResponse>({
+    calls: [],
+    username: "",
+  });
 
   useEffect(() => {
     initializeApp();
@@ -899,8 +902,8 @@ const App: React.FC = () => {
                           Calls History
                         </h2>
                         <div className="flex flex-col items-center justify-center w-full mt-3 h-full">
-                          <p>@{history?.username}</p>
-                          {history?.calls.map((callWithAth) => (
+                          <p>@{history.username}</p>
+                          {history.calls.map((callWithAth) => (
                             <div key={callWithAth.call.id} className="mb-4">
                               <p>Token: {callWithAth.call.token_symbol}</p>
                               <p>Address: {callWithAth.call.token_address}</p>
