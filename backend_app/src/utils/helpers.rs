@@ -12,8 +12,6 @@ pub async fn get_redis_connection() -> Result<Connection> {
 }
 
 
-
-
 /// Get the ATH of a token
 /// 
 /// # Arguments
