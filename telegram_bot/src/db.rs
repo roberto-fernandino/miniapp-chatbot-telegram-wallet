@@ -1,10 +1,27 @@
 use sqlx::{PgPool, postgres::PgPoolOptions};
+use sqlx::Pool;
+use sqlx::Postgres;
 use crate::utils::helpers::check_period_for_leaderboard;
+use serde::Serialize;
 use sqlx::Row;
 use anyhow::Result;
-use serde::Serialize;
-use chrono::NaiveDateTime;
 use std::env;
+use std::sync::Arc;
+
+/// Struct to hold the call with the ATH after the call
+/// 
+/// 
+/// # Fields
+/// 
+/// * `call` - The call
+/// * `ath_after_call` - The ATH after the call
+/// * `multiplier` - The multiplier
+#[derive(Debug, Clone, Serialize)]
+pub struct CallWithAth {
+    pub call: Call,
+    pub ath_after_call: f64,
+    pub multiplier: f64,
+}
 
 /// Represents a user in the system.
 #[derive(Debug, Serialize, Clone)]
@@ -30,13 +47,23 @@ pub struct Call {
     pub chain: String,
 }
 
-/// Represents a call history with additional ATH data.
+/// Represents a PNL call in the system.
 #[derive(Debug, Serialize)]
-pub struct CallHistoryUser {
-    pub call: Call,
-    pub multiplier: f64,
-    pub ath: f64,
+pub struct PnlCall {
+    pub call_id: i64,
+    pub token_address: String,
+    pub mkt_cap: String,
+    pub percent: String,
 }
+
+#[derive(Debug, Serialize)]
+pub struct ResponsePaylod {
+    pub calls: Vec<CallWithAth>,
+    pub username: String,
+}
+
+pub type SafePool = Arc<Pool<Postgres>>;
+
 
 
 /// Initializes and returns a PostgreSQL connection pool.
@@ -231,7 +258,7 @@ pub async fn get_all_calls_chat_id(pool: &PgPool, chat_id: &str) -> Result<Vec<C
 pub async fn get_channel_calls_last_x_days(pool: &PgPool, chat_id: &str, days: i32) -> Result<Vec<Call>> {
     let q = "SELECT id, time, mkt_cap, token_address, token_mint, token_symbol, price, user_tg_id, chat_id, message_id, chain
         FROM calls
-        WHERE time >= NOW() - INTERVAL '$1 days' AND chat_id = $2
+        WHERE time::timestamp >= NOW() - INTERVAL '$1 days' AND chat_id = $2
         ORDER BY time ASC";
 
     let calls = sqlx::query(q)
@@ -707,7 +734,7 @@ pub async fn get_user_call_count_for_user_chat_with_period(
         FROM calls
         WHERE user_tg_id = $1
           AND chat_id = $2
-          AND time >= NOW() - INTERVAL $3
+          AND time::timestamp >= NOW() - $3::interval
         "
     )
     .bind(user_tg_id)
@@ -807,3 +834,4 @@ pub async fn user_exists(pool: &PgPool, user_tg_id: &str) -> Result<bool, sqlx::
         .await?; // Await the result here
     Ok(count.0 > 0)
 }
+
