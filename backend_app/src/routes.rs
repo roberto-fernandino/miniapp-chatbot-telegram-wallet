@@ -1,4 +1,4 @@
-use crate::utils::helpers::{get_redis_connection, get_ath, time_to_timestamp};
+use crate::utils::helpers::get_redis_connection;
 use std::collections::HashMap;
 use redis::Commands;
 use serde::{Serialize, Deserialize};
