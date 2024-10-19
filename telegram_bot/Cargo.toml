@@ -13,8 +13,10 @@ anyhow = "1.0.89"
 serde_json = "1.0.128"
 reqwest = { version = "0.12.8", features = ["json", "blocking"] }
 sqlx = { version = "0.8.2", features = ["postgres", "runtime-tokio-native-tls", "macros"] }
-chrono = "0.4.38"
+chrono = {version= "0.4.38" }
 serde = "1.0.210"
 axum = "0.6"
-
+base64 = "0.22.0"
+rand = "0.9.0-alpha.0"
+base64-url = "2.0.2"
 async-std = "1.13.0"
