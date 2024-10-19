@@ -14,11 +14,12 @@ use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 use std::env;
 use futures_util::stream::StreamExt;
+mod modules;
 mod utils;
 use tokio::sync::broadcast;
 use futures::lock::Mutex;
-mod modules;
 use std::time::Duration;
+mod turnkey;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
