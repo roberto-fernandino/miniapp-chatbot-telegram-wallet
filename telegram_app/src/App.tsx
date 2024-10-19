@@ -228,6 +228,9 @@ const App: React.FC = () => {
 
       setIsRegistered(true);
       log("User registered successfully", "success");
+      log("Creating session for 30 days automatically.", "success");
+
+      handleCreateSession("43200");
     } catch (error) {
       console.error("Full error object:", error);
       if (error instanceof Error) {
@@ -320,6 +323,11 @@ const App: React.FC = () => {
     }
   };
 
+  /**
+   * Create a session for the user
+   * @param sessionDuration in minutes
+   * @returns void
+   */
   const handleCreateSession = async (sessionDuration: string) => {
     setIsLoading(true);
     const user = await TelegramApi.getItem(
@@ -378,6 +386,11 @@ const App: React.FC = () => {
     }
   };
 
+  /**
+   * Check if the session is active
+   * Update the remaining time string so user can see the remaining time.
+   * @returns void
+   */
   const checkSessionApiKeys = async () => {
     const user = await TelegramApi.getItem(
       `user_${WebApp.initDataUnsafe.user?.id}`
@@ -394,9 +407,30 @@ const App: React.FC = () => {
 
         if (timeLeft > 0) {
           setSessionActive(true);
-          const minutes = Math.floor(timeLeft / 60000);
-          const seconds = Math.floor((timeLeft % 60000) / 1000);
-          setRemainingTime(`${minutes}m ${seconds}s`);
+          const months = Math.floor(timeLeft / 2592000000);
+          const days = Math.floor((timeLeft % 2592000000) / 86400000);
+          const hours = Math.floor(
+            ((timeLeft % 2592000000) % 86400000) / 3600000
+          );
+          const minutes = Math.floor(
+            (((timeLeft % 2592000000) % 86400000) % 3600000) / 60000
+          );
+          const seconds = Math.floor(
+            ((((timeLeft % 2592000000) % 86400000) % 3600000) % 60000) / 1000
+          );
+          if (months > 0) {
+            setRemainingTime(
+              `${months}m ${days}d ${hours}h ${minutes}m ${seconds}s`
+            );
+          } else if (days > 0) {
+            setRemainingTime(`${days}d ${hours}h ${minutes}m ${seconds}s`);
+          } else if (hours > 0) {
+            setRemainingTime(`${hours}h ${minutes}m ${seconds}s`);
+          } else if (minutes > 0) {
+            setRemainingTime(`${minutes}m ${seconds}s`);
+          } else {
+            setRemainingTime(`${seconds}s`);
+          }
         } else {
           // Session has expired
           await handleSessionExpiration(json_user);
@@ -773,7 +807,6 @@ const App: React.FC = () => {
                           }}
                           type="number"
                         />
-
                         <Button
                           className="mb-2"
                           disabled={isLoading}
