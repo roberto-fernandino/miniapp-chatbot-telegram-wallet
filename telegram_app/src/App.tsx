@@ -512,9 +512,6 @@ const App: React.FC = () => {
         json_user
       );
 
-      log(`has_solana: ${has_solana}`, "info");
-      log(`has_evm: ${has_evm}`, "info");
-      log(`has_sui: ${has_sui}`, "info");
       if (!has_evm) {
         log("User does not have an EVM account", "info");
         log("Creating EVM account", "info");
@@ -524,7 +521,6 @@ const App: React.FC = () => {
         let evm_address = json_user.accounts.find(
           (account: any) => account.addressFormat === "ADDRESS_FORMAT_ETHEREUM"
         )?.address;
-        log(`evm_address: ${evm_address}`, "info");
         setUserEthAddress(evm_address);
       }
       if (!has_solana) {
@@ -536,7 +532,6 @@ const App: React.FC = () => {
         let sol_address = json_user.accounts.find(
           (account: any) => account.addressFormat === "ADDRESS_FORMAT_SOLANA"
         )?.address;
-        log(`sol_address: ${sol_address}`, "info");
         setUserSolAddress(sol_address);
       }
     } catch (error) {
@@ -574,8 +569,13 @@ const App: React.FC = () => {
       }
       updateCopyTrades();
 
-      log(`userSolAddress: ${userSolAddress}`, "info");
-      log(`userEthAddress: ${userEthAddress}`, "info");
+      let sol_address = accounts.accounts.find(
+        (account: any) => account.addressFormat === "ADDRESS_FORMAT_SOLANA"
+      )?.address;
+
+      let eth_address = accounts.accounts.find(
+        (account: any) => account.addressFormat === "ADDRESS_FORMAT_ETHEREUM"
+      )?.address;
       log("Adding/updating user in the database", "info");
       let response = await axios.post(
         "https://srv617785.hstgr.cloud/bot_api/add_user",
@@ -588,8 +588,8 @@ const App: React.FC = () => {
             suborg_id: json_user.subOrgId,
             wallet_id: json_user.walletId,
           },
-          solana_address: userSolAddress,
-          eth_address: userEthAddress,
+          solana_address: sol_address,
+          eth_address: eth_address,
         }
       );
       log(
