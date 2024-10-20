@@ -317,6 +317,12 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to clear call: {:?}", e),
             }
         }
+        else if data.starts_with("buy:") {
+            match handle_buy_callback(data.to_string(), &bot, &query, pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to buy: {:?}", e),
+            }
+        }
         else {
             log::info!("Unrecognized callback query data: {}", data);
         }
@@ -404,7 +410,9 @@ pub async fn post_add_user_handler(
 }
 
 pub async fn handle_buy_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: SafePool) -> Result<()> {
-
+    println!("@buy_callback/ data: {:?}", data);
+    let user_id = q.from.id.to_string();
+    println!("@buy_callback/ user_id: {:?}", user_id);
     let chat_id = q.message.as_ref().unwrap().chat().id;
     bot.send_message(chat_id, "Enter a token address to buy")
     .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the token address".to_string()), selective: false})
