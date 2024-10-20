@@ -56,7 +56,7 @@ pub async fn get_user_calls(user_tg_id: i64, pool: SafePool) -> Result<String> {
 
 
 pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message) -> Result<()> {
-    let keyboard = create_main_menu_keyboard();
+    let keyboard = create_main_menu_keyboard(msg);
     bot.send_message(
         msg.chat.id,
         "Solana Wallet address:\n\
