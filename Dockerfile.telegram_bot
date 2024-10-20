@@ -20,6 +20,9 @@ RUN chmod +x /scripts/telegram_bot
 # Add Rust and Cargo to the PATH
 ENV PATH="/root/.cargo/bin:/scripts:${PATH}"
 
+# Instal sqlx-cli
+RUN cargo install sqlx-cli
+
 WORKDIR /app
 COPY telegram_bot .
 
