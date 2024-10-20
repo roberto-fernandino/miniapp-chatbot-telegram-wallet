@@ -240,31 +240,31 @@ pub fn create_call_keyboard_after_just_scanning(call_id: &str, token_address: &s
 /// # Returns
 /// 
 /// A InlineKeyboardMarkup struct to be used in the ReplyMarkup on the bot
-pub fn create_main_menu_keyboard(msg: &teloxide::types::Message) -> InlineKeyboardMarkup {
+pub fn create_main_menu_keyboard() -> InlineKeyboardMarkup {
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
     buttons.push(vec![
-        InlineKeyboardButton::callback("Buy", format!("buy:{}", msg.clone().from.expect("Couldn't get user from message").id)),
-        InlineKeyboardButton::callback("Sell", format!("sell:{}", msg.clone().from.expect("Couldn't get user from message").id))
+        InlineKeyboardButton::callback("Buy", "buy"),
+        InlineKeyboardButton::callback("Sell", "sell")
     ]);
     buttons.push(vec![
-        InlineKeyboardButton::callback("🛫 Copy Trade", format!("copy_trade:{}", msg.clone().from.expect("Couldn't get user from message").id))
+        InlineKeyboardButton::callback("🛫 Copy Trade", "copy_trade")
     ]);
     buttons.push(vec![
-        InlineKeyboardButton::callback("💴 Smart Wallet", format!("smart_wallet:{}", msg.clone().from.expect("Couldn't get user from message").id))
+        InlineKeyboardButton::callback("💴 Smart Wallet", "smart_wallet")
     ]);
     buttons.push(vec![
-        InlineKeyboardButton::callback("Limit orders", format!("limit_orders:{}", msg.clone().from.expect("Couldn't get user from message").id)), 
-        InlineKeyboardButton::callback("Auto sell", format!("auto_sell:{}", msg.clone().from.expect("Couldn't get user from message").id))
+        InlineKeyboardButton::callback("Limit orders", "limit_orders"), 
+        InlineKeyboardButton::callback("Auto sell", "auto_sell")
     ]);
     buttons.push(vec![
-        InlineKeyboardButton::callback("Positions", format!("positions:{}", msg.clone().from.expect("Couldn't get user from message").id)),
-        InlineKeyboardButton::callback("Wallet", format!("wallet:{}", msg.clone().from.expect("Couldn't get user from message").id)),
+        InlineKeyboardButton::callback("Positions", "positions"),
+        InlineKeyboardButton::callback("Wallet", "wallet"),
         InlineKeyboardButton::callback("Help", "help"),
     ]);
 
     buttons.push(vec![
-        InlineKeyboardButton::callback("Settings", format!("settings:{}", msg.clone().from.expect("Couldn't get user from message").id)),
-        InlineKeyboardButton::callback("💰 Referrals", format!("referrals:{}", msg.clone().from.expect("Couldn't get user from message").id)),
+        InlineKeyboardButton::callback("Settings", "settings"),
+        InlineKeyboardButton::callback("💰 Referrals", "referrals"),
     ]);
 
     InlineKeyboardMarkup::new(buttons)
