@@ -896,3 +896,24 @@ pub fn user_stats_message(username: String, calls_count: usize, multipliers_sum:
     </blockquote>\n\
     ")
 }
+
+
+/// Requests the SOL balance of a wallet in the solana_app connected to the node
+/// 
+/// # Arguments
+/// 
+/// * `address` - The address of the wallet
+/// 
+/// # Returns
+/// 
+/// A f64 representing the SOL balance
+pub async fn get_wallet_sol_balance(address: &str) -> Result<f64> {
+    let client = reqwest::Client::new();
+    let response = client.get(
+    format!("http://solana_app:3030/get_wallet_sol_balance/{address}")
+    )
+    .send()
+    .await?;
+    let balance = response.text().await?;
+    Ok(balance.parse::<f64>().unwrap_or(0.0))
+}
