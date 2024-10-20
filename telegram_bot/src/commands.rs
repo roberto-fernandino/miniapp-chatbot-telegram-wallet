@@ -1,10 +1,10 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use crate::*;
-use crate::db::{Call, PnlCall, ResponsePaylod, CallWithAth, add_user};
+use crate::db::{Call, PnlCall, ResponsePaylod, CallWithAth, create_user_with_tg_id_and_username};
 use reqwest::Client;
 use std::net::SocketAddr;
-use handlers::get_user_calls_handler;
+use handlers::{get_user_calls_handler, post_add_user_handler};
 use crate::db;
 use crate::utils::helpers::*;
 use crate::handlers::create_call_keyboard;
@@ -76,7 +76,12 @@ pub async fn run_axum_server(pool: SafePool) {
        .route(
            "/user_calls/:tg_user_id",
            axum::routing::get(get_user_calls_handler),
-       ).with_state(pool);
+       )
+       .route(
+        "/add_user",
+        axum::routing::post(post_add_user_handler),
+       )
+       .with_state(pool);
    
        let addr = SocketAddr::new("0.0.0.0".parse().unwrap(), 2020); // Updated to use SocketAddr::new
        println!("Axum server running on {:?}", addr);
@@ -257,14 +262,14 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                 // Get the user
                 let user = db::get_user(&pool, user_id_str).await;
                 if user.is_err() {
-                    add_user(pool, user_id_str, Some(msg.from.clone().unwrap().username.clone().unwrap_or("Unknown".to_string()).as_str())).await?;
+                    create_user_with_tg_id_and_username(pool, user_id_str, Some(msg.from.clone().unwrap().username.clone().unwrap_or("Unknown".to_string()).as_str())).await?;
                     log::error!("User not found in database");
                 }
                 // If the user is not in the database, add them
                 match user {
                     Err(_) => {
                         // User not found, attempt to add them
-                        match db::add_user(&pool, user_id_str, Some(msg.from.clone().expect("Could not get the user from the message").username.clone().unwrap_or("Unknown".to_string()).as_str())).await {
+                        match db::create_user_with_tg_id_and_username(&pool, user_id_str, Some(msg.from.clone().expect("Could not get the user from the message").username.clone().unwrap_or("Unknown".to_string()).as_str())).await {
                             Ok(_) => {
                                 log::info!("User added to database");
                             }
