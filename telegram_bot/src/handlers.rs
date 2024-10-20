@@ -326,6 +326,16 @@ pub async fn handle_callback_query(
     Ok(())
 }
 
+/// Get the user calls
+/// 
+/// # Arguments
+/// 
+/// * `tg_user_id` - The Telegram user ID
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A JSON response with the user calls
 pub async fn get_user_calls_handler(
     Path(tg_user_id): Path<i64>,
     State(pool): State<Arc<Pool<Postgres>>>,
@@ -338,5 +348,28 @@ pub async fn get_user_calls_handler(
             }
         },
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to get calls: {}", e)).into_response(),
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct PostUserRequest {
+    pub username: Option<String>,
+    pub tg_id: String,
+    pub turnkey_info: TurnkeyInfo,
+    pub solana_address: String,
+    pub eth_address: String,
+}
+
+pub async fn post_add_user_handler(
+    State(pool): State<Arc<Pool<Postgres>>>,
+    Json(user): Json<PostUserRequest>
+) -> impl IntoResponse {
+    let user_exists = user_exists(&pool, &user.tg_id).await.expect("Could not check if user exists");
+
+    if user_exists {
+        let user_id = get_user_id_by_tg_id(&pool, &user.tg_id).await.expect("Could not get user id");
+        update_user(&pool, User { id: user_id, username: user.username, tg_id: user.tg_id, turnkey_info: user.turnkey_info, solana_address: user.solana_address, eth_address: user.eth_address }).await.expect("Could'n not update user in the db.");
+    } else {
+        add_user(&pool, user).await.expect("Could'n not add user to the db.");
     }
 }
