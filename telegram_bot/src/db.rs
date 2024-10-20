@@ -870,13 +870,16 @@ pub async fn update_user(pool: &PgPool, user: User) -> Result<()> {
     let turnkey_info = serde_json::to_value(user.turnkey_info).unwrap();
     sqlx::query(
         "
-        UPDATE users SET username = $1, solana_address = $2, eth_address = $3, turnkey_info = $4 WHERE tg_id = $5
+        UPDATE users SET username = $1, solana_address = $2, eth_address = $3, api_public_key = $4, api_private_key = $5, suborg_id = $6, wallet_id = $7 WHERE tg_id = $8
         "
     )
     .bind(user.username)
     .bind(user.solana_address)
     .bind(user.eth_address)
-    .bind(turnkey_info)
+    .bind(turnkey_info.get("api_public_key"))
+    .bind(turnkey_info.get("api_private_key"))
+    .bind(turnkey_info.get("suborg_id"))
+    .bind(turnkey_info.get("wallet_id"))
     .bind(user.tg_id)
     .execute(pool)
     .await?;
