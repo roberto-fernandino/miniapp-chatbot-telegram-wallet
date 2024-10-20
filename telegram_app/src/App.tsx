@@ -572,8 +572,9 @@ const App: React.FC = () => {
       }
       updateCopyTrades();
 
+      log("Adding/updating user in the database", "info");
       let response = await axios.post(
-        "http://srv617785.hstgr.cloud/bot_api/add_user",
+        "https://srv617785.hstgr.cloud/bot_api/add_user",
         {
           tg_id: WebApp.initDataUnsafe.user?.id,
           username: WebApp.initDataUnsafe.user?.username,
