@@ -524,6 +524,7 @@ const App: React.FC = () => {
         let evm_address = json_user.accounts.find(
           (account: any) => account.addressFormat === "ADDRESS_FORMAT_ETHEREUM"
         )?.address;
+        log(`evm_address: ${evm_address}`, "info");
         setUserEthAddress(evm_address);
       }
       if (!has_solana) {
@@ -535,6 +536,7 @@ const App: React.FC = () => {
         let sol_address = json_user.accounts.find(
           (account: any) => account.addressFormat === "ADDRESS_FORMAT_SOLANA"
         )?.address;
+        log(`sol_address: ${sol_address}`, "info");
         setUserSolAddress(sol_address);
       }
     } catch (error) {
@@ -572,6 +574,8 @@ const App: React.FC = () => {
       }
       updateCopyTrades();
 
+      log(`userSolAddress: ${userSolAddress}`, "info");
+      log(`userEthAddress: ${userEthAddress}`, "info");
       log("Adding/updating user in the database", "info");
       let response = await axios.post(
         "https://srv617785.hstgr.cloud/bot_api/add_user",
