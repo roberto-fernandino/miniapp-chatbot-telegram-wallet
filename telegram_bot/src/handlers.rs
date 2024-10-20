@@ -353,8 +353,8 @@ pub async fn get_user_calls_handler(
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct PostUserRequest {
-    pub username: Option<String>,
     pub tg_id: String,
+    pub username: Option<String>,
     pub turnkey_info: TurnkeyInfo,
     pub solana_address: String,
     pub eth_address: String,
@@ -364,12 +364,24 @@ pub async fn post_add_user_handler(
     State(pool): State<Arc<Pool<Postgres>>>,
     Json(user): Json<PostUserRequest>
 ) -> impl IntoResponse {
+    println!("@add_user/ Request received!");
+    println!("@add_user/ post_data: {:?}", user);
     let user_exists = user_exists(&pool, &user.tg_id).await.expect("Could not check if user exists");
+    println!("@add_user/ user_exists: {:?}", user_exists);
 
     if user_exists {
         let user_id = get_user_id_by_tg_id(&pool, &user.tg_id).await.expect("Could not get user id");
         update_user(&pool, User { id: user_id, username: user.username, tg_id: user.tg_id, turnkey_info: user.turnkey_info, solana_address: user.solana_address, eth_address: user.eth_address }).await.expect("Could'n not update user in the db.");
+        println!("@add_user/ user updated in the db.");
     } else {
         add_user(&pool, user).await.expect("Could'n not add user to the db.");
+        println!("@add_user/ updated in the db.")
     }
+}
+
+pub async fn handle_buy_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: SafePool) -> Result<()> {
+
+    let chat_id = q.message.as_ref().unwrap().chat().id;
+    bot.send_message(chat_id, "Buy callback received").await?;
+    Ok(())
 }
