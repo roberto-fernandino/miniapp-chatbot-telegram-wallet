@@ -1,3 +1,4 @@
+use teloxide::payloads::SendMessageSetters;
 use anyhow::Result;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -405,6 +406,8 @@ pub async fn post_add_user_handler(
 pub async fn handle_buy_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: SafePool) -> Result<()> {
 
     let chat_id = q.message.as_ref().unwrap().chat().id;
-    bot.send_message(chat_id, "Buy callback received").await?;
+    bot.send_message(chat_id, "Enter a token address to buy")
+    .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the token address".to_string()), selective: false})
+    .await?;
     Ok(())
 }
