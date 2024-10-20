@@ -9,7 +9,7 @@ use tokio_tungstenite::WebSocketStream;
 use futures::stream::SplitSink;
 use std::sync::Arc;
 use solana_client::rpc_client::RpcClient;
-use solana_app::{init_rpc_client, get_redis_connection, get_copy_trade_wallets, subscribe_to_account_transaction, handle_incoming_messages};
+use solana_app::{init_rpc_client, get_redis_connection, get_copy_trade_wallets, subscribe_to_account_transaction, handle_incoming_messages, get_sol_balance};
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 use std::env;
@@ -72,6 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Define the resubscribe endpoint
         app.at("/resubscribe").get(|req: Request<State>| async move { resubscribe(req).await });
+        app.at("/get_wallet_sol_balance/:address").get(|req: Request<State>| async move { get_wallet_sol_balance(req).await }); 
 
         // Start the Tide server on port 3030
         println!("Solana app Listening on port 3030");
@@ -173,6 +174,15 @@ async fn reconnect_websocket() -> Result<(SplitSink<WebSocketStream<tokio_tungst
     Ok(ws_stream.split())
 }
 
+/// Resubscribes to the Solana node
+/// 
+/// # Arguments
+/// 
+/// * `req` - The request
+/// 
+/// # Returns
+/// 
+/// A `Result` containing a `Response` or a `tide::Error`
 pub async fn resubscribe(req: Request<State>) -> Result<Response, tide::Error> {
     let mut con = get_redis_connection();
     let wallets = get_copy_trade_wallets(&mut con).unwrap();
@@ -221,5 +231,23 @@ pub async fn resubscribe(req: Request<State>) -> Result<Response, tide::Error> {
     eprintln!("Resubscribe failed after {} attempts", max_retries);
     let mut res = Response::new(StatusCode::InternalServerError);
     res.set_body(format!("Resubscribe failed after {} attempts", max_retries));
+    Ok(res)
+}
+
+
+/// Get the SOL balance of a wallet
+/// 
+/// # Arguments
+/// 
+/// * `req` - The request
+/// 
+/// # Returns
+/// 
+/// A `Result` containing a `Response` or a `tide::Error`
+pub async fn get_wallet_sol_balance(req: Request<State>) -> Result<Response, tide::Error> {
+    let address = req.param("address").unwrap();
+    let balance = get_sol_balance(address)?;
+    let mut res = Response::new(StatusCode::Ok);
+    res.set_body(format!("{}", balance));
     Ok(res)
 }
