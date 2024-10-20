@@ -317,7 +317,7 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to clear call: {:?}", e),
             }
         }
-        else if data.starts_with("buy:") {
+        else if data == "buy" {
             match handle_buy_callback(data.to_string(), &bot, &query, pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to buy: {:?}", e),
