@@ -366,17 +366,40 @@ pub async fn post_add_user_handler(
 ) -> impl IntoResponse {
     println!("@add_user/ Request received!");
     println!("@add_user/ post_data: {:?}", user);
-    let user_exists = user_exists(&pool, &user.tg_id).await.expect("Could not check if user exists");
+    let user_exists = match user_exists(&pool, &user.tg_id).await {
+        Ok(exists) => exists,
+        Err(e) => {
+            println!("@add_user/ error checking if user exists: {:?}", e);
+            false
+        }
+    };
     println!("@add_user/ user_exists: {:?}", user_exists);
 
     if user_exists {
-        let user_id = get_user_id_by_tg_id(&pool, &user.tg_id).await.expect("Could not get user id");
-        update_user(&pool, User { id: user_id, username: user.username, tg_id: user.tg_id, turnkey_info: user.turnkey_info, solana_address: user.solana_address, eth_address: user.eth_address }).await.expect("Could'n not update user in the db.");
-        println!("@add_user/ user updated in the db.");
+        let user_id = match get_user_id_by_tg_id(&pool, &user.tg_id).await {
+            Ok(id) => id,
+            Err(e) => {
+                println!("@add_user/ error getting user id: {:?}", e);
+                return (StatusCode::INTERNAL_SERVER_ERROR, "Could not get user id").into_response();
+            }
+        };
+        match update_user(&pool, User { id: user_id, username: user.username, tg_id: user.tg_id, turnkey_info: user.turnkey_info, solana_address: user.solana_address, eth_address: user.eth_address }).await {
+            Ok(_) => println!("@add_user/ user updated in the db."),
+            Err(e) => {
+                println!("@add_user/ error updating user in the db: {:?}", e);
+                return (StatusCode::INTERNAL_SERVER_ERROR, "Could not update user in the db").into_response();
+            }
+        }
     } else {
-        add_user(&pool, user).await.expect("Could'n not add user to the db.");
-        println!("@add_user/ updated in the db.")
+        match add_user(&pool, user).await {
+            Ok(_) => println!("@add_user/ user added to the db."),
+            Err(e) => {
+                println!("@add_user/ error adding user to the db: {:?}", e);
+                return (StatusCode::INTERNAL_SERVER_ERROR, "Could not add user to the db").into_response();
+            }
+        }
     }
+    (StatusCode::OK, "User added/updated in the db.").into_response()
 }
 
 pub async fn handle_buy_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: SafePool) -> Result<()> {
