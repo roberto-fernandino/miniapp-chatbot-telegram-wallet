@@ -1,6 +1,7 @@
 use sqlx::{PgPool, postgres::PgPoolOptions};
-use sqlx::Pool;
+use sqlx::{Encode, Pool};
 use sqlx::Postgres;
+use crate::handlers::PostUserRequest;
 use crate::utils::helpers::check_period_for_leaderboard;
 use serde::Serialize;
 use sqlx::Row;
@@ -23,12 +24,23 @@ pub struct CallWithAth {
     pub multiplier: f64,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Encode)]
+pub struct TurnkeyInfo {
+    pub api_public_key: String,
+    pub api_private_key: String,
+    pub suborg_id: String,
+    pub wallet_id: String,
+}
+
 /// Represents a user in the system.
 #[derive(Debug, Serialize, Clone)]
 pub struct User {
     pub id: i32,
     pub username: Option<String>,
     pub tg_id: String,
+    pub turnkey_info: TurnkeyInfo,
+    pub solana_address: String,
+    pub eth_address: String,
 }
 
 /// Represents a call in the system.
@@ -94,6 +106,14 @@ pub async fn get_user(pool: &PgPool, tg_id: &str) -> Result<User> {
         id: row.get("id"),
         tg_id: row.get("tg_id"),
         username: row.get("username"),
+        turnkey_info: TurnkeyInfo {
+            api_public_key: row.get("api_public_key"),
+            api_private_key: row.get("api_private_key"),
+            suborg_id: row.get("suborg_id"),
+            wallet_id: row.get("wallet_id"),
+        },
+        solana_address: row.get("solana_address"),  
+        eth_address: row.get("eth_address"),
     })
 
 }
@@ -109,7 +129,7 @@ pub async fn get_user(pool: &PgPool, tg_id: &str) -> Result<User> {
 /// # Returns
 ///
 /// An empty result indicating success or an error.
-pub async fn add_user(pool: &PgPool, tg_id: &str, username: Option<&str>) -> Result<()> {
+pub async fn create_user_with_tg_id_and_username(pool: &PgPool, tg_id: &str, username: Option<&str>) -> Result<()> {
     let q = "INSERT INTO users (tg_id, username) VALUES ($1, $2) ON CONFLICT (tg_id) DO NOTHING";
 
     let result = sqlx::query(q)
@@ -124,6 +144,8 @@ pub async fn add_user(pool: &PgPool, tg_id: &str, username: Option<&str>) -> Res
     
     Ok(())
 }
+
+
 
 /// Adds a new call to the database and returns its ID.
 /// 
@@ -158,7 +180,7 @@ pub async fn add_call(
     username: Option<&str>
 ) -> Result<i32> {
     if !user_exists(pool, tg_id).await? {
-        add_user(pool, tg_id, username).await?;
+        create_user_with_tg_id_and_username(pool, tg_id, username).await?;
     }
     let q = "INSERT INTO calls (time, user_tg_id, mkt_cap, token_address, token_mint, token_symbol, price, chat_id, message_id, chain) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id";
     let result = sqlx::query_scalar(q)
@@ -658,6 +680,14 @@ pub async fn get_user_from_call(pool: &PgPool, call_id: i64) -> Result<User> {
         id: user.get("id"),
         tg_id: user.get("tg_id"),
         username: user.get("username"),
+        turnkey_info: TurnkeyInfo {
+            api_public_key: user.get("api_public_key"),
+            api_private_key: user.get("api_private_key"),
+            suborg_id: user.get("suborg_id"),
+            wallet_id: user.get("wallet_id"),
+        },
+        solana_address: user.get("solana_address"),
+        eth_address: user.get("eth_address"),
     })
 }
 
@@ -835,3 +865,74 @@ pub async fn user_exists(pool: &PgPool, user_tg_id: &str) -> Result<bool, sqlx::
     Ok(count.0 > 0)
 }
 
+
+pub async fn update_user(pool: &PgPool, user: User) -> Result<()> {
+    let turnkey_info = serde_json::to_value(user.turnkey_info).unwrap();
+    sqlx::query(
+        "
+        UPDATE users SET username = $1, solana_address = $2, eth_address = $3, turnkey_info = $4 WHERE tg_id = $5
+        "
+    )
+    .bind(user.username)
+    .bind(user.solana_address)
+    .bind(user.eth_address)
+    .bind(turnkey_info)
+    .bind(user.tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}   
+
+
+pub async fn get_user_by_tg_id(pool: &PgPool, tg_id: &str) -> Result<User> {
+    let fetch_response = sqlx::query("SELECT * FROM users WHERE tg_id = $1")
+    .bind(tg_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(User{
+        id: fetch_response.get("id"),
+        tg_id: fetch_response.get("tg_id"),
+        username: fetch_response.get("username"),
+        turnkey_info: TurnkeyInfo {
+            api_public_key: fetch_response.get("api_public_key"),
+            api_private_key: fetch_response.get("api_private_key"),
+            suborg_id: fetch_response.get("suborg_id"),
+            wallet_id: fetch_response.get("wallet_id"),
+        },
+        solana_address: fetch_response.get("solana_address"),
+        eth_address: fetch_response.get("eth_address"),
+    })
+}
+
+
+pub async fn get_user_id_by_tg_id(pool: &PgPool, tg_id: &str) -> Result<i32> {
+    let id: i64 = sqlx::query_scalar("SELECT id FROM users WHERE tg_id = $1")
+    .bind(tg_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(id as i32)
+}   
+
+
+
+pub async fn add_user(pool: &PgPool, post_user_request: PostUserRequest) -> Result<()> {
+    let turnkey_info = serde_json::to_value(post_user_request.turnkey_info).unwrap();
+    sqlx::query(
+        "
+        INSERT INTO users (tg_id, username, api_private_key, api_public_key, suborg_id, wallet_id, solana_address, eth_address) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        "
+    )
+    .bind(post_user_request.tg_id)
+    .bind(post_user_request.username)
+    .bind(turnkey_info.get("api_private_key"))
+    .bind(turnkey_info.get("api_public_key"))
+    .bind(turnkey_info.get("suborg_id"))
+    .bind(turnkey_info.get("wallet_id"))
+    .bind(post_user_request.solana_address)
+    .bind(post_user_request.eth_address)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
