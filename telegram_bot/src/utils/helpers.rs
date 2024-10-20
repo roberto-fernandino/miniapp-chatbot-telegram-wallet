@@ -270,6 +270,49 @@ pub fn create_main_menu_keyboard() -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(buttons)
 }
 
+/// Create the swap keyboard
+/// 
+/// # Returns
+/// 
+/// A InlineKeyboardMarkup struct to be used in the ReplyMarkup on the bot
+pub fn create_swap_keyboard() -> InlineKeyboardMarkup {
+    let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
+    
+    buttons.push(vec![
+        InlineKeyboardButton::callback("← Back", "back"),
+        InlineKeyboardButton::callback("Smart Money", "smart_money"),
+        InlineKeyboardButton::callback("↻ Refresh", "refresh"),
+    ]);
+    
+    buttons.push(vec![
+        InlineKeyboardButton::callback("✓ Swap", "swap"),
+        InlineKeyboardButton::callback("Limit Orders", "limit_orders"),
+    ]);
+    
+    buttons.push(vec![
+        InlineKeyboardButton::callback("✓ Buy 0.2 SOL", "buy_0.2_sol"),
+        InlineKeyboardButton::callback("Buy 0.5 SOL", "buy_0.5_sol"),
+        InlineKeyboardButton::callback("Buy 1 SOL", "buy_1_sol"),
+    ]);
+    
+    buttons.push(vec![
+        InlineKeyboardButton::callback("Buy 2 SOL", "buy_2_sol"),
+        InlineKeyboardButton::callback("Buy 5 SOL", "buy_5_sol"),
+        InlineKeyboardButton::callback("Buy X SOL 📝", "buy_custom_sol"),
+    ]);
+    
+    buttons.push(vec![
+        InlineKeyboardButton::callback("✓ 18% Slippage", "toggle_slippage"),
+        InlineKeyboardButton::callback("X Slippage 📝", "custom_slippage"),
+    ]);
+    
+    buttons.push(vec![
+        InlineKeyboardButton::callback("Buy", "execute_buy"),
+    ]);
+
+    InlineKeyboardMarkup::new(buttons)
+}
+
 /// Check if there's a valid eth address in a text
 /// 
 /// # Arguments
