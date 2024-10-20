@@ -57,14 +57,16 @@ pub async fn get_user_calls(user_tg_id: i64, pool: SafePool) -> Result<String> {
 pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool) -> Result<()> {
     let is_user_registered_in_mini_app = db::is_user_registered_in_mini_app(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await?;
     if is_user_registered_in_mini_app {
+        let user = db::get_user(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await?;
         let keyboard = create_main_menu_keyboard();
+        let sol_balance = get_wallet_sol_balance(user.solana_address.as_str()).await?;
         bot.send_message(
         msg.chat.id,
-        "Solana Wallet address:\n\
-        <code>5AdCxiwvakT1dCwzWVtXgU14aKCvKLi2i8eCFYQ4ySXw</code>\n\
-        SOL Balance: <b>0 SOL ($0)</b>\n\n\
+        format!("Solana Wallet address:\n\
+        <code>{}</code>\n\
+        SOL Balance: <b>{:.6} SOL ($not_implemeted_yet)</b>\n\n\
         You can send SOL to this address or import your existing wallet.\n\n\
-        💵 Join our Telegram group <a href=\"https://t.me/dexcelerateapp\">Dexcelerate Lounge</a> for the state-of-the-art trading platform."
+        💵 Join our Telegram group <a href=\"https://t.me/dexcelerateapp\">Dexcelerate Lounge</a> for the state-of-the-art trading platform.", user.solana_address, sol_balance)
     )
     .parse_mode(teloxide::types::ParseMode::Html)
         .reply_markup(keyboard)
