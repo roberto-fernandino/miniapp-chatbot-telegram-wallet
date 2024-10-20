@@ -907,11 +907,11 @@ pub async fn get_user_by_tg_id(pool: &PgPool, tg_id: &str) -> Result<User> {
 
 
 pub async fn get_user_id_by_tg_id(pool: &PgPool, tg_id: &str) -> Result<i32> {
-    let id: i64 = sqlx::query_scalar("SELECT id FROM users WHERE tg_id = $1")
+    let id: i32 = sqlx::query_scalar("SELECT id FROM users WHERE tg_id = $1")
     .bind(tg_id)
     .fetch_one(pool)
     .await?;
-    Ok(id as i32)
+    Ok(id)
 }   
 
 
