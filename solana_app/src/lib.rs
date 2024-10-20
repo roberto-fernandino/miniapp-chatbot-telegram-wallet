@@ -614,3 +614,8 @@ async fn get_and_send_sell_transaction(
     }
 }
 
+pub fn get_sol_balance(address: &str) -> Result<f64> {
+    let client = Arc::new(RpcClient::new(env::var("NODE_HTTP").expect("NODE_HTTP must be set")));
+    let balance = client.get_balance(&Pubkey::from_str(address).unwrap())?;
+    Ok(lamports_to_sol(balance))
+}
