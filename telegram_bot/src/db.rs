@@ -939,3 +939,22 @@ pub async fn add_user(pool: &PgPool, post_user_request: PostUserRequest) -> Resu
     .await?;
     Ok(())
 }
+
+/// Checks if a user is registered in the mini app
+/// 
+/// # Description
+/// 
+/// A user is registered in the mini app if they have a Solana address, an Ethereum address, and a Turnkey API public key and private key
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A boolean indicating whether the user is registered in the mini app
+pub async fn is_user_registered_in_mini_app(pool: &PgPool, user_tg_id: &str) -> Result<bool> {
+    let user = get_user_by_tg_id(pool, user_tg_id).await?;
+    Ok(user.solana_address != "" && user.eth_address != "" && user.turnkey_info.api_public_key != "" && user.turnkey_info.api_private_key != "")
+}   

@@ -254,7 +254,7 @@ pub async fn handle_message(
             }
         }
         else if utils::helpers::is_start_command(text) {
-            match start(&bot, &msg).await {
+            match start(&bot, &msg, &pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to start: {:?}", e),
             }
@@ -271,7 +271,7 @@ pub async fn handle_message(
                     }
                 }
                 else if text.starts_with("/start") {
-                    match start(&bot, &msg).await {
+                    match start(&bot, &msg, &pool).await {
                         Ok(_) => (),
                         Err(e) => log::error!("Failed to start: {:?}", e),
                     }

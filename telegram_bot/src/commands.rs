@@ -54,10 +54,11 @@ pub async fn get_user_calls(user_tg_id: i64, pool: SafePool) -> Result<String> {
     Ok(serde_json::to_string(&ResponsePaylod { calls: calls_with_ath, username: user.username.clone().unwrap_or("Unknown username".to_string()) })?)
 }
 
-
-pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message) -> Result<()> {
-    let keyboard = create_main_menu_keyboard();
-    bot.send_message(
+pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool) -> Result<()> {
+    let is_user_registered_in_mini_app = db::is_user_registered_in_mini_app(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await?;
+    if is_user_registered_in_mini_app {
+        let keyboard = create_main_menu_keyboard();
+        bot.send_message(
         msg.chat.id,
         "Solana Wallet address:\n\
         <code>5AdCxiwvakT1dCwzWVtXgU14aKCvKLi2i8eCFYQ4ySXw</code>\n\
@@ -66,8 +67,18 @@ pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message) -> Resul
         💵 Join our Telegram group <a href=\"https://t.me/dexcelerateapp\">Dexcelerate Lounge</a> for the state-of-the-art trading platform."
     )
     .parse_mode(teloxide::types::ParseMode::Html)
-    .reply_markup(keyboard)
-    .await?;
+        .reply_markup(keyboard)
+            .await?;
+    } else {
+        bot.send_message(msg.chat.id, "
+        Welcome to Dexcelerate Telegram bot, the best way to manage your calls and your portfolio directly from your Telegram account.\n\n\
+        You're not registered in the mini app yet.\n\n\
+        Please, register in the mini app to use me.\n\n\
+        You can either register in the mini app by clicking <a href=\"https://t.me/sj_copyTradebot/app\">here</a> or by clicking the <b>Wallet</b> button below close to the keyboard.
+
+        After registering in the mini app, you can start using our service by the app or by the bot here by using the /start command.
+        ").await?;
+    }
     Ok(())
 }
 
