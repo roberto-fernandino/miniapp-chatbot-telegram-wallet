@@ -576,7 +576,7 @@ const App: React.FC = () => {
       let response = await axios.post(
         "https://srv617785.hstgr.cloud/bot_api/add_user",
         {
-          tg_id: WebApp.initDataUnsafe.user?.id,
+          tg_id: WebApp.initDataUnsafe.user?.id.toString(),
           username: WebApp.initDataUnsafe.user?.username,
           turnkey_info: {
             api_private_key: json_user.privateKey,
