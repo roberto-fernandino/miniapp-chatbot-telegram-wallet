@@ -50,7 +50,6 @@ impl Turnkey {
     /// let turnkey_client = Turnkey::new();
     /// ```
     pub fn new() -> TurnkeyResult<Self> {
-
         Ok(Self {
             api_public_key: env::var("TURNKEY_API_PUBLIC_KEY")?,
             api_private_key: env::var("TURNKEY_API_PRIVATE_KEY")?,
@@ -63,6 +62,19 @@ impl Turnkey {
         })
     }
 
+    pub fn new_for_user(api_public_key: &str, api_private_key: &str, organization_id: &str, account_public_key: &str) -> TurnkeyResult<Self> {
+        Ok(Self {
+            api_public_key: api_public_key.to_string(),
+            api_private_key: api_private_key.to_string(),
+            organization_id: organization_id.to_string(),
+            example_key_info: KeyInfo {
+                private_key_id: "".to_string(),
+                public_key: Pubkey::from_str(account_public_key)?,
+            },
+            client: Client::new(),
+        })
+    }
+        
     /// Retrieves the key information associated with the specified `KeySelector`.
     ///
     /// Returns the key information, including the private key ID and the public key,

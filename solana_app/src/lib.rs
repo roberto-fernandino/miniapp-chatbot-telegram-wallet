@@ -30,6 +30,7 @@ use utils::helpers::{decode_signature_get_transaction, get_account_involved_in_t
 use tokio::time::{sleep, Duration};
 mod utils;
 mod modules;
+mod turnkey;
 use modules::{
     jupiter::{is_jupiter_swap, info_jupiter_swap},
     pump::{is_pump_swap, info_pump_swap},
