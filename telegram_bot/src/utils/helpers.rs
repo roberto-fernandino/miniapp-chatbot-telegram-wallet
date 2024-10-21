@@ -317,13 +317,13 @@ pub async fn create_sol_swap_keyboard(token_address: &str, pool: &PgPool, user_t
 
     let buy_amounts2 = vec!["2", "5"];
     let mut row2 = buy_amounts2.iter().map(|&amount| {
-        InlineKeyboardButton::callback(format!("Buy {} SOL", amount), format!("set_buy_amount:{}:{}", amount, token_address))
+        InlineKeyboardButton::callback(format!("Buy {} SOL", amount), format!("amount:{}:{}", amount, token_address))
     }).collect::<Vec<_>>();
 
     if !global_amounts.contains(&buy_amount)  {
-        row2.push(InlineKeyboardButton::callback(format!("✅ Buy {} SOL", buy_amount), format!("set_buy_amount:{}:{}", buy_amount, token_address)));
+        row2.push(InlineKeyboardButton::callback(format!("✅ Buy {} SOL", buy_amount), format!("amount:{}:{}", buy_amount, token_address)));
     } else {
-        row2.push(InlineKeyboardButton::callback("Buy X SOL 🖌 ", format!("set_buy_amount:custom:{}", token_address)));
+        row2.push(InlineKeyboardButton::callback("Buy X SOL 🖌 ", format!("amount:custom:{}", token_address)));
     }
     buttons.push(row2);
     
