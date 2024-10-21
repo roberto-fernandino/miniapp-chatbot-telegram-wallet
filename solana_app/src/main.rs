@@ -262,8 +262,8 @@ pub async fn resubscribe(AxumState(state): AxumState<State>) -> impl IntoRespons
 }
 
 
-#[derive(Serialize, Deserialize)]
-struct SwapRequest {
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SwapRequest {
     user: crate::modules::swap::User,
     priorization_fee_lamports: u64,
     input_mint: String,
@@ -301,8 +301,10 @@ pub async fn sol_swap(
         output_mint,
         amount,
         slippage
-    } = swap_request;
+    } = swap_request.clone();
     println!("@sol_swap /sol/swap parsed request");
+    println!("@sol_swap /sol/swap request: {:?}", swap_request.clone());
+
     let pubkey = Pubkey::from_str(&user.public_key).expect("Invalid pubkey");
     println!("@sol_swap /sol/swap getting transaction");
     let swap_transacation = get_swap_transaction(&pubkey, priorization_fee_lamports, input_mint, output_mint, amount, slippage).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
