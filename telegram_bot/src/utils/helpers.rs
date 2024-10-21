@@ -286,7 +286,7 @@ pub async fn create_sol_swap_keyboard(token_address: &str, pool: &PgPool, user_t
     buttons.push(vec![
         InlineKeyboardButton::callback("← Back", "back"),
         InlineKeyboardButton::callback("Smart Money", "smart_money"),
-        InlineKeyboardButton::callback("↻ Refresh", format!("refresh:{}", token_address)),
+        InlineKeyboardButton::callback("↻ Refresh", "refresh"),
     ]);
 
 
@@ -294,11 +294,11 @@ pub async fn create_sol_swap_keyboard(token_address: &str, pool: &PgPool, user_t
     buttons.push(vec![
         InlineKeyboardButton::callback(
             if swap_or_limit == "swap" { "✅ Swap" } else { "Swap" },
-            format!("toggle_swap_limit:swap:{}", token_address)
+            "toggle_swap_limit:swap"
         ),
         InlineKeyboardButton::callback(
             if swap_or_limit == "limit" { "✅ Limit Orders" } else { "Limit Orders" },
-            format!("toggle_swap_limit:limit:{}", token_address)
+            "toggle_swap_limit:limit"
         ),
     ]);
 
@@ -309,7 +309,7 @@ pub async fn create_sol_swap_keyboard(token_address: &str, pool: &PgPool, user_t
         let is_selected = user_settings.buy_amount == amount;
         InlineKeyboardButton::callback(
             if is_selected { format!("✅ Buy {} SOL", amount) } else { format!("Buy {} SOL", amount) },
-            format!("set_buy_amount:{}:{}", amount, token_address)
+            format!("amount:{}", amount)
         )
     }).collect::<Vec<_>>();
     buttons.push(row1);
@@ -317,13 +317,13 @@ pub async fn create_sol_swap_keyboard(token_address: &str, pool: &PgPool, user_t
 
     let buy_amounts2 = vec!["2", "5"];
     let mut row2 = buy_amounts2.iter().map(|&amount| {
-        InlineKeyboardButton::callback(format!("Buy {} SOL", amount), format!("amount:{}:{}", amount, token_address))
+        InlineKeyboardButton::callback(format!("Buy {} SOL", amount), format!("amount:{}", amount))
     }).collect::<Vec<_>>();
 
     if !global_amounts.contains(&buy_amount)  {
-        row2.push(InlineKeyboardButton::callback(format!("✅ Buy {} SOL", buy_amount), format!("amount:{}:{}", buy_amount, token_address)));
+        row2.push(InlineKeyboardButton::callback(format!("✅ Buy {} SOL", buy_amount), format!("amount:{}", buy_amount)));
     } else {
-        row2.push(InlineKeyboardButton::callback("Buy X SOL 🖌 ", format!("amount:custom:{}", token_address)));
+        row2.push(InlineKeyboardButton::callback("Buy X SOL 🖌 ", format!("amount:custom")));
     }
     buttons.push(row2);
     
@@ -334,7 +334,7 @@ pub async fn create_sol_swap_keyboard(token_address: &str, pool: &PgPool, user_t
     ]);
     
     buttons.push(vec![
-        InlineKeyboardButton::callback("Buy", format!("buy:{}:{}", token_address, buy_amount)),
+        InlineKeyboardButton::callback("Buy", format!("buy:{}", buy_amount)),
     ]);
 
     InlineKeyboardMarkup::new(buttons)
