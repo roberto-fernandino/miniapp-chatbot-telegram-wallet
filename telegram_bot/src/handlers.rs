@@ -437,7 +437,7 @@ pub async fn handle_buy_callback(data: String, bot: &teloxide::Bot, q: &teloxide
     Ok(())
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TurnkeyUser {
     pub api_public_key: String,
     pub api_private_key: String,
@@ -457,21 +457,25 @@ pub struct SwapSolRequest {
 }
 
 pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    println!("@handle_execute_buy_sol_callback/ data: {:?}", data);
     let sol_amount = data.strip_prefix("buy_")
         .and_then(|s| s.strip_suffix("_sol"))
         .and_then(|s| s.parse::<f64>().ok())
         .unwrap_or(0.0);
+    println!("@handle_execute_buy_sol_callback/ sol_amount: {:?}", sol_amount);
     let user_id = q.from.id.to_string();
+    println!("@handle_execute_buy_sol_callback/ user_id: {:?}", user_id);
     let chat_id = q.message.as_ref().unwrap().chat().id;
     let user = get_user(&pool, &user_id).await?;
     let solana_address = user.solana_address;
+    println!("@handle_execute_buy_sol_callback/ solana_address: {:?}", solana_address);
     let turnkey_user = TurnkeyUser {
         api_public_key: user.turnkey_info.api_public_key,
         api_private_key: user.turnkey_info.api_private_key,
         organization_id: user.turnkey_info.suborg_id,
         public_key: solana_address,
     };
-
+    println!("@handle_execute_buy_sol_callback/ turnkey_user: {:?}", turnkey_user);
 
     Ok(())
 
