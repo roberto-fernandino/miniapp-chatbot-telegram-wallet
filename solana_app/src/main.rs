@@ -1,4 +1,5 @@
 use anyhow::Result;
+use crate::modules::swap::sign_and_send_swap_transaction;
 use std::str::FromStr;
 use crate::modules::matis::get_swap_transaction;
 use solana_sdk::pubkey::Pubkey;
@@ -257,13 +258,15 @@ pub async fn resubscribe(req: Request<State>) -> Result<Response, tide::Error> {
     Ok(res)
 }
 
+
 #[derive(Serialize, Deserialize)]
 struct SwapRequest {
-    user_public_key: String,
+    user: crate::modules::swap::User,
     priorization_fee_lamports: u64,
     input_mint: String,
     output_mint: String,
     amount: u64,
+    slippage: f64
 }
 
 /// @sol_swap /sol/swap
@@ -284,16 +287,22 @@ struct SwapRequest {
 /// 
 /// A `Result` containing a `Response` or a `tide::Error`
 pub async fn sol_swap(mut req: Request<State>) -> tide::Result {
+    println!("@sol_swap /sol/swap received request");
     let SwapRequest {
-        user_public_key,
+        user,
         priorization_fee_lamports,
         input_mint,
         output_mint,
         amount,
+        slippage
     } = req.body_json().await.expect("Failed to parse swap request");
-    let pubkey = Pubkey::from_str(&user_public_key).expect("Invalid pubkey");
-    let swap_transacation = get_swap_transaction(&pubkey, priorization_fee_lamports, input_mint, output_mint, amount).await?;
-    let mut res = Response::new(StatusCode::Ok);
-    res.set_body(serde_json::to_string(&swap_transacation)?);
-    Ok(res)
+    println!("@sol_swap /sol/swap parsed request");
+    let pubkey = Pubkey::from_str(&user.public_key).expect("Invalid pubkey");
+    println!("@sol_swap /sol/swap getting transaction");
+    let swap_transacation = get_swap_transaction(&pubkey, priorization_fee_lamports, input_mint, output_mint, amount, slippage).await?;
+    println!("@sol_swap /sol/swap got transaction");
+    println!("@sol_swap /sol/swap signing and sending transaction");
+    let tx = sign_and_send_swap_transaction(swap_transacation, user).await.expect("Failed to sign swap transaction");
+    println!("@sol_swap /sol/swap transaction sent: {:?}", tx);
+    Ok(Response::new(StatusCode::Ok))
 }
