@@ -531,6 +531,18 @@ async fn  handle_toggle_swap_limit_callback(data: String, bot: &teloxide::Bot, q
 }
 
 
+/// Handle set buy amount callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
 async fn handle_set_buy_amount_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     let token_address = data.split(":").nth(1).unwrap_or("");
     let user_tg_id = q.from.id.to_string();
