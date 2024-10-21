@@ -55,7 +55,7 @@ pub async fn get_user_calls(user_tg_id: i64, pool: SafePool) -> Result<String> {
 }
 
 pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool) -> Result<()> {
-    let is_user_registered_in_mini_app = db::is_user_registered_in_mini_app(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await?;
+    let is_user_registered_in_mini_app = db::is_user_registered_in_mini_app(&pool, &msg).await?;
     if is_user_registered_in_mini_app {
         let user = db::get_user(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await?;
         let keyboard = create_main_menu_keyboard();
