@@ -74,13 +74,14 @@ pub async fn get_quote(
     input_mint: String,
     output_mint: String,
     amount: String,
+    slippage: f64
 ) -> Result<Quote> {
     // Create a new reqwest client
     let client = reqwest::Client::new();
-
+    let slippage_bps = (slippage * 100.0).round() as u64;
     // Setup the url
     let url = format!(
-        "{}/quote?inputMint={input_mint}&outputMint={output_mint}&amount={amount}&slippageBps=1500",
+        "{}/quote?inputMint={input_mint}&outputMint={output_mint}&amount={amount}&slippageBps={slippage_bps}",
         env::var("METIS_HTTP").expect("METIS_HTTP must be set")
     );
 
@@ -111,6 +112,7 @@ pub async fn get_swap_transaction(
     input_mint: String,
     output_mint: String,
     amount: u64,
+    slippage: f64
 ) -> Result<SwapTransaction>{
     let client = reqwest::Client::new();
     let url = format!(
@@ -119,7 +121,7 @@ pub async fn get_swap_transaction(
     );
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert("Content-Type", "application/json".parse()?);
-    let quote = get_quote(input_mint, output_mint, amount.to_string()).await?;
+    let quote = get_quote(input_mint, output_mint, amount.to_string(), slippage).await.expect("Failed to get quote");
 
     let data = format!(
         r#"{{
@@ -160,6 +162,7 @@ pub async fn send_buy_swap_transaction(
         SOL_MINT.to_string(),
         mint,
         sol_to_lamports(amount),
+        0.18
     )
     .await?;
 
@@ -202,6 +205,7 @@ pub async fn send_sell_swap_transaction(
         mint.to_string(),
         SOL_MINT.to_string(),
         amount,
+        0.18
     )
     .await?;
 

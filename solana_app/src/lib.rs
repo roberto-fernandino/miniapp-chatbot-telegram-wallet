@@ -558,6 +558,7 @@ async fn get_and_send_buy_transaction(
         "So11111111111111111111111111111111111111112".to_string(),
         token_ca.to_string(),
         sol_to_lamports(buy_amount),
+        0.18
     ).await?;
 
     // Create and send payload
@@ -602,6 +603,7 @@ async fn get_and_send_sell_transaction(
             token_ca.to_string(),
             "So11111111111111111111111111111111111111112".to_string(),
             token_to_sell_balance.token_amount,
+            0.18
         ).await?;
 
         // Send transaction
