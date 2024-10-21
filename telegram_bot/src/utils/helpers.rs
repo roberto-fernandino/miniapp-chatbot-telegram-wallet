@@ -275,34 +275,34 @@ pub fn create_main_menu_keyboard() -> InlineKeyboardMarkup {
 /// # Returns
 /// 
 /// A InlineKeyboardMarkup struct to be used in the ReplyMarkup on the bot
-pub fn create_swap_keyboard() -> InlineKeyboardMarkup {
+pub fn create_sol_swap_keyboard(token_address: &str) -> InlineKeyboardMarkup {
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
     
     buttons.push(vec![
         InlineKeyboardButton::callback("← Back", "back"),
         InlineKeyboardButton::callback("Smart Money", "smart_money"),
-        InlineKeyboardButton::callback("↻ Refresh", "refresh"),
+        InlineKeyboardButton::callback("↻ Refresh", format!("refresh:{}", token_address)),
     ]);
     
     buttons.push(vec![
-        InlineKeyboardButton::callback("✓ Swap", "swap"),
+        InlineKeyboardButton::callback("✅ Swap", "swap"),
         InlineKeyboardButton::callback("Limit Orders", "limit_orders"),
     ]);
     
     buttons.push(vec![
-        InlineKeyboardButton::callback("✓ Buy 0.2 SOL", "buy_0.2_sol"),
-        InlineKeyboardButton::callback("Buy 0.5 SOL", "buy_0.5_sol"),
-        InlineKeyboardButton::callback("Buy 1 SOL", "buy_1_sol"),
+        InlineKeyboardButton::callback("✅ Buy 0.2 SOL", format!("buy_0.2_sol:{}", token_address)),
+        InlineKeyboardButton::callback("Buy 0.5 SOL", format!("buy_0.5_sol:{}", token_address)),
+        InlineKeyboardButton::callback("Buy 1 SOL", format!("buy_1_sol:{}", token_address)),
     ]);
     
     buttons.push(vec![
-        InlineKeyboardButton::callback("Buy 2 SOL", "buy_2_sol"),
-        InlineKeyboardButton::callback("Buy 5 SOL", "buy_5_sol"),
-        InlineKeyboardButton::callback("Buy X SOL 📝", "buy_custom_sol"),
+        InlineKeyboardButton::callback("Buy 2 SOL", format!("buy_2_sol:{}", token_address)),
+        InlineKeyboardButton::callback("Buy 5 SOL", format!("buy_5_sol:{}", token_address)),
+        InlineKeyboardButton::callback("Buy X SOL 📝", format!("buycustom_sol:{}", token_address)),
     ]);
     
     buttons.push(vec![
-        InlineKeyboardButton::callback("✓ 18% Slippage", "toggle_slippage"),
+        InlineKeyboardButton::callback("✅ 18% Slippage", "_"),
         InlineKeyboardButton::callback("X Slippage 📝", "custom_slippage"),
     ]);
     
@@ -457,7 +457,7 @@ pub fn format_number(num: f64) -> String {
 /// 
 /// # Returns
 /// 
-fn calculate_liquidity(pair0_reserve_usd: f64, pair1_reserve_usd: f64) -> f64 {
+pub fn calculate_liquidity(pair0_reserve_usd: f64, pair1_reserve_usd: f64) -> f64 {
     pair0_reserve_usd + pair1_reserve_usd
 }
 
@@ -590,10 +590,10 @@ pub async fn call_message(pool: &SafePool, ath_response: &Value, holders_respons
     // Liq
     let pair_reserves0 = scanner_response["pair"]["pairReserves0Usd"].as_str().unwrap_or("0");
     let pair_reserves1 = scanner_response["pair"]["pairReserves1Usd"].as_str().unwrap_or("0");
-    let liquidity = format_number(calculate_liquidity(pair_reserves0.parse::<f64>().unwrap_or(0.0), pair_reserves1.parse::<f64>().unwrap_or(0.0)));
+    let liquidity: String = format_number(calculate_liquidity(pair_reserves0.parse::<f64>().unwrap_or(0.0), pair_reserves1.parse::<f64>().unwrap_or(0.0)));
     
     let volume = format_number(scanner_response["pairStats"]["twentyFourHour"]["volume"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
-    let mkt_cap = format_number(scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
+    let mkt_cap: String = format_number(scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
     log::info!("mkt_cap: {}", mkt_cap);
 
    //  If is first call, call_info_str com empty from @call function, so we need to add the first call info
@@ -624,9 +624,12 @@ pub async fn call_message(pool: &SafePool, ath_response: &Value, holders_respons
     let buy_volume = format_number(scanner_response["pairStats"]["oneHour"]["buyVolume"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
     let buys = format_number(scanner_response["pairStats"]["oneHour"]["buys"].as_i64().unwrap_or(0) as f64);
     let sells = format_number(scanner_response["pairStats"]["oneHour"]["sells"].as_i64().unwrap_or(0) as f64);
+
     let lp = if scanner_response["pair"]["totalLockedRatio"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) > 0.0 { "🔥" } else { "🔴" };
+
     let token_address = scanner_response["pair"]["token1Address"].as_str().unwrap_or("");
     let verified = if scanner_response["pair"]["isVerified"].as_bool().unwrap_or(false) { "🟢" } else { "🔴" };
+
     let top_10_holders_percentage = format_number(holders_response["holders"]
     .as_array()
     .unwrap_or(&Vec::new())
@@ -635,6 +638,7 @@ pub async fn call_message(pool: &SafePool, ath_response: &Value, holders_respons
     .take(10)  // Take only the first 10 elements
     .map(|h| h["percent"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * 100.0) // Multiply by 100 to convert to percentage
     .sum::<f64>());
+
     let holders_str = holders_response["holders"]
     .as_array()
     .unwrap_or(&Vec::new())
@@ -704,7 +708,7 @@ pub async fn call_message(pool: &SafePool, ath_response: &Value, holders_respons
         💎 FDV: <code>${fdv}</code>\n\
         💦 Liq: <code>${liquidity}</code> \n\
         📊 Vol: <code>${volume}</code> 🕰️ Age: <code>{age}</code> \n\
-        ⛰️  ATH: <code>${ath}</code> <code>[{ath_date}]</code>\n\
+        ⛰️ ATH: <code>${ath}</code> <code>[{ath_date}]</code>\n\
         🚀 1H: <code>{one_hour_change_str}%</code> . <code>${buy_volume}</code> 🅑 {buys} 🅢 {sells}\n\
         {holders_str}\n\
         LP: {lp} Mint:{verified}\n\
