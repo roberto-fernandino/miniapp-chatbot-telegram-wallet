@@ -1,4 +1,8 @@
 use anyhow::Result;
+use std::str::FromStr;
+use crate::modules::matis::get_swap_transaction;
+use solana_sdk::pubkey::Pubkey;
+use serde::{Serialize, Deserialize};
 use futures_util::SinkExt;
 use tide::Request;
 use tide::Response;
@@ -73,6 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Define the resubscribe endpoint
         app.at("/resubscribe").get(|req: Request<State>| async move { resubscribe(req).await });
         app.at("/get_wallet_sol_balance/:address").get(|req: Request<State>| async move { get_wallet_sol_balance(req).await }); 
+        app.at("/sol/swap").post(|req: Request<State>| async move { sol_swap(req).await });
 
         // Start the Tide server on port 3030
         println!("Solana app Listening on port 3030");
@@ -174,6 +179,24 @@ async fn reconnect_websocket() -> Result<(SplitSink<WebSocketStream<tokio_tungst
     Ok(ws_stream.split())
 }
 
+
+/// Get the SOL balance of a wallet
+/// 
+/// # Arguments
+/// 
+/// * `req` - The request
+/// 
+/// # Returns
+/// 
+/// A `Result` containing a `Response` or a `tide::Error`
+pub async fn get_wallet_sol_balance(req: Request<State>) -> Result<Response, tide::Error> {
+    let address = req.param("address").unwrap();
+    let balance = get_sol_balance(address)?;
+    let mut res = Response::new(StatusCode::Ok);
+    res.set_body(format!("{}", balance));
+    Ok(res)
+}
+
 /// Resubscribes to the Solana node
 /// 
 /// # Arguments
@@ -234,20 +257,43 @@ pub async fn resubscribe(req: Request<State>) -> Result<Response, tide::Error> {
     Ok(res)
 }
 
+#[derive(Serialize, Deserialize)]
+struct SwapRequest {
+    user_public_key: String,
+    priorization_fee_lamports: u64,
+    input_mint: String,
+    output_mint: String,
+    amount: u64,
+}
 
-/// Get the SOL balance of a wallet
+/// @sol_swap /sol/swap
 /// 
-/// # Arguments
+/// @POST
+/// 
+/// @body [SwapRequest]
+/// 
+/// # Description
+/// 
+/// Sign and send sol swap transaction
+/// 
+/// # ArgumentsSolana swap route
 /// 
 /// * `req` - The request
 /// 
 /// # Returns
 /// 
 /// A `Result` containing a `Response` or a `tide::Error`
-pub async fn get_wallet_sol_balance(req: Request<State>) -> Result<Response, tide::Error> {
-    let address = req.param("address").unwrap();
-    let balance = get_sol_balance(address)?;
+pub async fn sol_swap(mut req: Request<State>) -> tide::Result {
+    let SwapRequest {
+        user_public_key,
+        priorization_fee_lamports,
+        input_mint,
+        output_mint,
+        amount,
+    } = req.body_json().await.expect("Failed to parse swap request");
+    let pubkey = Pubkey::from_str(&user_public_key).expect("Invalid pubkey");
+    let swap_transacation = get_swap_transaction(&pubkey, priorization_fee_lamports, input_mint, output_mint, amount).await?;
     let mut res = Response::new(StatusCode::Ok);
-    res.set_body(format!("{}", balance));
+    res.set_body(serde_json::to_string(&swap_transacation)?);
     Ok(res)
 }
