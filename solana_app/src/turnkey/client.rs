@@ -29,13 +29,14 @@ pub struct Turnkey {
 /// Holds the private key ID and corresponding public key for a specific operation.
 #[derive(Clone)]
 pub struct KeyInfo {
-    private_key_id: String,
-    public_key: Pubkey,
+    pub private_key_id: String,
+    pub public_key: Pubkey,
 }
 
 /// Enumerates the selectable keys for operations, distinguishing by their use case.
 pub enum KeySelector {
     ExampleKey,
+    Wallet,
     // other key info variants depending on what other keys you need to sign with
 }
 
@@ -73,23 +74,6 @@ impl Turnkey {
             },
             client: Client::new(),
         })
-    }
-        
-    /// Retrieves the key information associated with the specified `KeySelector`.
-    ///
-    /// Returns the key information, including the private key ID and the public key,
-    /// based on the specified selector. Each `KeySelector` variant corresponds to a
-    /// distinct key pair within the `Turnkey` structure, facilitating access to
-    /// specific cryptographic keys as needed.
-    ///
-    /// # Arguments
-    ///
-    /// * `selector` - The `KeySelector` variant indicating the key information to retrieve.
-    fn select_key(&self, selector: KeySelector) -> &KeyInfo {
-        match selector {
-            KeySelector::ExampleKey => &self.example_key_info,
-            // add more variants here as the number of keys you're managing for signing grows
-        }
     }
 
     /// Creates a digital stamp for a given message.
@@ -145,9 +129,8 @@ impl Turnkey {
     pub async fn sign_transaction(
         &self,
         transaction: &mut Transaction,
-        key_selector: KeySelector,
+        key_info: KeyInfo,
     ) -> TurnkeyResult<(Transaction, Signature)> {
-        let key_info = self.select_key(key_selector);
         let serialized_message = transaction.message_data();
 
         // get signature
