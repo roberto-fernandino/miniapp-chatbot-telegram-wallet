@@ -986,12 +986,13 @@ pub async fn is_user_registered_in_mini_app(pool: &PgPool, msg: &teloxide::types
 /// * `tg_id` - The user's Telegram ID
 /// * `slippage_tolerance` - The slippage tolerance
 /// * `buy_amount` - The buy amount
+/// * `swap_or_limit` - The swap or limit
 /// 
 /// # Returns
 /// 
 /// A result indicating whether the user settings were set
 pub async fn set_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str) -> Result<()> {
-    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit) VALUES ($1, $2, $3, $4)")
+    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit) VALUES ($1, $2, $3, $4) ON CONFLICT (tg_id) DO UPDATE SET slippage_tolerance = $2, buy_amount = $3, swap_or_limit = $4")
     .bind(tg_id)
     .bind(slippage_tolerance)
     .bind(buy_amount)
