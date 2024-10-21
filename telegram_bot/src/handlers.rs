@@ -415,7 +415,7 @@ pub async fn post_add_user_handler(
                 return (StatusCode::INTERNAL_SERVER_ERROR, "Could not add user to the db").into_response();
             }
         }
-        match upsert_user_settings(&pool, &user.tg_id, "0.18", "10", "swap").await {
+        match upsert_user_settings(&pool, &user.tg_id, "0.18", "10", "swap", "").await {
             Ok(_) => println!("@add_user/ user settings added to the db."),
             Err(e) => {
                 println!("@add_user/ error adding user settings to the db: {:?}", e);
@@ -489,6 +489,9 @@ pub async fn buy_sol_token_address_handler(text: &str, bot: &teloxide::Bot, msg:
     println!("@buy_sol_token_address_handler sol_balance: {:?}", sol_balance);
     let token_address= address_handler(text).await?;
     println!("@buy_sol_token_address_handler token_address: {:?}", token_address);
+    println!("@buy_sol_token_address_handler setting last sent token");
+    set_user_last_sent_token(&pool, &user.tg_id, token_address.as_str()).await?;
+    println!("@buy_sol_token_address_handler last sent token set");
     println!("@buy_sol_token_address_handler creating keyboard");
     let keyboard = create_sol_swap_keyboard(token_address.as_str(), &pool, user.tg_id.to_string().as_str()).await;
     println!("@buy_sol_token_address_handler keyboard created");
