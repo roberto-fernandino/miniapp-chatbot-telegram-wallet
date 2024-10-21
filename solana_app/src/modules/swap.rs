@@ -1,22 +1,21 @@
 use {
-    super::matis::SwapTransaction,
-    crate::turnkey::{
+    super::matis::SwapTransaction, crate::turnkey::{
         client::{KeyInfo, Turnkey}, errors::TurnkeyResult
-    }, bincode::deserialize, solana_client::rpc_client::RpcClient, solana_sdk::{
-        pubkey::Pubkey,
-        transaction::Transaction,
+    }, bincode::deserialize, serde::{Deserialize, Serialize}, solana_client::rpc_client::RpcClient, solana_sdk::{
+        pubkey::Pubkey, signature::Signature, transaction::Transaction
     }, std::{env, str::FromStr}
 };
 
-struct User {
-    api_public_key: String,
-    api_private_key: String,
-    organization_id: String,
-    public_key: String,
+#[derive(Serialize, Deserialize)]
+pub struct User {
+    pub api_public_key: String,
+    pub api_private_key: String,
+    pub organization_id: String,
+    pub public_key: String,
 }
 
 
-async fn sign_swap_transaction(transaction: SwapTransaction, user: User) -> TurnkeyResult<()> {
+pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: User) -> TurnkeyResult<Signature> {
     // Initialize Turnkey client
     let turnkey_client = Turnkey::new_for_user(&user.api_public_key, &user.api_private_key, &user.organization_id, &user.public_key)?;
     let pubkey = Pubkey::from_str(&user.public_key).expect("Invalid pubkey");
@@ -43,6 +42,6 @@ async fn sign_swap_transaction(transaction: SwapTransaction, user: User) -> Turn
     let tx_sig = rpc_client.send_and_confirm_transaction(&tx).expect("Failed to send transaction");
     println!("Transaction confirmed: {:?}", tx_sig);
 
-    Ok(())
+    Ok(tx_sig)
 
 }
