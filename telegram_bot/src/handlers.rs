@@ -480,6 +480,7 @@ pub async fn buy_sol_token_address_handler(text: &str, bot: &teloxide::Bot, msg:
             "
         )
     )
+    .parse_mode(teloxide::types::ParseMode::Html)
     .reply_markup(keyboard)
     .await?;
     Ok(())
