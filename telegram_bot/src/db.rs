@@ -1012,9 +1012,9 @@ pub async fn set_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &
 /// # Returns
 /// 
 /// A UserSettings struct
-pub async fn get_user_settings(pool: &PgPool, user_id: &str) -> Result<UserSettings> {
-    let user_settings = sqlx::query("SELECT * FROM user_settings WHERE user_id = $1")
-    .bind(user_id)
+pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSettings> {
+    let user_settings = sqlx::query("SELECT * FROM user_settings WHERE tg_id = $1")
+    .bind(user_tg_id)
     .fetch_one(pool)
     .await?;
     Ok(UserSettings {
@@ -1022,4 +1022,45 @@ pub async fn get_user_settings(pool: &PgPool, user_id: &str) -> Result<UserSetti
         buy_amount: user_settings.get("buy_amount"),
         swap_or_limit: user_settings.get("swap_or_limit"),
     })
+}
+
+
+/// Set user swap or limit
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `tg_id` - The user's Telegram ID
+/// * `swap_or_limit` - The swap or limit
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user swap or limit was set
+pub async fn set_user_swap_or_limit(pool: &PgPool, tg_id: &str, swap_or_limit: &str) -> Result<()> {
+    sqlx::query("UPDATE user_settings SET swap_or_limit = $1 WHERE tg_id = $2")
+    .bind(swap_or_limit)
+    .bind(tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}   
+
+/// Set user buy amount
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `tg_id` - The user's Telegram ID
+/// * `buy_amount` - The buy amount
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user buy amount was set
+pub async fn set_user_buy_amount(pool: &PgPool, tg_id: &str, buy_amount: &str) -> Result<()> {
+    sqlx::query("UPDATE user_settings SET buy_amount = $1 WHERE tg_id = $2")
+    .bind(buy_amount)
+    .bind(tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
 }
