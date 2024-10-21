@@ -100,7 +100,7 @@ pub async fn handle_callback_refresh(data: String, bot: &teloxide::Bot, query: &
 /// 
 /// # Returns
 /// 
-/// A tuple containing the address and the chain
+/// The token address
 pub async fn address_handler(text: &str) -> Result<String> {
     let is_solana_address = there_is_valid_solana_address(text);
     let is_eth_address = there_is_valid_eth_address(text);
@@ -270,6 +270,14 @@ pub async fn handle_message(
                         Err(e) => log::error!("Failed to start: {:?}", e),
                     }
                 }
+                else if there_is_valid_solana_address(text) || there_is_valid_eth_address(text) {
+                    match buy_sol_token_address_handler(text, &bot, &msg, &pool).await {
+                        Ok(_) => (),
+                        Err(e) => log::error!("Failed to buy token address: {:?}", e),
+                    }
+                 
+
+                }
         }
         // Check if there's a valid solana address in the message
         else if there_is_valid_solana_address(text) || there_is_valid_eth_address(text) {
@@ -312,7 +320,13 @@ pub async fn handle_callback_query(
             }
         }
         else if data == "buy" {
-            match handle_buy_callback(data.to_string(), &bot, &query, pool).await {
+            match handle_buy_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to buy: {:?}", e),
+            }
+        }
+        else if data.starts_with("buy_") {
+            match handle_buy_callback(data.to_string(), &bot, &query, &pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to buy: {:?}", e),
             }
@@ -403,13 +417,70 @@ pub async fn post_add_user_handler(
     (StatusCode::OK, "User added/updated in the db.").into_response()
 }
 
-pub async fn handle_buy_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: SafePool) -> Result<()> {
+pub async fn handle_buy_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     println!("@buy_callback/ data: {:?}", data);
     let user_id = q.from.id.to_string();
     println!("@buy_callback/ user_id: {:?}", user_id);
     let chat_id = q.message.as_ref().unwrap().chat().id;
     bot.send_message(chat_id, "Enter a token address to buy")
     .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the token address".to_string()), selective: false})
+    .await?;
+    Ok(())
+}
+
+
+pub struct SwapSolRequest {
+    pub user_public_key: String,
+    pub priorization_fee_lamports: u64,
+    pub input_mint: String,
+    pub output_mint: String,
+    pub amount: u64,
+}
+
+pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let sol_amount = data.strip_prefix("buy_")
+        .and_then(|s| s.strip_suffix("_sol"))
+        .and_then(|s| s.parse::<f64>().ok())
+        .unwrap_or(0.0);
+    let user_id = q.from.id.to_string();
+    let chat_id = q.message.as_ref().unwrap().chat().id;
+    let user = get_user(&pool, &user_id).await?;
+    let solana_address = user.solana_address;
+
+    Ok(())
+
+
+}
+pub async fn buy_sol_token_address_handler(text: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool) -> Result<()> {
+    let user = get_user(&pool, &msg.from.as_ref().unwrap().id.to_string()).await?;
+    let sol_balance = get_wallet_sol_balance(&user.solana_address).await?;
+    let token_address= address_handler(text).await?;
+    let keyboard = create_sol_swap_keyboard(token_address.as_str());
+    let token_pair_and_token_address  = get_pair_token_pair_and_token_address(token_address.as_str()).await?;
+    let scanner_response = get_scanner_search(token_pair_and_token_address["pairAddress"].as_str().unwrap_or(""), token_pair_and_token_address["tokenAddress"].as_str().unwrap_or(""), token_pair_and_token_address["chainName"].as_str().unwrap_or("")).await?;
+
+
+    // token info
+    let token_symbol = scanner_response["pair"]["token1Symbol"].as_str().unwrap_or("N/A").to_uppercase();
+    let token_name = scanner_response["pair"]["token1Name"].as_str().unwrap_or("N/A");
+    let token_usd_price = format!("{:.8}", scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0)).parse::<f64>().unwrap_or(0.0);
+    let mkt_cap: String = format_number(scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
+    let lp = scanner_response["pair"]["burnedAmount"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    let lp = if scanner_response["pair"]["totalLockedRatio"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) > 0.0 { "✓" } else { "x" };
+    let renounced = if scanner_response["pair"]["renounced"].as_bool().unwrap_or(false) { "✓" } else { "x" };
+
+    bot.send_message(
+        msg.chat.id, 
+        format!(
+            "Swap ${token_symbol}📈 - ({token_name})\n\
+            <code> {token_address}</code> (Tap to copy)\n\
+            • SOL Balance: {sol_balance} ($not_implemented_yet) [TransferSOL]\n\
+            • Price: <b>${token_usd_price}</b> LP: <b>${lp}</b> MC: <b>${mkt_cap}</b>\n\
+            • Renounced: {renounced} Burnt: {lp}
+            "
+        )
+    )
+    .reply_markup(keyboard)
     .await?;
     Ok(())
 }
