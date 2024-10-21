@@ -474,7 +474,6 @@ pub fn format_number(num: f64) -> String {
     }
 }
 
-
 /// Calculate the liquidity of a pair
 /// 
 /// # Arguments
@@ -947,4 +946,9 @@ pub async fn get_wallet_sol_balance(address: &str) -> Result<f64> {
     .await?;
     let balance = response.text().await?;
     Ok(balance.parse::<f64>().unwrap_or(0.0))
+}
+
+
+pub fn sol_to_lamports(sol_amount: f64) -> u64 {
+    (sol_amount * 1_000_000_000.0) as u64
 }
