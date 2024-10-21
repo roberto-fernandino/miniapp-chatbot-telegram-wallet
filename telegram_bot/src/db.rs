@@ -954,7 +954,15 @@ pub async fn add_user(pool: &PgPool, post_user_request: PostUserRequest) -> Resu
 /// # Returns
 /// 
 /// A boolean indicating whether the user is registered in the mini app
-pub async fn is_user_registered_in_mini_app(pool: &PgPool, user_tg_id: &str) -> Result<bool> {
-    let user = get_user_by_tg_id(pool, user_tg_id).await?;
-    Ok(user.solana_address != "" && user.eth_address != "" && user.turnkey_info.api_public_key != "" && user.turnkey_info.api_private_key != "")
+pub async fn is_user_registered_in_mini_app(pool: &PgPool,msg: &teloxide::types::Message) -> Result<bool> {
+    let user_tg_id = msg.from.clone().unwrap().id.to_string().as_str();
+    let username = msg.from.clone().unwrap().username.unwrap_or("Unknown".to_string()).as_str();
+    let user_exists = user_exists(pool, user_tg_id).await?;
+    if user_exists {
+        let user = get_user_by_tg_id(pool, user_tg_id).await?;
+        Ok(user.solana_address != "" && user.eth_address != "" && user.turnkey_info.api_public_key != "" && user.turnkey_info.api_private_key != "")
+    } else {
+        create_user_with_tg_id_and_username(pool, user_tg_id, Some(username));
+        Ok(false)
+    }
 }   
