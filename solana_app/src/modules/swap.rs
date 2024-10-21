@@ -1,10 +1,10 @@
 use {
-    super::matis::{get_swap_transaction, SwapTransaction},
+    super::matis::SwapTransaction,
     crate::turnkey::{
         client::{KeyInfo, Turnkey}, errors::TurnkeyResult
     }, bincode::deserialize, solana_client::rpc_client::RpcClient, solana_sdk::{
-        commitment_config::CommitmentConfig, message::Message, pubkey::Pubkey,
-        system_instruction, transaction::{Transaction, VersionedTransaction},
+        pubkey::Pubkey,
+        transaction::Transaction,
     }, std::{env, str::FromStr}
 };
 
