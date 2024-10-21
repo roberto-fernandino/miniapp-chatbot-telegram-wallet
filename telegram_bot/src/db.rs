@@ -991,12 +991,13 @@ pub async fn is_user_registered_in_mini_app(pool: &PgPool, msg: &teloxide::types
 /// # Returns
 /// 
 /// A result indicating whether the user settings were set
-pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str) -> Result<()> {
-    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit) VALUES ($1, $2, $3, $4) ON CONFLICT (tg_id) DO UPDATE SET slippage_tolerance = $2, buy_amount = $3, swap_or_limit = $4")
+pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str, last_sent_token: &str) -> Result<()> {
+    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit, last_sent_token) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (tg_id) DO UPDATE SET slippage_tolerance = $2, buy_amount = $3, swap_or_limit = $4, last_sent_token = $5")
     .bind(tg_id)
     .bind(slippage_tolerance)
     .bind(buy_amount)
     .bind(swap_or_limit)
+    .bind(last_sent_token)
     .execute(pool)
     .await?;
     Ok(())
@@ -1094,6 +1095,25 @@ pub async fn check_if_user_has_settings(pool: &PgPool, user_tg_id: &str) -> Resu
 /// 
 /// A result indicating whether the user settings were created
 pub async fn create_user_settings_default(pool: &PgPool, user_tg_id: &str) -> Result<()> {
-    upsert_user_settings(pool, user_tg_id, "0.18", "0.2", "swap").await.expect("Failed to create user settings");
+    upsert_user_settings(pool, user_tg_id, "0.18", "0.2", "swap", "").await.expect("Failed to create user settings");
     Ok(())
+}
+
+
+
+pub async fn set_user_last_sent_token(pool: &PgPool, tg_id: &str, token_address: &str) -> Result<()> {
+    sqlx::query("UPDATE user_settings SET last_sent_token = $1 WHERE tg_id = $2")
+    .bind(token_address)
+    .bind(tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}   
+
+pub async fn get_user_last_sent_token(pool: &PgPool, tg_id: &str) -> Result<String> {
+    let last_sent_token = sqlx::query_scalar("SELECT last_sent_token FROM user_settings WHERE tg_id = $1")
+    .bind(tg_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(last_sent_token)
 }
