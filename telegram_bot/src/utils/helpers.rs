@@ -937,7 +937,7 @@ pub fn user_stats_message(username: String, calls_count: usize, multipliers_sum:
 /// # Returns
 /// 
 /// A f64 representing the SOL balance
-pub async fn get_wallet_sol_balance(address: &str) -> Result<f64> {
+pub async fn get_wallet_sol_balance(address: &str) -> Result<String> {
     println!("@get_wallet_sol_balance/ address: {:?}", address);
     let client = reqwest::Client::new();
     let response = client.get(
@@ -947,7 +947,7 @@ pub async fn get_wallet_sol_balance(address: &str) -> Result<f64> {
     .await?;
     let balance = response.text().await?;
     println!("@get_wallet_sol_balance/ balance: {:?}", balance);
-    Ok(balance.parse::<f64>().unwrap_or(0.0))
+    Ok(balance)
 }
 
 
