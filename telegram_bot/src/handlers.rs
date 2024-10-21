@@ -455,6 +455,7 @@ pub struct SwapSolRequest {
     pub input_mint: String,
     pub output_mint: String,
     pub amount: u64,
+    pub slippage: f64,
 }
 
 pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
@@ -462,7 +463,9 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
 
     let user_settings = get_user_settings(pool, &q.from.id.to_string()).await?;
     let sol_amount = user_settings.buy_amount.parse::<f64>().unwrap_or(0.2);
+    let slippage = user_settings.slippage_tolerance.parse::<f64>().unwrap_or(0.5);
     println!("@handle_execute_buy_sol_callback/ sol_amount: {:?}", sol_amount);
+    println!("@handle_execute_buy_sol_callback/ slippage: {:?}", slippage);
 
     let user_id = q.from.id.to_string();
     let user = get_user(&pool, &user_id).await?;
@@ -489,6 +492,7 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
         output_mint: token_address.to_string(),
         input_mint: "So11111111111111111111111111111111111111112".to_string(),
         amount: sol_to_lamports(sol_amount),
+        slippage,
     };
     let client = reqwest::Client::new();
     let url = format!("{}/sol/swap", "http://solana_app:3030");
@@ -502,6 +506,20 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
 
 
 }
+
+
+/// Create the buy state on tg bot after receiving a token address
+/// 
+/// # Arguments
+/// 
+/// * `text` - The token address
+/// * `bot` - The Telegram bot
+/// * `msg` - The message
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
 pub async fn buy_sol_token_address_handler(text: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool) -> Result<()> {
     println!("@buy_sol_token_address_handler/ text: {:?}", text);
     let user = get_user(&pool, &msg.from.as_ref().unwrap().id.to_string()).await?;
@@ -548,6 +566,21 @@ pub async fn buy_sol_token_address_handler(text: &str, bot: &teloxide::Bot, msg:
 }
 
 /// Handle toggle swap or limit callback
+/// 
+/// # Description
+/// 
+/// Toggle the swap or limit state on the tg bot
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
 async fn  handle_toggle_swap_limit_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     let user_tg_id = q.from.id.to_string();
     let msg_id = q.message.as_ref().unwrap().id();
@@ -576,13 +609,13 @@ async fn  handle_toggle_swap_limit_callback(data: String, bot: &teloxide::Bot, q
 /// 
 /// A result indicating the success of the operation
 async fn handle_set_buy_amount_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
-    let token_address = data.split(":").nth(1).unwrap_or("");
+    let token_address = get_user_last_sent_token(&pool, &q.from.id.to_string()).await?;
     let user_tg_id = q.from.id.to_string();
     let msg_id = q.message.as_ref().unwrap().id();
     let chat_id = q.message.as_ref().unwrap().chat().id;
     let buy_amount = data.strip_prefix("set_buy_amount:").unwrap_or("0.2");
     set_user_buy_amount(&pool, &user_tg_id, buy_amount).await?;
-    let keyboard = create_sol_swap_keyboard(token_address, &pool, &user_tg_id).await;
+    let keyboard = create_sol_swap_keyboard(&token_address, &pool, &user_tg_id).await;
     bot.edit_message_reply_markup(chat_id, msg_id)
     .reply_markup(keyboard)
     .await?;
