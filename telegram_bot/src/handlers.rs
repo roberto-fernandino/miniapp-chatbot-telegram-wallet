@@ -6,6 +6,7 @@ use axum::Json;
 use teloxide::types::CallbackQuery;
 use teloxide::types::Message;
 use teloxide::Bot;
+use serde::{Serialize, Deserialize};
 use crate::db::*;
 use crate::utils::helpers::*;
 use axum::extract::State;
@@ -326,7 +327,7 @@ pub async fn handle_callback_query(
             }
         }
         else if data.starts_with("buy_") {
-            match handle_buy_callback(data.to_string(), &bot, &query, &pool).await {
+            match handle_execute_buy_sol_callback(data.to_string(), &bot, &query, &pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to buy: {:?}", e),
             }
@@ -366,7 +367,7 @@ pub async fn get_user_calls_handler(
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct PostUserRequest {
     pub tg_id: String,
     pub username: Option<String>,
@@ -406,11 +407,18 @@ pub async fn post_add_user_handler(
             }
         }
     } else {
-        match add_user(&pool, user).await {
+        match add_user(&pool, user.clone()).await {
             Ok(_) => println!("@add_user/ user added to the db."),
             Err(e) => {
                 println!("@add_user/ error adding user to the db: {:?}", e);
                 return (StatusCode::INTERNAL_SERVER_ERROR, "Could not add user to the db").into_response();
+            }
+        }
+        match set_user_settings(&pool, &user.tg_id, "0.18", "10", "swap").await {
+            Ok(_) => println!("@add_user/ user settings added to the db."),
+            Err(e) => {
+                println!("@add_user/ error adding user settings to the db: {:?}", e);
+                return (StatusCode::INTERNAL_SERVER_ERROR, "Could not add user settings to the db").into_response();
             }
         }
     }
@@ -428,8 +436,18 @@ pub async fn handle_buy_callback(data: String, bot: &teloxide::Bot, q: &teloxide
     Ok(())
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct TurnkeyUser {
+    pub api_public_key: String,
+    pub api_private_key: String,
+    pub organization_id: String,
+    pub public_key: String
+}
 
+
+#[derive(Serialize, Deserialize)]
 pub struct SwapSolRequest {
+    pub user: TurnkeyUser,
     pub user_public_key: String,
     pub priorization_fee_lamports: u64,
     pub input_mint: String,
@@ -446,6 +464,13 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
     let chat_id = q.message.as_ref().unwrap().chat().id;
     let user = get_user(&pool, &user_id).await?;
     let solana_address = user.solana_address;
+    let turnkey_user = TurnkeyUser {
+        api_public_key: user.turnkey_info.api_public_key,
+        api_private_key: user.turnkey_info.api_private_key,
+        organization_id: user.turnkey_info.suborg_id,
+        public_key: solana_address,
+    };
+
 
     Ok(())
 
@@ -455,7 +480,7 @@ pub async fn buy_sol_token_address_handler(text: &str, bot: &teloxide::Bot, msg:
     let user = get_user(&pool, &msg.from.as_ref().unwrap().id.to_string()).await?;
     let sol_balance = get_wallet_sol_balance(&user.solana_address).await?;
     let token_address= address_handler(text).await?;
-    let keyboard = create_sol_swap_keyboard(token_address.as_str());
+    let keyboard = create_sol_swap_keyboard(token_address.as_str(), &pool, user.id.to_string().as_str()).await;
     let token_pair_and_token_address  = get_pair_token_pair_and_token_address(token_address.as_str()).await?;
     let scanner_response = get_scanner_search(token_pair_and_token_address["pairAddress"].as_str().unwrap_or(""), token_pair_and_token_address["tokenAddress"].as_str().unwrap_or(""), token_pair_and_token_address["chainName"].as_str().unwrap_or("")).await?;
 
@@ -466,7 +491,6 @@ pub async fn buy_sol_token_address_handler(text: &str, bot: &teloxide::Bot, msg:
     let token_usd_price = format!("{:.8}", scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0)).parse::<f64>().unwrap_or(0.0);
     let mkt_cap: String = format_number(scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
     let lp = scanner_response["pair"]["burnedAmount"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
-    let lp = if scanner_response["pair"]["totalLockedRatio"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) > 0.0 { "✓" } else { "x" };
     let renounced = if scanner_response["pair"]["renounced"].as_bool().unwrap_or(false) { "✓" } else { "x" };
 
     bot.send_message(
