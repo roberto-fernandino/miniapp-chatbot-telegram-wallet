@@ -481,7 +481,7 @@ pub async fn buy_sol_token_address_handler(text: &str, bot: &teloxide::Bot, msg:
     let user = get_user(&pool, &msg.from.as_ref().unwrap().id.to_string()).await?;
     let sol_balance = get_wallet_sol_balance(&user.solana_address).await?;
     let token_address= address_handler(text).await?;
-    let keyboard = create_sol_swap_keyboard(token_address.as_str(), &pool, user.id.to_string().as_str()).await;
+    let keyboard = create_sol_swap_keyboard(token_address.as_str(), &pool, user.tg_id.to_string().as_str()).await;
     let token_pair_and_token_address  = get_pair_token_pair_and_token_address(token_address.as_str()).await?;
     let scanner_response = get_scanner_search(token_pair_and_token_address["pairAddress"].as_str().unwrap_or(""), token_pair_and_token_address["tokenAddress"].as_str().unwrap_or(""), token_pair_and_token_address["chainName"].as_str().unwrap_or("")).await?;
 
