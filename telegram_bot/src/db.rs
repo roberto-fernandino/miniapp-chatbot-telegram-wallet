@@ -828,6 +828,17 @@ pub async fn get_chat_call_count_with_period(
 
     Ok(count)
 }
+
+/// Gets all calls made by a user
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A vector of Call structs
 pub async fn get_all_calls_user_tg_id(pool: &PgPool, user_tg_id: &str) -> Result<Vec<Call>> {
     let query = "SELECT id, time, mkt_cap, price, token_address, token_mint, token_symbol, user_tg_id, chat_id, message_id, chain FROM calls WHERE user_tg_id = $1";
     let calls = sqlx::query(query)
@@ -874,6 +885,16 @@ pub async fn user_exists(pool: &PgPool, user_tg_id: &str) -> Result<bool, sqlx::
 }
 
 
+/// Updates a user in the database
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user` - The user
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user was updated
 pub async fn update_user(pool: &PgPool, user: User) -> Result<()> {
     let turnkey_info = serde_json::to_value(user.turnkey_info).unwrap();
     sqlx::query(
@@ -895,6 +916,16 @@ pub async fn update_user(pool: &PgPool, user: User) -> Result<()> {
 }   
 
 
+/// Gets the user by the user's Telegram ID
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A User struct
 pub async fn get_user_by_tg_id(pool: &PgPool, tg_id: &str) -> Result<User> {
     let fetch_response = sqlx::query("SELECT * FROM users WHERE tg_id = $1")
     .bind(tg_id)
@@ -917,6 +948,16 @@ pub async fn get_user_by_tg_id(pool: &PgPool, tg_id: &str) -> Result<User> {
 }
 
 
+/// Gets the user ID by the user's Telegram ID
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// The user's ID
 pub async fn get_user_id_by_tg_id(pool: &PgPool, tg_id: &str) -> Result<i32> {
     let id: i32 = sqlx::query_scalar("SELECT id FROM users WHERE tg_id = $1")
     .bind(tg_id)
@@ -927,7 +968,17 @@ pub async fn get_user_id_by_tg_id(pool: &PgPool, tg_id: &str) -> Result<i32> {
 
 
 
-pub async fn add_user(pool: &PgPool, post_user_request: PostUserRequest) -> Result<()> {
+/// Adds a user to the database from the post user request
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `post_user_request` - The user request
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user was added
+pub async fn add_user_post(pool: &PgPool, post_user_request: PostUserRequest) -> Result<()> {
     let turnkey_info = serde_json::to_value(post_user_request.turnkey_info).unwrap();
     sqlx::query(
         "
