@@ -1,4 +1,5 @@
 use teloxide::payloads::SendMessageSetters;
+use std::env;
 use teloxide::payloads::EditMessageReplyMarkupSetters;
 use anyhow::Result;
 use axum::http::StatusCode;
@@ -327,7 +328,7 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to buy: {:?}", e),
             }
         }
-        else if data.starts_with("buy_") {
+        else if data.starts_with("buy:") {
             match handle_execute_buy_sol_callback(data.to_string(), &bot, &query, &pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to buy: {:?}", e),
@@ -408,7 +409,7 @@ pub async fn post_add_user_handler(
             }
         }
     } else {
-        match add_user(&pool, user.clone()).await {
+        match add_user_post(&pool, user.clone()).await {
             Ok(_) => println!("@add_user/ user added to the db."),
             Err(e) => {
                 println!("@add_user/ error adding user to the db: {:?}", e);
@@ -458,17 +459,18 @@ pub struct SwapSolRequest {
 
 pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     println!("@handle_execute_buy_sol_callback/ data: {:?}", data);
-    let sol_amount = data.strip_prefix("buy_")
-        .and_then(|s| s.strip_suffix("_sol"))
-        .and_then(|s| s.parse::<f64>().ok())
-        .unwrap_or(0.0);
+
+    let user_settings = get_user_settings(pool, &q.from.id.to_string()).await?;
+    let sol_amount = user_settings.buy_amount.parse::<f64>().unwrap_or(0.2);
     println!("@handle_execute_buy_sol_callback/ sol_amount: {:?}", sol_amount);
+
     let user_id = q.from.id.to_string();
-    println!("@handle_execute_buy_sol_callback/ user_id: {:?}", user_id);
-    let chat_id = q.message.as_ref().unwrap().chat().id;
     let user = get_user(&pool, &user_id).await?;
+    println!("@handle_execute_buy_sol_callback/ user_id: {:?}", user_id);
+
     let solana_address = user.solana_address;
     println!("@handle_execute_buy_sol_callback/ solana_address: {:?}", solana_address);
+    
     let turnkey_user = TurnkeyUser {
         api_public_key: user.turnkey_info.api_public_key,
         api_private_key: user.turnkey_info.api_private_key,
@@ -477,6 +479,18 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
     };
     println!("@handle_execute_buy_sol_callback/ turnkey_user: {:?}", turnkey_user);
 
+    let token_address = data.split(":").nth(1).unwrap_or("");
+    println!("@handle_execute_buy_sol_callback/ token_address: {:?}", token_address);
+    let request = SwapSolRequest {
+        user: turnkey_user,
+        user_public_key: user.eth_address,
+        priorization_fee_lamports: 0,
+        output_mint: token_address.to_string(),
+        input_mint: "So11111111111111111111111111111111111111112".to_string(),
+        amount: sol_to_lamports(sol_amount),
+    };
+    let client = reqwest::Client::new();
+    let url = format!("{}/sol/swap", env::var("SOLANA_APP_URL").expect("SOLANA_APP_URL must be set"));
     Ok(())
 
 
