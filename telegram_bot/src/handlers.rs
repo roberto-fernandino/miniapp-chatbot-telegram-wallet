@@ -253,12 +253,6 @@ pub async fn handle_message(
                 Err(e) => log::error!("Failed to leaderboard: {:?}", e),
             }
         }
-        else if utils::helpers::is_start_command(text) {
-            match start(&bot, &msg, &pool).await {
-                Ok(_) => (),
-                Err(e) => log::error!("Failed to start: {:?}", e),
-            }
-        }
         else if msg.chat.is_private() {
                 if text.starts_with("/start user_") {
                     // get the user id
