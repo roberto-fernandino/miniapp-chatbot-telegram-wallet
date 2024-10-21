@@ -991,7 +991,7 @@ pub async fn is_user_registered_in_mini_app(pool: &PgPool, msg: &teloxide::types
 /// # Returns
 /// 
 /// A result indicating whether the user settings were set
-pub async fn set_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str) -> Result<()> {
+pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str) -> Result<()> {
     sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit) VALUES ($1, $2, $3, $4) ON CONFLICT (tg_id) DO UPDATE SET slippage_tolerance = $2, buy_amount = $3, swap_or_limit = $4")
     .bind(tg_id)
     .bind(slippage_tolerance)
@@ -1094,6 +1094,6 @@ pub async fn check_if_user_has_settings(pool: &PgPool, user_tg_id: &str) -> Resu
 /// 
 /// A result indicating whether the user settings were created
 pub async fn create_user_settings_default(pool: &PgPool, user_tg_id: &str) -> Result<()> {
-    set_user_settings(pool, user_tg_id, "0.18", "0.2", "swap").await.expect("Failed to create user settings");
+    upsert_user_settings(pool, user_tg_id, "0.18", "0.2", "swap").await.expect("Failed to create user settings");
     Ok(())
 }
