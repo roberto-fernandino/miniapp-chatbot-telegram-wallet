@@ -1,13 +1,20 @@
 use anyhow::Result;
+use serde_json::json;
+use axum::response::Response;
+use axum::http::StatusCode;
 use crate::modules::swap::sign_and_send_swap_transaction;
+use axum::{
+    routing::{get, post},
+    Router,
+    extract::{State as AxumState, Path},
+    response::IntoResponse,
+    Json,
+};
 use std::str::FromStr;
 use crate::modules::matis::get_swap_transaction;
 use solana_sdk::pubkey::Pubkey;
 use serde::{Serialize, Deserialize};
 use futures_util::SinkExt;
-use tide::Request;
-use tide::Response;
-use tide::StatusCode;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio_tungstenite::WebSocketStream;
@@ -73,17 +80,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             write1: Arc::clone(&server_write1),
         };
 
-        let mut app = tide::with_state(state);
+        let app = Router::new()
+        .route("/resubscribe", get(resubscribe))
+        .route("/get_wallet_sol_balance/:address", get(get_wallet_sol_balance))
+        .route("/sol/swap", post(sol_swap))
+        .with_state(state);
 
-        // Define the resubscribe endpoint
-        app.at("/resubscribe").get(|req: Request<State>| async move { resubscribe(req).await });
-        app.at("/get_wallet_sol_balance/:address").get(|req: Request<State>| async move { get_wallet_sol_balance(req).await }); 
-        app.at("/sol/swap").post(|req: Request<State>| async move { sol_swap(req).await });
-
-        // Start the Tide server on port 3030
+        let listener = TcpListener::bind("0.0.0.0:3030").await.expect("Failed to bind to address");
         println!("Solana app Listening on port 3030");
-        app.listen("0.0.0.0:3030").await?;
-        Ok::<(), tide::Error>(())
+        axum::serve(listener, app.into_make_service()).await.expect("Failed to serve");
     });
 
     let tx_clone2 = Arc::clone(&tx);
@@ -166,7 +171,6 @@ async fn handle_connection(stream: TcpStream, tx: Arc<broadcast::Sender<String>>
     println!("Telegram Connection closed from {}", addr);
 }
 
-// State for the Tide server to subscribe changes to the Solana node
 #[derive(Clone)]
 pub struct State {
     write1: Arc<Mutex<Option<SplitSink<WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>, tokio_tungstenite::tungstenite::Message>>>>,
@@ -190,12 +194,14 @@ async fn reconnect_websocket() -> Result<(SplitSink<WebSocketStream<tokio_tungst
 /// # Returns
 /// 
 /// A `Result` containing a `Response` or a `tide::Error`
-pub async fn get_wallet_sol_balance(req: Request<State>) -> Result<Response, tide::Error> {
-    let address = req.param("address").unwrap();
-    let balance = get_sol_balance(address)?;
-    let mut res = Response::new(StatusCode::Ok);
-    res.set_body(format!("{}", balance));
-    Ok(res)
+pub async fn get_wallet_sol_balance(
+    AxumState(state): AxumState<State>,
+    Path(address): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    match get_sol_balance(address.as_str()) {
+        Ok(balance) => Ok(Json(json!({ "balance": balance }))),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+    }
 }
 
 /// Resubscribes to the Solana node
@@ -207,10 +213,9 @@ pub async fn get_wallet_sol_balance(req: Request<State>) -> Result<Response, tid
 /// # Returns
 /// 
 /// A `Result` containing a `Response` or a `tide::Error`
-pub async fn resubscribe(req: Request<State>) -> Result<Response, tide::Error> {
+pub async fn resubscribe(AxumState(state): AxumState<State>) -> impl IntoResponse {
     let mut con = get_redis_connection();
     let wallets = get_copy_trade_wallets(&mut con).unwrap();
-    let state = req.state().clone();
     let mut write_lock = state.write1.lock().await;
 
     let mut retry_count = 0;
@@ -223,7 +228,7 @@ pub async fn resubscribe(req: Request<State>) -> Result<Response, tide::Error> {
                 match subscribe_to_account_transaction(write, wallets.clone()).await {
                     Ok(_) => {
                         println!("Successfully resubscribed");
-                        return Ok(Response::new(StatusCode::Ok));
+                        return Ok((StatusCode::OK, "Resubscribed"));
                     },
                     Err(e) => {
                         eprintln!("Resubscribe attempt {} failed: {:?}", retry_count + 1, e);
@@ -253,9 +258,7 @@ pub async fn resubscribe(req: Request<State>) -> Result<Response, tide::Error> {
     }
 
     eprintln!("Resubscribe failed after {} attempts", max_retries);
-    let mut res = Response::new(StatusCode::InternalServerError);
-    res.set_body(format!("Resubscribe failed after {} attempts", max_retries));
-    Ok(res)
+    Err((StatusCode::INTERNAL_SERVER_ERROR, format!("Resubscribe failed after {} attempts", max_retries)))
 }
 
 
@@ -286,7 +289,10 @@ struct SwapRequest {
 /// # Returns
 /// 
 /// A `Result` containing a `Response` or a `tide::Error`
-pub async fn sol_swap(mut req: Request<State>) -> tide::Result {
+pub async fn sol_swap(
+    AxumState(state): AxumState<State>,
+    Json(swap_request): Json<SwapRequest>,
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, String)> {
     println!("@sol_swap /sol/swap received request");
     let SwapRequest {
         user,
@@ -295,14 +301,15 @@ pub async fn sol_swap(mut req: Request<State>) -> tide::Result {
         output_mint,
         amount,
         slippage
-    } = req.body_json().await.expect("Failed to parse swap request");
+    } = swap_request;
     println!("@sol_swap /sol/swap parsed request");
     let pubkey = Pubkey::from_str(&user.public_key).expect("Invalid pubkey");
     println!("@sol_swap /sol/swap getting transaction");
-    let swap_transacation = get_swap_transaction(&pubkey, priorization_fee_lamports, input_mint, output_mint, amount, slippage).await?;
+    let swap_transacation = get_swap_transaction(&pubkey, priorization_fee_lamports, input_mint, output_mint, amount, slippage).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     println!("@sol_swap /sol/swap got transaction");
     println!("@sol_swap /sol/swap signing and sending transaction");
     let tx = sign_and_send_swap_transaction(swap_transacation, user).await.expect("Failed to sign swap transaction");
     println!("@sol_swap /sol/swap transaction sent: {:?}", tx);
-    Ok(Response::new(StatusCode::Ok))
+    Ok((StatusCode::OK, Json(json!({ "transaction": tx }))))
+
 }
