@@ -1101,6 +1101,17 @@ pub async fn create_user_settings_default(pool: &PgPool, user_tg_id: &str) -> Re
 
 
 
+/// Sets the user last sent token
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `tg_id` - The user's Telegram ID
+/// * `token_address` - The token address
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user last sent token was set
 pub async fn set_user_last_sent_token(pool: &PgPool, tg_id: &str, token_address: &str) -> Result<()> {
     sqlx::query("UPDATE user_settings SET last_sent_token = $1 WHERE tg_id = $2")
     .bind(token_address)
@@ -1110,6 +1121,16 @@ pub async fn set_user_last_sent_token(pool: &PgPool, tg_id: &str, token_address:
     Ok(())
 }   
 
+/// Gets the user last sent token
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A string representing the user's last sent token
 pub async fn get_user_last_sent_token(pool: &PgPool, tg_id: &str) -> Result<String> {
     let last_sent_token = sqlx::query_scalar("SELECT last_sent_token FROM user_settings WHERE tg_id = $1")
     .bind(tg_id)
