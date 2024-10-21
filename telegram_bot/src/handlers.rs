@@ -1,4 +1,5 @@
 use teloxide::payloads::SendMessageSetters;
+use teloxide::payloads::EditMessageReplyMarkupSetters;
 use anyhow::Result;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -505,6 +506,36 @@ pub async fn buy_sol_token_address_handler(text: &str, bot: &teloxide::Bot, msg:
         )
     )
     .parse_mode(teloxide::types::ParseMode::Html)
+    .reply_markup(keyboard)
+    .await?;
+    Ok(())
+}
+
+/// Handle toggle swap or limit callback
+async fn  handle_toggle_swap_limit_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let user_tg_id = q.from.id.to_string();
+    let msg_id = q.message.as_ref().unwrap().id();
+    let chat_id = q.message.as_ref().unwrap().chat().id;
+    let limit_or_swap = data.strip_prefix("toggle_swap_limit:").unwrap_or("swap");
+    set_user_swap_or_limit(&pool, &user_tg_id, limit_or_swap).await?;
+    let token_address = data.split(":").nth(1).unwrap_or("");
+    let keyboard = create_sol_swap_keyboard(token_address, &pool, &user_tg_id).await;
+    bot.edit_message_reply_markup(chat_id, msg_id)
+    .reply_markup(keyboard)
+    .await?;
+    Ok(())
+}
+
+
+async fn handle_set_buy_amount_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let token_address = data.split(":").nth(1).unwrap_or("");
+    let user_tg_id = q.from.id.to_string();
+    let msg_id = q.message.as_ref().unwrap().id();
+    let chat_id = q.message.as_ref().unwrap().chat().id;
+    let buy_amount = data.strip_prefix("set_buy_amount:").unwrap_or("0.2");
+    set_user_buy_amount(&pool, &user_tg_id, buy_amount).await?;
+    let keyboard = create_sol_swap_keyboard(token_address, &pool, &user_tg_id).await;
+    bot.edit_message_reply_markup(chat_id, msg_id)
     .reply_markup(keyboard)
     .await?;
     Ok(())
