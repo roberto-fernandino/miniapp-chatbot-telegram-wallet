@@ -9,6 +9,14 @@ use anyhow::Result;
 use std::env;
 use std::sync::Arc;
 
+/// Struct to hold the user settings
+#[derive(Debug, Clone, Serialize)]
+pub struct UserSettings {
+    pub slippage_tolerance: String,
+    pub buy_amount: String,
+    pub swap_or_limit: String,
+}
+
 /// Struct to hold the call with the ATH after the call
 /// 
 /// 
@@ -968,3 +976,50 @@ pub async fn is_user_registered_in_mini_app(pool: &PgPool, msg: &teloxide::types
         Ok(false)
     }
 }   
+
+
+/// Sets the user settings for a user
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `tg_id` - The user's Telegram ID
+/// * `slippage_tolerance` - The slippage tolerance
+/// * `buy_amount` - The buy amount
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user settings were set
+pub async fn set_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str) -> Result<()> {
+    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit) VALUES ($1, $2, $3, $4)")
+    .bind(tg_id)
+    .bind(slippage_tolerance)
+    .bind(buy_amount)
+    .bind(swap_or_limit)
+    .execute(pool)
+    .await?;
+    Ok(())
+}   
+
+
+/// Gets the user settings for a user
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_id` - The user's ID
+/// 
+/// # Returns
+/// 
+/// A UserSettings struct
+pub async fn get_user_settings(pool: &PgPool, user_id: &str) -> Result<UserSettings> {
+    let user_settings = sqlx::query("SELECT * FROM user_settings WHERE user_id = $1")
+    .bind(user_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(UserSettings {
+        slippage_tolerance: user_settings.get("slippage_tolerance"),
+        buy_amount: user_settings.get("buy_amount"),
+        swap_or_limit: user_settings.get("swap_or_limit"),
+    })
+}
