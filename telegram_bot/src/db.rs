@@ -1064,3 +1064,35 @@ pub async fn set_user_buy_amount(pool: &PgPool, tg_id: &str, buy_amount: &str) -
     .await?;
     Ok(())
 }
+
+
+/// Checks if a user has settings   
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A boolean indicating whether the user has settings
+pub async fn check_if_user_has_settings(pool: &PgPool, user_tg_id: &str) -> Result<bool> {
+    let user_settings = get_user_settings(pool, user_tg_id).await;
+    Ok(user_settings.is_ok())
+}
+
+
+/// Creates the default user settings for a user
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user settings were created
+pub async fn create_user_settings_default(pool: &PgPool, user_tg_id: &str) -> Result<()> {
+    set_user_settings(pool, user_tg_id, "0.18", "0.2", "swap").await.expect("Failed to create user settings");
+    Ok(())
+}
