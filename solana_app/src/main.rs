@@ -303,15 +303,16 @@ pub async fn sol_swap(
         slippage
     } = swap_request.clone();
     println!("@sol_swap /sol/swap parsed request");
+    
     println!("@sol_swap /sol/swap request: {:?}", swap_request.clone());
-
     let pubkey = Pubkey::from_str(&user.public_key).expect("Invalid pubkey");
     println!("@sol_swap /sol/swap getting transaction");
     let swap_transacation = get_swap_transaction(&pubkey, priorization_fee_lamports, input_mint, output_mint, amount, slippage).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     println!("@sol_swap /sol/swap got transaction");
+
     println!("@sol_swap /sol/swap signing and sending transaction");
     let tx = sign_and_send_swap_transaction(swap_transacation, user).await.expect("Failed to sign swap transaction");
     println!("@sol_swap /sol/swap transaction sent: {:?}", tx);
-    Ok((StatusCode::OK, Json(json!({ "transaction": tx }))))
 
+    Ok((StatusCode::OK, Json(json!({ "transaction": tx }))))
 }
