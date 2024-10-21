@@ -275,7 +275,8 @@ pub fn create_main_menu_keyboard() -> InlineKeyboardMarkup {
 /// # Returns
 /// 
 /// A InlineKeyboardMarkup struct to be used in the ReplyMarkup on the bot
-pub fn create_sol_swap_keyboard(token_address: &str) -> InlineKeyboardMarkup {
+pub async fn create_sol_swap_keyboard(token_address: &str, pool: &PgPool, user_id: &str) -> InlineKeyboardMarkup {
+    let user_settings = get_user_settings(&pool, user_id).await.expect("User settings not found");
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
     
     buttons.push(vec![
@@ -283,31 +284,53 @@ pub fn create_sol_swap_keyboard(token_address: &str) -> InlineKeyboardMarkup {
         InlineKeyboardButton::callback("Smart Money", "smart_money"),
         InlineKeyboardButton::callback("↻ Refresh", format!("refresh:{}", token_address)),
     ]);
-    
+
+
+    let swap_or_limit = user_settings.swap_or_limit.as_str();
     buttons.push(vec![
-        InlineKeyboardButton::callback("✅ Swap", "swap"),
-        InlineKeyboardButton::callback("Limit Orders", "limit_orders"),
+        InlineKeyboardButton::callback(
+            if swap_or_limit == "swap" { "✅ Swap" } else { "Swap" },
+            "toggle_swap_limit:swap"
+        ),
+        InlineKeyboardButton::callback(
+            if swap_or_limit == "limit" { "✅ Limit Orders" } else { "Limit Orders" },
+            "toggle_swap_limit:limit"
+        ),
+    ]);
+
+    let buy_amount = user_settings.buy_amount.as_str();
+    let global_amounts = vec!["0.2", "0.5", "1", "2", "5"];
+    let buy_amounts = vec!["0.2", "0.5", "1"];
+    let row1 = buy_amounts.iter().map(|&amount| {
+        let is_selected = user_settings.buy_amount == amount;
+        InlineKeyboardButton::callback(
+            if is_selected { format!("✅ Buy {} SOL", amount) } else { format!("Buy {} SOL", amount) },
+            format!("set_buy_amount:{}:{}", amount, token_address)
+        )
+    }).collect::<Vec<_>>();
+    buttons.push(row1);
+    
+
+    let buy_amounts2 = vec!["2", "5"];
+    let mut row2 = buy_amounts2.iter().map(|&amount| {
+        InlineKeyboardButton::callback(format!("Buy {} SOL", amount), format!("set_buy_amount:{}", amount))
+    }).collect::<Vec<_>>();
+
+    if !global_amounts.contains(&buy_amount)  {
+        row2.push(InlineKeyboardButton::callback(format!("✅ Buy {} SOL", buy_amount), format!("set_buy_amount:{}", buy_amount)));
+    } else {
+        row2.push(InlineKeyboardButton::callback("Buy X SOL 🖌 ", format!("set_buy_amount:custom")));
+    }
+    buttons.push(row2);
+    
+    let slippage = user_settings.slippage_tolerance.parse::<f64>().unwrap_or(0.18);
+    buttons.push(vec![
+        InlineKeyboardButton::callback(if slippage == 0.18 { "✅ 18% Slippage" } else { "18% Slippage" }, "_"),
+        InlineKeyboardButton::callback(if slippage != 0.18 { format!("✅ {}% Slippage 📝", slippage * 100.0) } else { "X Slippage 🖌".to_string() }, "set_custom_slippage")
     ]);
     
     buttons.push(vec![
-        InlineKeyboardButton::callback("✅ Buy 0.2 SOL", format!("buy_0.2_sol:{}", token_address)),
-        InlineKeyboardButton::callback("Buy 0.5 SOL", format!("buy_0.5_sol:{}", token_address)),
-        InlineKeyboardButton::callback("Buy 1 SOL", format!("buy_1_sol:{}", token_address)),
-    ]);
-    
-    buttons.push(vec![
-        InlineKeyboardButton::callback("Buy 2 SOL", format!("buy_2_sol:{}", token_address)),
-        InlineKeyboardButton::callback("Buy 5 SOL", format!("buy_5_sol:{}", token_address)),
-        InlineKeyboardButton::callback("Buy X SOL 📝", format!("buycustom_sol:{}", token_address)),
-    ]);
-    
-    buttons.push(vec![
-        InlineKeyboardButton::callback("✅ 18% Slippage", "_"),
-        InlineKeyboardButton::callback("X Slippage 📝", "custom_slippage"),
-    ]);
-    
-    buttons.push(vec![
-        InlineKeyboardButton::callback("Buy", "execute_buy"),
+        InlineKeyboardButton::callback("Buy", format!("execute_buy:{}:{}", token_address, buy_amount)),
     ]);
 
     InlineKeyboardMarkup::new(buttons)
