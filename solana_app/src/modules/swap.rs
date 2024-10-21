@@ -6,7 +6,7 @@ use {
     }, std::{env, str::FromStr}
 };
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct User {
     pub api_public_key: String,
     pub api_private_key: String,
