@@ -76,10 +76,11 @@ pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &S
         Welcome to Dexcelerate Telegram bot, the best way to manage your calls and your portfolio directly from your Telegram account.\n\n\
         You're not registered in the mini app yet.\n\n\
         Please, register in the mini app to use me.\n\n\
-        You can either register in the mini app by clicking <a href=\"https://t.me/sj_copyTradebot/app\">here</a> or by clicking the <b>Wallet</b> button below close to the keyboard.
-
+        You can either register in the mini app by clicking <a href=\"https://t.me/sj_copyTradebot/app\">here</a> or by clicking the <b>Wallet</b> button below close to the keyboard.\n\
         After registering in the mini app, you can start using our service by the app or by the bot here by using the /start command.
-        ").await?;
+        ")
+        .parse_mode(teloxide::types::ParseMode::Html)
+        .await?;
     }
     Ok(())
 }
