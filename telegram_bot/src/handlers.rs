@@ -482,7 +482,7 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
     };
     println!("@handle_execute_buy_sol_callback/ turnkey_user: {:?}", turnkey_user);
 
-    let token_address = data.split(":").nth(1).unwrap_or("");
+    let token_address = get_user_last_sent_token(pool, &q.from.id.to_string()).await?;
     println!("@handle_execute_buy_sol_callback/ token_address: {:?}", token_address);
     println!("@handle_execute_buy_sol_callback/ preparing request");
     let request = SwapSolRequest {
