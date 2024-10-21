@@ -489,8 +489,9 @@ pub async fn buy_sol_token_address_handler(text: &str, bot: &teloxide::Bot, msg:
     println!("@buy_sol_token_address_handler sol_balance: {:?}", sol_balance);
     let token_address= address_handler(text).await?;
     println!("@buy_sol_token_address_handler token_address: {:?}", token_address);
+    println!("@buy_sol_token_address_handler creating keyboard");
     let keyboard = create_sol_swap_keyboard(token_address.as_str(), &pool, user.tg_id.to_string().as_str()).await;
-    println!("@buy_sol_token_address_handler keyboard: {:?}", keyboard);
+    println!("@buy_sol_token_address_handler keyboard created");
     let token_pair_and_token_address  = get_pair_token_pair_and_token_address(token_address.as_str()).await?;
     println!("@buy_sol_token_address_handler token_pair_and_token_address: {:?}", token_pair_and_token_address);
     println!("@buy_sol_token_address_handler sending scanner request");
