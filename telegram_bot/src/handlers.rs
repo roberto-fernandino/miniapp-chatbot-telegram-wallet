@@ -481,6 +481,7 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
 
     let token_address = data.split(":").nth(1).unwrap_or("");
     println!("@handle_execute_buy_sol_callback/ token_address: {:?}", token_address);
+    println!("@handle_execute_buy_sol_callback/ preparing request");
     let request = SwapSolRequest {
         user: turnkey_user,
         user_public_key: user.eth_address,
@@ -490,7 +491,13 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
         amount: sol_to_lamports(sol_amount),
     };
     let client = reqwest::Client::new();
-    let url = format!("{}/sol/swap", env::var("SOLANA_APP_URL").expect("SOLANA_APP_URL must be set"));
+    let url = format!("{}/sol/swap", "http://solana_app:3030");
+    println!("@handle_execute_buy_sol_callback/ sending request to url: {:?}", url);
+    client.post(url)
+    .json(&request)
+    .send()
+    .await?;
+    println!("@handle_execute_buy_sol_callback/ request sent");
     Ok(())
 
 
