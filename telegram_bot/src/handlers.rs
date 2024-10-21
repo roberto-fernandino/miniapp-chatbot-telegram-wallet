@@ -482,24 +482,24 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
 
 }
 pub async fn buy_sol_token_address_handler(text: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool) -> Result<()> {
-    println!("@buy_sol_token_address_handler text: {:?}", text);
+    println!("@buy_sol_token_address_handler/ text: {:?}", text);
     let user = get_user(&pool, &msg.from.as_ref().unwrap().id.to_string()).await?;
-    println!("@buy_sol_token_address_handler user: {:?}", user);
+    println!("@buy_sol_token_address_handler/ user: {:?}", user);
     let sol_balance = get_wallet_sol_balance(&user.solana_address).await?;
-    println!("@buy_sol_token_address_handler sol_balance: {:?}", sol_balance);
+    println!("@buy_sol_token_address_handler/ sol_balance: {:?}", sol_balance);
     let token_address= address_handler(text).await?;
-    println!("@buy_sol_token_address_handler token_address: {:?}", token_address);
-    println!("@buy_sol_token_address_handler setting last sent token");
+    println!("@buy_sol_token_address_handler/ token_address: {:?}", token_address);
+    println!("@buy_sol_token_address_handler/ setting last sent token");
     set_user_last_sent_token(&pool, &user.tg_id, token_address.as_str()).await?;
-    println!("@buy_sol_token_address_handler last sent token set");
-    println!("@buy_sol_token_address_handler creating keyboard");
+    println!("@buy_sol_token_address_handler/ last sent token set");
+    println!("@buy_sol_token_address_handler/ creating keyboard");
     let keyboard = create_sol_swap_keyboard(token_address.as_str(), &pool, user.tg_id.to_string().as_str()).await;
-    println!("@buy_sol_token_address_handler keyboard created");
+    println!("@buy_sol_token_address_handler/ keyboard created");
     let token_pair_and_token_address  = get_pair_token_pair_and_token_address(token_address.as_str()).await?;
-    println!("@buy_sol_token_address_handler token_pair_and_token_address: {:?}", token_pair_and_token_address);
-    println!("@buy_sol_token_address_handler sending scanner request");
+    println!("@buy_sol_token_address_handler/ token_pair_and_token_address: {:?}", token_pair_and_token_address);
+    println!("@buy_sol_token_address_handler/ sending scanner request");
     let scanner_response = get_scanner_search(token_pair_and_token_address["pairAddress"].as_str().unwrap_or(""), token_pair_and_token_address["tokenAddress"].as_str().unwrap_or(""), token_pair_and_token_address["chainName"].as_str().unwrap_or("")).await?;
-    println!("@buy_sol_token_address_handler received response");
+    println!("@buy_sol_token_address_handler/ received response");
 
     // token info
     let token_symbol = scanner_response["pair"]["token1Symbol"].as_str().unwrap_or("N/A").to_uppercase();
