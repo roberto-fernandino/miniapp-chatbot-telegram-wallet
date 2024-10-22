@@ -70,7 +70,7 @@ impl Turnkey {
             api_private_key: api_private_key.to_string(),
             organization_id: organization_id.to_string(),
             example_key_info: KeyInfo {
-                private_key_id: "".to_string(),
+                private_key_id: account_public_key.to_string(),
                 public_key: Pubkey::from_str(account_public_key)?,
             },
             client: Client::new(),
