@@ -138,8 +138,14 @@ pub async fn get_user(pool: &PgPool, tg_id: &str) -> Result<User> {
 ///
 /// An empty result indicating success or an error.
 pub async fn create_user_with_tg_id_and_username(pool: &PgPool, tg_id: &str, username: Option<&str>) -> Result<()> {
-    let q = "INSERT INTO users (tg_id, username) VALUES ($1, $2) ON CONFLICT (tg_id) DO NOTHING";
-
+    println!("@create_user_with_tg_id_and_username/ tg_id: {}, username: {:?}", tg_id, username);
+    let mut q = "";
+    if let Some(_) = username {
+        q = "INSERT INTO users (tg_id, username) VALUES ($1, $2) ON CONFLICT (tg_id) DO NOTHING";
+    }
+    else {
+        q = "INSERT INTO users (tg_id, username) VALUES ($1, NULL) ON CONFLICT (tg_id) DO NOTHING";
+    }
     let result = sqlx::query(q)
     .bind(tg_id)
     .bind(username)
