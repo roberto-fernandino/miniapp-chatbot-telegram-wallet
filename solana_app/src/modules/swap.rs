@@ -19,15 +19,21 @@ pub struct User {
 pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: User) -> TurnkeyResult<Signature> {
     // Initialize Turnkey client
     println!("@sign_and_send_swap_transaction/ user: {:?}", user);
+    // Remove surrounding quotes from keys if present
+    let api_public_key = user.api_public_key.trim_matches('"');
+    let api_private_key = user.api_private_key.trim_matches('"');
+    let organization_id = user.organization_id.trim_matches('"');
+    let public_key = user.public_key.trim_matches('"');
     println!("@sign_and_send_swap_transaction/ transaction: {:?}", transaction);
-    println!("@sign_and_send_swap_transaction/ api_public_key: {}", user.api_public_key);
-    println!("@sign_and_send_swap_transaction/ api_private_key: {}", user.api_private_key);
-    println!("@sign_and_send_swap_transaction/ organization_id: {}", user.organization_id);
-    println!("@sign_and_send_swap_transaction/ public_key: {}", user.public_key);
+    println!("@sign_and_send_swap_transaction/ api_public_key: {}", api_public_key);
+    println!("@sign_and_send_swap_transaction/ api_private_key: {}", api_private_key);
+    println!("@sign_and_send_swap_transaction/ organization_id: {}", organization_id);
+    println!("@sign_and_send_swap_transaction/ public_key: {}", public_key);
 
-    let turnkey_client = Turnkey::new_for_user(&user.api_public_key, &user.api_private_key, &user.organization_id, &user.public_key)?;
+
+    let turnkey_client = Turnkey::new_for_user(api_public_key, api_private_key, organization_id, public_key)?;
     println!("@sign_and_send_swap_transaction/ turnkey_client created: {:?}", turnkey_client);
-    let pubkey = Pubkey::from_str(&user.public_key).expect("Invalid pubkey");
+    let pubkey = Pubkey::from_str(public_key).expect("Invalid pubkey");
 
     // Initialize RPC client
     let rpc_client = RpcClient::new(env::var("NODE_HTTP").expect("NODE_HTTP must be set"));
@@ -57,7 +63,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
         println!("@sign_and_send_swap_transaction/ transaction deserialized successfully");
 
         let key_info = KeyInfo {
-           private_key_id: user.public_key, // String
+           private_key_id: public_key.to_string(), // Ensure this is a String
            public_key: pubkey // Pubkey OBJ
         };
         println!("@sign_and_send_swap_transaction/ key_info created: {:?}", key_info);
