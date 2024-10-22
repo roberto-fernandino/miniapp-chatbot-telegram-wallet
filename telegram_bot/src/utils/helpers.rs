@@ -275,7 +275,7 @@ pub fn create_main_menu_keyboard() -> InlineKeyboardMarkup {
 /// # Returns
 /// 
 /// A InlineKeyboardMarkup struct to be used in the ReplyMarkup on the bot
-pub async fn create_sol_swap_keyboard(token_address: &str, pool: &PgPool, user_tg_id: &str) -> InlineKeyboardMarkup {
+pub async fn create_sol_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> InlineKeyboardMarkup {
     let user_has_settings = check_if_user_has_settings(&pool, user_tg_id).await.expect("Failed to check if user has settings");
     if !user_has_settings {
         create_user_settings_default(&pool, user_tg_id).await.expect("Failed to create user settings");
