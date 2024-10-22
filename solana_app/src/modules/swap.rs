@@ -38,10 +38,12 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     }).expect("Failed to decode transaction");
     println!("@sign_and_send_swap_transaction/ transaction decoded, length: {}", transaction_data.len());
 
-  let mut transaction = match bincode::deserialize::<Transaction>(&transaction_data) {
+  let transaction = match bincode::deserialize::<Transaction>(&transaction_data) {
         Ok(tx) => Some(tx),
         Err(e) => {
             println!("Failed to deserialize transaction: {:?}", e);
+            println!("Transaction data (base64): {}", transaction.swap_transaction);
+            println!("Transaction data (decoded): {:?}", transaction_data);
             None
         }
     };
