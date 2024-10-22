@@ -64,7 +64,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
            private_key_id: public_key,
            public_key: pubkey
         };
-        println!("@sign_and_send_swap_transaction/ key_info created");
+        println!("@sign_and_send_swap_transaction/ key_info created: {:?}", key_info);
 
         // Sign transaction
         println!("@sign_and_send_swap_transaction/ signing transaction");
