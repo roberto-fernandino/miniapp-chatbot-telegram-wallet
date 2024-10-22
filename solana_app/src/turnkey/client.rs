@@ -27,7 +27,7 @@ pub struct Turnkey {
 }
 
 /// Holds the private key ID and corresponding public key for a specific operation.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct KeyInfo {
     pub private_key_id: String,
     pub public_key: Pubkey,
