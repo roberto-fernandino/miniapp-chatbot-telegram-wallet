@@ -274,7 +274,7 @@ pub async fn handle_message(
                     }
                 }
                 else if there_is_valid_solana_address(text) || there_is_valid_eth_address(text) {
-                    match buy_sol_token_address_handler(text, &bot, &msg, &pool).await {
+                    match token_address_buy_info_handler(text, &bot, &msg, &pool).await {
                         Ok(_) => (),
                         Err(e) => log::error!("Failed to buy token address: {:?}", e),
                     }
@@ -520,7 +520,7 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
 /// # Returns
 /// 
 /// A result indicating the success of the operation
-pub async fn buy_sol_token_address_handler(text: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool) -> Result<()> {
+pub async fn token_address_buy_info_handler(text: &str, bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool) -> Result<()> {
     println!("@buy_sol_token_address_handler/ text: {:?}", text);
     let user = get_user(&pool, &msg.from.as_ref().unwrap().id.to_string()).await?;
     println!("@buy_sol_token_address_handler/ user: {:?}", user);
