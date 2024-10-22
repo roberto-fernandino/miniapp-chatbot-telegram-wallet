@@ -24,6 +24,10 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     let api_private_key = user.api_private_key.replace("\\\"", "");
     let organization_id = user.organization_id.replace("\\\"", "");
     let public_key = user.public_key.replace("\\\"", "");
+    println!("@sign_and_send_swap_transaction/ api_public_key: {}", api_public_key);
+    println!("@sign_and_send_swap_transaction/ api_private_key: {}", api_private_key);
+    println!("@sign_and_send_swap_transaction/ organization_id: {}", organization_id);
+    println!("@sign_and_send_swap_transaction/ public_key: {}", public_key);
     let turnkey_client = Turnkey::new_for_user(&api_public_key, &api_private_key, &organization_id, &public_key)?;
     println!("@sign_and_send_swap_transaction/ turnkey_client created");
     let pubkey = Pubkey::from_str(&public_key).expect("Invalid pubkey");
@@ -42,7 +46,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     }).expect("Failed to decode transaction");
     println!("@sign_and_send_swap_transaction/ transaction decoded, length: {}", transaction_data.len());
 
-  let transaction = match bincode::deserialize::<Transaction>(&transaction_data) {
+    let transaction = match bincode::deserialize::<Transaction>(&transaction_data) {
         Ok(tx) => Some(tx),
         Err(e) => {
             println!("Failed to deserialize transaction: {:?}", e);
@@ -51,7 +55,8 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
             None
         }
     };
-    if transaction.is_some() {
+
+    if let Some(mut transaction) = transaction {
         println!("@sign_and_send_swap_transaction/ transaction deserialized successfully");
 
         // Get latest blockhash
@@ -60,16 +65,24 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
            public_key: pubkey
         };
         println!("@sign_and_send_swap_transaction/ key_info created");
+
         // Sign transaction
         println!("@sign_and_send_swap_transaction/ signing transaction");
-        let (tx, _sig) = turnkey_client.sign_transaction(&mut transaction.unwrap(), key_info).await?;
-        println!("@sign_and_send_swap_transaction/ transaction signed");
-    
-        println!("@sign_and_send_swap_transaction/ sending transaction");
-        let tx_sig = rpc_client.send_and_confirm_transaction(&tx).expect("Failed to send transaction");
-        println!("@sign_and_send_swap_transaction/ transaction confirmed: {:?}", tx_sig);
-    
-        Ok(tx_sig)
+        match turnkey_client.sign_transaction(&mut transaction, key_info).await {
+            Ok((tx, _sig)) => {
+                println!("@sign_and_send_swap_transaction/ transaction signed");
+
+                println!("@sign_and_send_swap_transaction/ sending transaction");
+                let tx_sig = rpc_client.send_and_confirm_transaction(&tx).expect("Failed to send transaction");
+                println!("@sign_and_send_swap_transaction/ transaction confirmed: {:?}", tx_sig);
+
+                Ok(tx_sig)
+            }
+            Err(e) => {
+                println!("Failed to sign transaction: {:?}", e);
+                Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to sign transaction: {:?}", e))))
+            }
+        }
     } else {
         Err(TurnkeyError::from(Box::<dyn std::error::Error>::from("Failed to deserialize transaction".to_string())))
     }
