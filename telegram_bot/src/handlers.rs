@@ -568,6 +568,7 @@ pub async fn token_address_buy_info_handler(text: &str, bot: &teloxide::Bot, msg
     println!("@buy_sol_token_address_handler/ user: {:?}", user);
     let sol_balance = get_wallet_sol_balance(&user.solana_address).await?;
     println!("@buy_sol_token_address_handler/ sol_balance: {:?}", sol_balance);
+    let sol_balance_usd = sol_to_usd(sol_balance.parse::<f64>().unwrap_or(0.0)).await?;
     let token_address= address_handler(text).await?;
     println!("@buy_sol_token_address_handler/ token_address: {:?}", token_address);
     println!("@buy_sol_token_address_handler/ setting last sent token");
@@ -595,7 +596,7 @@ pub async fn token_address_buy_info_handler(text: &str, bot: &teloxide::Bot, msg
         format!(
             "Swap ${token_symbol}📈 - ({token_name})\n\
             <code> {token_address}</code> (Tap to copy)\n\
-            • SOL Balance: {sol_balance} ($not_implemented_yet) [TransferSOL]\n\
+            • SOL Balance: {sol_balance} (${sol_balance_usd}) [TransferSOL]\n\
             • Price: <b>${token_usd_price}</b> LP: <b>${lp}</b> MC: <b>${mkt_cap}</b>\n\
             • Renounced: {renounced} Burnt: {lp}
             "
