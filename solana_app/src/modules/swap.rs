@@ -19,12 +19,14 @@ pub struct User {
 pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: User) -> TurnkeyResult<Signature> {
     // Initialize Turnkey client
     println!("@sign_and_send_swap_transaction/ user: {:?}", user);
+
+
+
     // Remove surrounding quotes from keys if present
     let api_public_key = user.api_public_key.trim_matches('"');
     let api_private_key = user.api_private_key.trim_matches('"');
     let organization_id = user.organization_id.trim_matches('"');
     let public_key = user.public_key.trim_matches('"');
-    println!("@sign_and_send_swap_transaction/ transaction: {:?}", transaction);
     println!("@sign_and_send_swap_transaction/ api_public_key: {}", api_public_key);
     println!("@sign_and_send_swap_transaction/ api_private_key: {}", api_private_key);
     println!("@sign_and_send_swap_transaction/ organization_id: {}", organization_id);
