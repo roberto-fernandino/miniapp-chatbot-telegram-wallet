@@ -64,7 +64,7 @@ pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &S
         msg.chat.id,
         format!("Solana Wallet address:\n\
         <code>{}</code>\n\
-        SOL Balance: <b>{:.6} SOL ($not_implemeted_yet)</b>\n\n\
+        SOL Balance: <b>{} SOL ($not_implemeted_yet)</b>\n\n\
         You can send SOL to this address or import your existing wallet.\n\n\
         💵 Join our Telegram group <a href=\"https://t.me/dexcelerateapp\">Dexcelerate Lounge</a> for the state-of-the-art trading platform.", user.solana_address, sol_balance)
     )
