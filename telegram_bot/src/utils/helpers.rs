@@ -953,6 +953,17 @@ pub async fn get_wallet_sol_balance(address: &str) -> Result<String> {
 }
 
 
+pub async fn sol_to_usd(sol_amount: f64) -> Result<f64> {
+    let client = reqwest::Client::new();
+    let response = client.get(
+        format!("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd")
+    )
+    .send()
+    .await?;
+    let response_json = response.json::<serde_json::Value>().await?;
+    Ok(response_json["solana"]["usd"].as_f64().unwrap_or(0.0) * sol_amount)
+}
+
 pub fn sol_to_lamports(sol_amount: f64) -> u64 {
     (sol_amount * 1_000_000_000.0) as u64
 }
