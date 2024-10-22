@@ -34,10 +34,10 @@ pub struct CallWithAth {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Encode)]
 pub struct TurnkeyInfo {
-    pub api_public_key: String,
-    pub api_private_key: String,
-    pub suborg_id: String,
-    pub wallet_id: String,
+    pub api_public_key: Option<String>,
+    pub api_private_key: Option<String>,
+    pub suborg_id: Option<String>,
+    pub wallet_id: Option<String>,
 }
 
 /// Represents a user in the system.
@@ -47,8 +47,8 @@ pub struct User {
     pub username: Option<String>,
     pub tg_id: String,
     pub turnkey_info: TurnkeyInfo,
-    pub solana_address: String,
-    pub eth_address: String,
+    pub solana_address: Option<String>,
+    pub eth_address: Option<String>,
 }
 
 /// Represents a call in the system.
@@ -695,10 +695,10 @@ pub async fn get_user_from_call(pool: &PgPool, call_id: i64) -> Result<User> {
         tg_id: user.get("tg_id"),
         username: user.get("username"),
         turnkey_info: TurnkeyInfo {
-            api_public_key: user.get("api_public_key"),
-            api_private_key: user.get("api_private_key"),
-            suborg_id: user.get("suborg_id"),
-            wallet_id: user.get("wallet_id"),
+            api_public_key: user.try_get("api_public_key").ok(),
+            api_private_key: user.try_get("api_private_key").ok(),
+            suborg_id: user.try_get("suborg_id").ok(),
+            wallet_id: user.try_get("wallet_id").ok(),
         },
         solana_address: user.get("solana_address"),
         eth_address: user.get("eth_address"),
@@ -1027,7 +1027,7 @@ pub async fn is_user_registered_in_mini_app(pool: &PgPool, msg: &teloxide::types
     let user_exists = user_exists(pool, &user_tg_id).await?;
     if user_exists {
         let user = get_user_by_tg_id(pool, &user_tg_id).await?;
-        Ok(user.solana_address != "" && user.eth_address != "" && user.turnkey_info.api_public_key != "" && user.turnkey_info.api_private_key != "")
+        Ok(user.solana_address != None && user.eth_address != None && user.turnkey_info.api_public_key != None && user.turnkey_info.api_private_key != None)
     } else {
         create_user_with_tg_id_and_username(pool, &user_tg_id, Some(&username)).await?;
         Ok(false)

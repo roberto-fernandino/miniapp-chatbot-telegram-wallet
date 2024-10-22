@@ -443,7 +443,7 @@ pub async fn post_add_user_handler(
                 return (StatusCode::INTERNAL_SERVER_ERROR, "Could not get user id").into_response();
             }
         };
-        match update_user(&pool, User { id: user_id, username: user.username, tg_id: user.tg_id, turnkey_info: user.turnkey_info, solana_address: user.solana_address, eth_address: user.eth_address }).await {
+        match update_user(&pool, User { id: user_id, username: user.username, tg_id: user.tg_id, turnkey_info: user.turnkey_info, solana_address: Some(user.solana_address), eth_address: Some(user.eth_address) }).await {
             Ok(_) => println!("@add_user/ user updated in the db."),
             Err(e) => {
                 println!("@add_user/ error updating user in the db: {:?}", e);
@@ -513,14 +513,14 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
     let user = get_user(&pool, &user_id).await?;
     println!("@handle_execute_buy_sol_callback/ user_id: {:?}", user_id);
 
-    let solana_address = user.solana_address;
+    let solana_address = user.solana_address.clone();
     println!("@handle_execute_buy_sol_callback/ solana_address: {:?}", solana_address);
     
     let turnkey_user = TurnkeyUser {
-        api_public_key: user.turnkey_info.api_public_key,
-        api_private_key: user.turnkey_info.api_private_key,
-        organization_id: user.turnkey_info.suborg_id,
-        public_key: solana_address,
+        api_public_key: user.turnkey_info.api_public_key.clone().expect("API public key not found"),
+        api_private_key: user.turnkey_info.api_private_key.clone().expect("API private key not found"),
+        organization_id: user.turnkey_info.suborg_id.clone().expect("Suborg ID not found"),
+        public_key: solana_address.clone().expect("Solana address not found").to_string(),
     };
     println!("@handle_execute_buy_sol_callback/ turnkey_user: {:?}", turnkey_user);
 
@@ -529,7 +529,7 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
     println!("@handle_execute_buy_sol_callback/ preparing request");
     let request = SwapSolRequest {
         user: turnkey_user,
-        user_public_key: user.eth_address,
+        user_public_key: user.solana_address.clone().expect("Solana address not found").to_string(),
         priorization_fee_lamports: 0,
         output_mint: token_address.to_string(),
         input_mint: "So11111111111111111111111111111111111111112".to_string(),
@@ -566,7 +566,7 @@ pub async fn token_address_buy_info_handler(text: &str, bot: &teloxide::Bot, msg
     println!("@buy_sol_token_address_handler/ text: {:?}", text);
     let user = get_user(&pool, &msg.from.as_ref().unwrap().id.to_string()).await?;
     println!("@buy_sol_token_address_handler/ user: {:?}", user);
-    let sol_balance = get_wallet_sol_balance(&user.solana_address).await?;
+    let sol_balance = get_wallet_sol_balance(&user.solana_address.expect("Solana address not found").as_str()).await?;
     println!("@buy_sol_token_address_handler/ sol_balance: {:?}", sol_balance);
     let sol_balance_usd = sol_to_usd(sol_balance.parse::<f64>().unwrap_or(0.0)).await?;
     let token_address= address_handler(text).await?;
