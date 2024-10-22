@@ -185,7 +185,7 @@ pub async fn check_pnl_call(pool: &SafePool, mkt_cap: &str, token_address: &str,
 /// # Returns  
 /// 
 /// An Ok result
-pub async fn pnl(msg: &teloxide::types::Message, bot: &teloxide::Bot, pool: SafePool) -> Result<()> {
+pub async fn pnl(msg: &teloxide::types::Message, bot: &teloxide::Bot, pool: &SafePool) -> Result<()> {
     let chat_id = msg.chat.id.to_string();
     let text = msg.text().unwrap().to_string(); 
     let token_address = text.split(" ").nth(1).unwrap_or("");
@@ -385,7 +385,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
 /// # Returns
 /// 
 /// An Ok result
-pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot, pool: SafePool) -> Result<()> {
+pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot, pool: &SafePool) -> Result<()> {
     let period = utils::helpers::check_period(msg.text().unwrap());
     let chat_id = msg.chat.id.to_string();
     let mut calls: Vec<Call> = vec![];
