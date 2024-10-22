@@ -8,7 +8,7 @@ use tokio::sync::broadcast;
 use solana_account_decoder::UiAccountData;
 use solana_program::native_token::lamports_to_sol;
 use solana_sdk::native_token::sol_to_lamports;
-use crate::modules::matis::get_swap_transaction;
+use crate::modules::matis::get_swap_versioned_transaction;
 use solana_transaction_status::UiTransactionEncoding;
 use solana_sdk::commitment_config::CommitmentLevel;
 use solana_sdk::commitment_config::CommitmentConfig;
@@ -552,7 +552,7 @@ async fn get_and_send_buy_transaction(
     println!("Account pubkey: {}", account_pubkey.to_string()); 
 
     // Get swap transaction
-    let transaction = get_swap_transaction(
+    let transaction = get_swap_versioned_transaction(
         account_pubkey,
         sol_to_lamports(0.0015),
         "So11111111111111111111111111111111111111112".to_string(),
@@ -597,7 +597,7 @@ async fn get_and_send_sell_transaction(
         println!("Token amount: {:?}", token_to_sell_balance.token_ui_amount);
 
         // Get swap transaction
-        let transaction = get_swap_transaction(
+        let transaction = get_swap_versioned_transaction(
             account_pubkey,
             sol_to_lamports(0.005),
             token_ca.to_string(),
