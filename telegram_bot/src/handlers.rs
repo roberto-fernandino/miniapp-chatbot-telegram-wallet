@@ -278,8 +278,6 @@ pub async fn handle_message(
                         Ok(_) => (),
                         Err(e) => log::error!("Failed to buy token address: {:?}", e),
                     }
-                 
-                    
                 }
         }
         // Check if there's a valid solana address in the message
