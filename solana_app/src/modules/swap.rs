@@ -14,7 +14,6 @@ pub struct User {
     pub public_key: String,
 }
 
-
 pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: User) -> TurnkeyResult<Signature> {
     // Initialize Turnkey client
     println!("@sign_and_send_swap_transaction/ user: {:?}", user);
@@ -35,21 +34,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     }).expect("Failed to decode transaction");
     println!("@sign_and_send_swap_transaction/ transaction decoded, length: {}", transaction_data.len());
 
-    // Deserialize transaction using Solana's VersionedTransaction
-    let versioned_transaction = bincode::deserialize::<VersionedTransaction>(&transaction_data)
-        .map_err(|e| {
-            println!("Transaction deserialization error: {:?}", e);
-            e
-        }).expect("Failed to deserialize transaction");
-    println!("@sign_and_send_swap_transaction/ transaction deserialized successfully");
-    
-    let mut transaction = versioned_transaction.into_legacy_transaction()
-        .ok_or_else(|| {
-            let err = "Failed to convert to legacy transaction";
-            println!("{}", err);
-            err
-        }).expect("Failed to convert to legacy transaction");
-
+    let mut transaction = bincode::deserialize::<Transaction>(&transaction_data).expect("Failed to deserialize transaction");
     println!("@sign_and_send_swap_transaction/ transaction deserialized successfully");
 
     // Get latest blockhash
