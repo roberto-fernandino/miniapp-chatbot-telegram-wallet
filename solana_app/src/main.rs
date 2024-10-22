@@ -11,7 +11,7 @@ use axum::{
     Json,
 };
 use std::str::FromStr;
-use crate::modules::matis::get_swap_transaction;
+use crate::modules::matis::get_legacy_swap_transaction;
 use solana_sdk::pubkey::Pubkey;
 use serde::{Serialize, Deserialize};
 use futures_util::SinkExt;
@@ -307,7 +307,7 @@ pub async fn sol_swap(
     println!("@sol_swap /sol/swap request: {:?}", swap_request.clone());
     let pubkey = Pubkey::from_str(&user.public_key).expect("Invalid pubkey");
     println!("@sol_swap /sol/swap getting transaction");
-    let swap_transacation = get_swap_transaction(&pubkey, priorization_fee_lamports, input_mint, output_mint, amount, slippage).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let swap_transacation = get_legacy_swap_transaction(&pubkey, priorization_fee_lamports, input_mint, output_mint, amount, slippage).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     println!("@sol_swap /sol/swap got transaction");
 
     println!("@sol_swap /sol/swap signing and sending transaction");
