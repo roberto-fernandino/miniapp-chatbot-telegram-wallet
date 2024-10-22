@@ -243,6 +243,26 @@ pub async fn handle_message(
     log::info!("Handling message...");
     
     if let Some(text) = msg.text() {
+        if let Some(reply_to_message) = msg.reply_to_message() { 
+            if reply_to_message.text().unwrap_or_default().starts_with("Enter the amount of SOL to buy") {
+                if let Ok(amount) = text.parse::<f64>() {
+                    set_user_buy_amount(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), amount.to_string().as_str()).await.unwrap();
+                    bot.send_message(msg.chat.id, format!("Amount set to: {}", amount)).await?;
+                    let last_token = get_user_last_sent_token(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await.unwrap();
+                    token_address_buy_info_handler(&last_token, &bot, &msg, &pool).await?;
+                } else {
+                    bot.send_message(msg.chat.id, "Invalid amount").await?;
+                }
+            }
+            else if reply_to_message.text().unwrap_or_default().starts_with("Enter the slippage tolerance") {
+                let mut slippage_tolerance = text.parse::<f64>().unwrap_or(0.18);
+                slippage_tolerance = slippage_tolerance / 100.0;
+                set_user_slippage_tolerance(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), slippage_tolerance.to_string().as_str()).await.unwrap();
+                bot.send_message(msg.chat.id, format!("Slippage tolerance set to: {}%", slippage_tolerance * 100.0)).await?;
+                let last_token = get_user_last_sent_token(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await.unwrap();
+                token_address_buy_info_handler(&last_token, &bot, &msg, &pool).await?;
+            }
+        }
         if is_pnl_command(text) {
             log::info!("Message is a pnl command");
             match pnl(&msg, &bot, &pool).await {
@@ -291,18 +311,7 @@ pub async fn handle_message(
                 Err(e) => log::error!("Failed to call: {:?}", e),
             }
         }   
-        if let Some(reply_to_message) = msg.reply_to_message() { 
-            if reply_to_message.text().unwrap_or_default().starts_with("Enter the amount of SOL to buy") {
-                if let Ok(amount) = text.parse::<f64>() {
-                    set_user_buy_amount(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), amount.to_string().as_str()).await.unwrap();
-                    bot.send_message(msg.chat.id, format!("Amount set to: {}", amount)).await?;
-                    let last_token = get_user_last_sent_token(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await.unwrap();
-                    token_address_buy_info_handler(&last_token, &bot, &msg, &pool).await?;
-                } else {
-                    bot.send_message(msg.chat.id, "Invalid amount").await?;
-                }
-            }
-        }
+      
     }
     Ok(())
 }
@@ -655,9 +664,49 @@ async fn handle_set_buy_amount_callback(data: String, bot: &teloxide::Bot, q: &t
 }
 
 
+/// Handle set custom buy amount callback
+/// 
+/// # Description
+/// 
+/// Set the custom buy amount on the tg bot
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
 async fn handle_set_custom_buy_amount_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     bot.send_message(q.message.as_ref().unwrap().chat().id, "Enter the amount of SOL to buy")
     .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the amount of SOL to buy".to_string()), selective: false})
+    .await?;
+    Ok(())
+}
+
+
+/// Handle set custom slippage callback
+/// 
+/// # Description
+/// 
+/// Set the custom slippage on the tg bot
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation    
+async fn handle_set_custom_slippage_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    bot.send_message(q.message.as_ref().unwrap().chat().id, "Enter the slippage tolerance format integer (10 for 10%)")
+    .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the slippage tolerance".to_string()), selective: false})
     .await?;
     Ok(())
 }
