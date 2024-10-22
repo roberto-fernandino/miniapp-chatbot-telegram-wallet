@@ -20,9 +20,13 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     // Initialize Turnkey client
     println!("@sign_and_send_swap_transaction/ user: {:?}", user);
     println!("@sign_and_send_swap_transaction/ transaction: {:?}", transaction);
-    let turnkey_client = Turnkey::new_for_user(&user.api_public_key, &user.api_private_key, &user.organization_id, &user.public_key)?;
+    let api_public_key = user.api_public_key.replace("\\\"", "");
+    let api_private_key = user.api_private_key.replace("\\\"", "");
+    let organization_id = user.organization_id.replace("\\\"", "");
+    let public_key = user.public_key.replace("\\\"", "");
+    let turnkey_client = Turnkey::new_for_user(&api_public_key, &api_private_key, &organization_id, &public_key)?;
     println!("@sign_and_send_swap_transaction/ turnkey_client created");
-    let pubkey = Pubkey::from_str(&user.public_key).expect("Invalid pubkey");
+    let pubkey = Pubkey::from_str(&public_key).expect("Invalid pubkey");
 
     // Initialize RPC client
     let rpc_client = RpcClient::new(env::var("NODE_HTTP").expect("NODE_HTTP must be set"));
@@ -49,10 +53,10 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     };
     if transaction.is_some() {
         println!("@sign_and_send_swap_transaction/ transaction deserialized successfully");
-    
+
         // Get latest blockhash
         let key_info = KeyInfo {
-           private_key_id: user.public_key,
+           private_key_id: public_key,
            public_key: pubkey
         };
         println!("@sign_and_send_swap_transaction/ key_info created");
