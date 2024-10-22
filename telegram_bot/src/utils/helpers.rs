@@ -947,7 +947,7 @@ pub async fn get_wallet_sol_balance(address: &str) -> Result<String> {
     .await?;
     let response_json = response.json::<serde_json::Value>().await?;
     println!("@get_wallet_sol_balance/ response_json: {:?}", response_json);
-    let balance = response_json["balance"].as_str().unwrap_or("0");
+    let balance = response_json["balance"].as_f64().unwrap_or(0.0);
     println!("@get_wallet_sol_balance/ balance: {:?}", balance);
     Ok(balance.to_string())
 }
