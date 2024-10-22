@@ -70,7 +70,7 @@ pub struct SwapTransaction {
 /// * `output_mint` - The mint of the token to be received
 /// * `amount` - The amount of the token to be swapped
 ///
-pub async fn get_quote(
+pub async fn get_versioned_quote(
     input_mint: String,
     output_mint: String,
     amount: String,
@@ -96,6 +96,92 @@ pub async fn get_quote(
     Ok(quote)
 }
 
+
+/// Get a legacy quote for a swap
+/// # Arguments
+/// * `input_mint` - The mint of the token to be swapped
+/// * `output_mint` - The mint of the token to be received
+/// * `amount` - The amount of the token to be swapped
+/// * `slippage` - The slippage tolerance
+pub async fn get_legacy_quote(
+    input_mint: String,
+    output_mint: String,
+    amount: String,
+    slippage: f64
+) -> Result<Quote> {
+    // Create a new reqwest client
+    let client = reqwest::Client::new();
+    let slippage_bps = (slippage * 100.0).round() as u64;
+    // Setup the url
+    let url = format!(
+        "{}/quote?inputMint={input_mint}&outputMint={output_mint}&amount={amount}&slippageBps={slippage_bps}&asLegacyTransaction=true",
+        env::var("METIS_HTTP").expect("METIS_HTTP must be set")
+    );
+
+    // Create the request
+    let request: reqwest::RequestBuilder = client.request(reqwest::Method::GET, url);
+
+    // Send the request
+    let response = request.send().await?;
+    let body = response.text().await?;
+    let quote = deserialize_quote(&body)?;
+
+    Ok(quote) 
+}
+
+
+/// Get a legacy swap transaction
+/// # Arguments
+/// * `user_public_key` - The public key of the user
+/// * `priorization_fee_lamports` - The priorization fee in lamports
+/// * `input_mint` - The mint of the token to be swapped
+/// * `output_mint` - The mint of the token to be received
+/// * `amount` - The amount of the token to be swapped
+/// * `slippage` - The slippage tolerance
+///
+/// # Returns
+/// * `SwapTransaction` - The swap transaction
+pub async fn get_legacy_swap_transaction(
+    user_public_key: &Pubkey,
+    priorization_fee_lamports: u64,
+    input_mint: String,
+    output_mint: String,
+    amount: u64,
+    slippage: f64
+) -> Result<SwapTransaction> {
+ let client = reqwest::Client::new();
+    let url = format!(
+        "{}/swap",
+        env::var("METIS_HTTP").expect("METIS_HTTP must be set")
+    );
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("Content-Type", "application/json".parse()?);
+    let quote = get_legacy_quote(input_mint, output_mint, amount.to_string(), slippage).await.expect("Failed to get quote");
+
+    let data = format!(
+        r#"{{
+        "userPublicKey": "{}",
+        "priorizationFeeLamports": {},
+        "quoteResponse": {} 
+    }}"#,
+        user_public_key.to_string(),
+        priorization_fee_lamports,
+        serialize_quote(quote)?
+    );
+    let json: serde_json::Value = serde_json::from_str(&data)?;
+
+    let request = client
+        .request(reqwest::Method::POST, url)
+        .headers(headers)
+        .json(&json);
+
+    let response = request.send().await?;
+    let body = response.text().await?;
+    let swap_transaction: SwapTransaction = serde_json::from_str(&body)?;
+
+    Ok(swap_transaction)
+}
+
 fn deserialize_quote(quote: &str) -> Result<Quote> {
     let quote: Quote = serde_json::from_str(quote)?;
     Ok(quote)
@@ -106,7 +192,17 @@ fn serialize_quote(quote: Quote) -> Result<String> {
     Ok(quote)
 }
 
-pub async fn get_swap_transaction(
+/// Get a versioned swap transaction
+/// # Arguments
+/// * `user_public_key` - The public key of the user
+/// * `priorization_fee_lamports` - The priorization fee in lamports
+/// * `input_mint` - The mint of the token to be swapped
+/// * `output_mint` - The mint of the token to be received
+/// * `amount` - The amount of the token to be swapped
+/// * `slippage` - The slippage tolerance
+/// # Returns
+/// * `SwapTransaction` - The swap transaction
+pub async fn get_swap_versioned_transaction(
     user_public_key: &Pubkey,
     priorization_fee_lamports: u64,
     input_mint: String,
@@ -121,7 +217,7 @@ pub async fn get_swap_transaction(
     );
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert("Content-Type", "application/json".parse()?);
-    let quote = get_quote(input_mint, output_mint, amount.to_string(), slippage).await.expect("Failed to get quote");
+    let quote = get_versioned_quote(input_mint, output_mint, amount.to_string(), slippage).await.expect("Failed to get quote");
 
     let data = format!(
         r#"{{
@@ -156,7 +252,7 @@ pub async fn send_buy_swap_transaction(
     let start = Instant::now();
     
     // Aumentar a taxa de priorização
-    let swap_transaction = get_swap_transaction(
+    let swap_transaction = get_swap_versioned_transaction(
         &keypair.pubkey(),
         sol_to_lamports(0.05), // Aumentado de 0.03 para 0.1
         SOL_MINT.to_string(),
@@ -199,7 +295,7 @@ pub async fn send_sell_swap_transaction(
 ) -> Result<()> {
     let start = chrono::Utc::now();
     // Get the swap transaction
-    let swap_transaction = get_swap_transaction(
+    let swap_transaction = get_swap_versioned_transaction(
         &keypair.pubkey(),
         sol_to_lamports(0.05),
         mint.to_string(),
