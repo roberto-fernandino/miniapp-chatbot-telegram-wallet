@@ -1,3 +1,5 @@
+use base64::Engine;
+use crate::turnkey::errors::TurnkeyError;
 use {
     super::matis::SwapTransaction, crate::turnkey::{
         client::{KeyInfo, Turnkey}, errors::TurnkeyResult
@@ -28,30 +30,41 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
 
     // Decode transaction
     println!("@sign_and_send_swap_transaction/ decoding transaction");
-    let transaction_data = base64::decode(&transaction.swap_transaction).map_err(|e| {
+    let engine = base64::engine::general_purpose::STANDARD;
+
+    let transaction_data = engine.decode(&transaction.swap_transaction).map_err(|e| {
         println!("Base64 decoding error: {:?}", e);
         e
     }).expect("Failed to decode transaction");
     println!("@sign_and_send_swap_transaction/ transaction decoded, length: {}", transaction_data.len());
 
-    let mut transaction = bincode::deserialize::<Transaction>(&transaction_data).expect("Failed to deserialize transaction");
-    println!("@sign_and_send_swap_transaction/ transaction deserialized successfully");
-
-    // Get latest blockhash
-    let key_info = KeyInfo {
-       private_key_id: user.public_key,
-       public_key: pubkey
+  let mut transaction = match bincode::deserialize::<Transaction>(&transaction_data) {
+        Ok(tx) => Some(tx),
+        Err(e) => {
+            println!("Failed to deserialize transaction: {:?}", e);
+            None
+        }
     };
-    println!("@sign_and_send_swap_transaction/ key_info created");
-    // Sign transaction
-    println!("@sign_and_send_swap_transaction/ signing transaction");
-    let (tx, _sig) = turnkey_client.sign_transaction(&mut transaction, key_info).await?;
-    println!("@sign_and_send_swap_transaction/ transaction signed");
-
-    println!("@sign_and_send_swap_transaction/ sending transaction");
-    let tx_sig = rpc_client.send_and_confirm_transaction(&tx).expect("Failed to send transaction");
-    println!("@sign_and_send_swap_transaction/ transaction confirmed: {:?}", tx_sig);
-
-    Ok(tx_sig)
-
+    if transaction.is_some() {
+        println!("@sign_and_send_swap_transaction/ transaction deserialized successfully");
+    
+        // Get latest blockhash
+        let key_info = KeyInfo {
+           private_key_id: user.public_key,
+           public_key: pubkey
+        };
+        println!("@sign_and_send_swap_transaction/ key_info created");
+        // Sign transaction
+        println!("@sign_and_send_swap_transaction/ signing transaction");
+        let (tx, _sig) = turnkey_client.sign_transaction(&mut transaction.unwrap(), key_info).await?;
+        println!("@sign_and_send_swap_transaction/ transaction signed");
+    
+        println!("@sign_and_send_swap_transaction/ sending transaction");
+        let tx_sig = rpc_client.send_and_confirm_transaction(&tx).expect("Failed to send transaction");
+        println!("@sign_and_send_swap_transaction/ transaction confirmed: {:?}", tx_sig);
+    
+        Ok(tx_sig)
+    } else {
+        Err(TurnkeyError::from(Box::<dyn std::error::Error>::from("Failed to deserialize transaction".to_string())))
+    }
 }
