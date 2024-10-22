@@ -243,18 +243,18 @@ pub async fn handle_message(
     log::info!("Handling message...");
     
     if let Some(text) = msg.text() {
-        if let Some(reply_to_message) = msg.reply_to_message() { 
-            if reply_to_message.text().unwrap_or_default().starts_with("Enter the amount of SOL to buy") {
-                if let Ok(amount) = text.parse::<f64>() {
-                    set_user_buy_amount(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), amount.to_string().as_str()).await.unwrap();
-                    bot.send_message(msg.chat.id, format!("Amount set to: {}", amount)).await?;
-                    let last_token = get_user_last_sent_token(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await.unwrap();
-                    token_address_buy_info_handler(&last_token, &bot, &msg, &pool).await?;
-                } else {
-                    bot.send_message(msg.chat.id, "Invalid amount").await?;
-                }
-            }
-        }
+        // if let Some(reply_to_message) = msg.reply_to_message() { 
+        //     if reply_to_message.text().unwrap_or_default().starts_with("Enter the amount of SOL to buy") {
+        //         if let Ok(amount) = text.parse::<f64>() {
+        //             set_user_buy_amount(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), amount.to_string().as_str()).await.unwrap();
+        //             bot.send_message(msg.chat.id, format!("Amount set to: {}", amount)).await?;
+        //             let last_token = get_user_last_sent_token(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await.unwrap();
+        //             token_address_buy_info_handler(&last_token, &bot, &msg, &pool).await?;
+        //         } else {
+        //             bot.send_message(msg.chat.id, "Invalid amount").await?;
+        //         }
+        //     }
+        // }
         if is_pnl_command(text) {
             log::info!("Message is a pnl command");
             match pnl(&msg, &bot, pool).await {
