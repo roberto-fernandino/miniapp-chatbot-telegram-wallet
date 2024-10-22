@@ -56,10 +56,9 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     if let Some(mut transaction) = transaction {
         println!("@sign_and_send_swap_transaction/ transaction deserialized successfully");
 
-        // Get latest blockhash
         let key_info = KeyInfo {
-           private_key_id: user.public_key,
-           public_key: pubkey
+           private_key_id: user.public_key, // String
+           public_key: pubkey // Pubkey OBJ
         };
         println!("@sign_and_send_swap_transaction/ key_info created: {:?}", key_info);
 

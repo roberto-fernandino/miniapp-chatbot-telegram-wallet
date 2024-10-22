@@ -132,27 +132,34 @@ impl Turnkey {
         transaction: &mut Transaction,
         key_info: KeyInfo,
     ) -> TurnkeyResult<(Transaction, Signature)> {
+        println!("@sign_transaction/ with {}", key_info.private_key_id);
         let serialized_message = transaction.message_data();
-
+        println!("@sign_transaction/ serialized_message: {:?}", serialized_message);
         // get signature
         let signature_bytes = self
-            .sign_bytes(&serialized_message, key_info.private_key_id.to_string())
+        .sign_bytes(&serialized_message, key_info.private_key_id.to_string())
             .await?;
+        println!("@sign_transaction/ signature_bytes: {:?}", signature_bytes);
         let signature = Signature::try_from(signature_bytes.as_slice())?;
-
+        println!("@sign_transaction/ signature: {:?}", signature);
+        println!("@sign_transaction/ discovering index to add signature to");
         // add signature to transaction
         let index = transaction
             .message
             .account_keys
             .iter()
             .position(|key| key == &key_info.public_key);
-
+        println!("@sign_transaction/ index found: {:?}", index.expect("Index not found"));
+        println!("@sign_transaction/ checking  if index is less than transaction.signatures.len()");
         match index {
             Some(i) if i < transaction.signatures.len() => {
+                println!("@sign_transaction/ index is less than transaction.signatures.len()");
                 transaction.signatures[i] = signature;
+                println!("@sign_transaction/ added signature to transaction");
                 Ok((transaction.clone(), signature))
             }
             _ => {
+                println!("@sign_transaction/ index is not less than transaction.signatures.len()");
                 return Err(TurnkeyError::OtherError(
                     "Unknown signer or index out of bounds".into(),
                 ))
