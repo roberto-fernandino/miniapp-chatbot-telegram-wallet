@@ -1119,6 +1119,26 @@ pub async fn set_user_buy_amount(pool: &PgPool, tg_id: &str, buy_amount: &str) -
 }
 
 
+/// Set user slippage tolerance
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `tg_id` - The user's Telegram ID
+/// * `slippage_tolerance` - The slippage tolerance
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user slippage tolerance was set
+pub async fn set_user_slippage_tolerance(pool: &PgPool, tg_id: &str, slippage_tolerance: &str) -> Result<()> {
+    sqlx::query("UPDATE user_settings SET slippage_tolerance = $1 WHERE tg_id = $2")
+    .bind(slippage_tolerance)
+    .bind(tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Checks if a user has settings   
 /// 
 /// # Arguments
