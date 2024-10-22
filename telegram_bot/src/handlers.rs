@@ -346,7 +346,7 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to buy: {:?}", e),
             }
         }
-        else if data.starts_with("amount:") {
+        else if data.starts_with("amount:") && !data.ends_with("custom") {
             match handle_set_buy_amount_callback(data.to_string(), &bot, &query, &pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to buy: {:?}", e),
