@@ -18,6 +18,7 @@ use {
 };
 
 /// Represents the Turnkey service client, encapsulating all necessary keys and the API client.
+#[derive(Clone, Debug)]
 pub struct Turnkey {
     api_public_key: String,
     api_private_key: String,

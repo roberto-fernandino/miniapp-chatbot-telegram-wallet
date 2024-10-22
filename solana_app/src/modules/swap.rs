@@ -29,7 +29,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     println!("@sign_and_send_swap_transaction/ organization_id: {}", organization_id);
     println!("@sign_and_send_swap_transaction/ public_key: {}", public_key);
     let turnkey_client = Turnkey::new_for_user(&api_public_key, &api_private_key, &organization_id, &public_key)?;
-    println!("@sign_and_send_swap_transaction/ turnkey_client created");
+    println!("@sign_and_send_swap_transaction/ turnkey_client created: {:?}", turnkey_client);
     let pubkey = Pubkey::from_str(&public_key).expect("Invalid pubkey");
 
     // Initialize RPC client
