@@ -967,3 +967,43 @@ pub async fn sol_to_usd(sol_amount: f64) -> Result<f64> {
 pub fn sol_to_lamports(sol_amount: f64) -> u64 {
     (sol_amount * 1_000_000_000.0) as u64
 }
+
+/// Create the call buttons
+/// 
+/// # Arguments
+/// 
+/// * `call_info_str` - The call info string
+/// * `call_id` - The call ID
+/// * `mini_app_url` - The mini app URL
+/// 
+/// # Returns
+/// 
+/// A InlineKeyboardMarkup struct
+pub fn create_call_keyboard(call_info_str: &str, call_id: &str, token_address: &str, user_tg_id: &str) -> InlineKeyboardMarkup {
+    let swap_mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app?start=tokenCA={}", token_address)).expect("Invalid Swap URL");
+    let copy_mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app?start=copyUser={}", user_tg_id)).expect("Invalid Copy Caller URL");
+    log::info!("mini_app_url: {:?}", swap_mini_app_url);
+    let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
+    // Call info == "" means that is firt call
+    if call_info_str == "" {
+        buttons.push(
+            vec![InlineKeyboardButton::callback("🔭 Just Scanning", format!("del_call:{}", call_id))
+            ]
+        );
+    }
+    buttons.push(
+        vec![
+            InlineKeyboardButton::url("💳 Buy now", swap_mini_app_url), 
+            InlineKeyboardButton::url("Copy", copy_mini_app_url)
+        ]
+    );
+    buttons.push(
+        vec![
+            InlineKeyboardButton::callback("🔄 Refresh", format!("refresh:{}", call_id)), 
+            InlineKeyboardButton::callback("🆑 Clear", format!("clear_call:{}", call_id))
+            ]
+        );
+    InlineKeyboardMarkup::new(buttons)
+}
+
+

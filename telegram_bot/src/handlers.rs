@@ -39,7 +39,7 @@ pub async fn handle_callback_clear_call( bot: &teloxide::Bot, query: &teloxide::
     Ok(())
 }
 
-pub async fn handle_callback_refresh(data: String, bot: &teloxide::Bot, query: &teloxide::types::CallbackQuery, pool: SafePool) -> Result<()> {
+pub async fn handle_callback_refresh_call(data: String, bot: &teloxide::Bot, query: &teloxide::types::CallbackQuery, pool: SafePool) -> Result<()> {
     let call_id = data.strip_prefix("refresh:").unwrap_or_default();
     let call = crate::db::get_call_by_id(&pool, call_id.parse::<i64>().expect("Could not parse call id, maybe the value is not a number or to big.")).await?;
     let token_pair_token_address = get_pair_token_pair_and_token_address(&call.token_mint).await?;
@@ -117,45 +117,6 @@ pub async fn address_handler(text: &str) -> Result<String> {
         Err(anyhow::anyhow!("No valid address found"))
     }
 }
-
-/// Create the call buttons
-/// 
-/// # Arguments
-/// 
-/// * `call_info_str` - The call info string
-/// * `call_id` - The call ID
-/// * `mini_app_url` - The mini app URL
-/// 
-/// # Returns
-/// 
-/// A InlineKeyboardMarkup struct
-pub fn create_call_keyboard(call_info_str: &str, call_id: &str, token_address: &str, user_tg_id: &str) -> InlineKeyboardMarkup {
-    let swap_mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app?start=tokenCA={}", token_address)).expect("Invalid Swap URL");
-    let copy_mini_app_url = Url::parse(&format!("https://t.me/sj_copyTradebot/app?start=copyUser={}", user_tg_id)).expect("Invalid Copy Caller URL");
-    log::info!("mini_app_url: {:?}", swap_mini_app_url);
-    let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
-    // Call info == "" means that is firt call
-    if call_info_str == "" {
-        buttons.push(
-            vec![InlineKeyboardButton::callback("🔭 Just Scanning", format!("del_call:{}", call_id))
-            ]
-        );
-    }
-    buttons.push(
-        vec![
-            InlineKeyboardButton::url("💳 Buy now", swap_mini_app_url), 
-            InlineKeyboardButton::url("Copy", copy_mini_app_url)
-        ]
-    );
-    buttons.push(
-        vec![
-            InlineKeyboardButton::callback("🔄 Refresh", format!("refresh:{}", call_id)), 
-            InlineKeyboardButton::callback("🆑 Clear", format!("clear_call:{}", call_id))
-            ]
-        );
-    InlineKeyboardMarkup::new(buttons)
-}
-
 
 
 /// Handle the callback query to delete a call
@@ -330,7 +291,7 @@ pub async fn handle_callback_query(
             }
         } 
         else if data.starts_with("refresh:") {
-            match handle_callback_refresh(data.to_string(), &bot, &query, pool).await {
+            match handle_callback_refresh_call(data.to_string(), &bot, &query, pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to refresh: {:?}", e),
             }
