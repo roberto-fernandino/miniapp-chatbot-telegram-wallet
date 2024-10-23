@@ -321,9 +321,9 @@ pub async fn create_sol_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> Inline
     }).collect::<Vec<_>>();
 
     if !global_amounts.contains(&buy_amount)  {
-        row2.push(InlineKeyboardButton::callback(format!("✅ Buy {} SOL", buy_amount), format!("amount:{}", buy_amount)));
+        row2.push(InlineKeyboardButton::callback(format!("✅ Buy {} 🖌 SOL", buy_amount), "amount:custom"));
     } else {
-        row2.push(InlineKeyboardButton::callback("Buy X SOL 🖌 ", format!("amount:custom")));
+        row2.push(InlineKeyboardButton::callback("Buy X SOL 🖌 ", "amount:custom"));
     }
     buttons.push(row2);
     
