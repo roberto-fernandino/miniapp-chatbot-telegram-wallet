@@ -648,7 +648,7 @@ pub async fn get_qtd_calls_user_made_in_24hrs(pool: &PgPool, user_tg_id: &str) -
     let q = "
         SELECT COUNT(*) as count
         FROM calls
-        WHERE user_tg_id = $1 AND time >= NOW() - INTERVAL '24 hours'
+        WHERE user_tg_id = $1 AND time::timestamptz >= NOW() - INTERVAL '24 hours'
         ";
 
     let count: i64 = sqlx::query_scalar(q)
