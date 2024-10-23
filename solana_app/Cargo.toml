@@ -10,7 +10,8 @@ serde_json = "1.0.128"
 tokio = { version = "1.40.0", features = ["full"] }
 log = "0.4"
 pretty_env_logger = "0.4"
-chrono = "0.4.38"
+chrono = { version = "0.4", features = ["serde"] }
+serde_derive = "1.0.213"
 thiserror = "1.0.63"
 futures = "0.3.30"
 solana-client = "2.0.8"
