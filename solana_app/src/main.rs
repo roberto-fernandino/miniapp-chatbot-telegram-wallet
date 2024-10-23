@@ -21,7 +21,7 @@ use tokio_tungstenite::WebSocketStream;
 use futures::stream::SplitSink;
 use std::sync::Arc;
 use solana_client::rpc_client::RpcClient;
-use solana_app::{init_rpc_client, get_redis_connection, get_copy_trade_wallets, subscribe_to_account_transaction, handle_incoming_messages, get_sol_balance};
+use solana_app::{get_copy_trade_wallets, get_redis_connection, get_sol_balance, get_tokens_balance, handle_incoming_messages, init_rpc_client, subscribe_to_account_transaction};
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 use std::env;
@@ -78,6 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let server = tokio::spawn(async move {
         let state = State {
             write1: Arc::clone(&server_write1),
+            client: Arc::clone(&client),
         };
 
         let app = Router::new()
@@ -174,6 +175,7 @@ async fn handle_connection(stream: TcpStream, tx: Arc<broadcast::Sender<String>>
 #[derive(Clone)]
 pub struct State {
     write1: Arc<Mutex<Option<SplitSink<WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>, tokio_tungstenite::tungstenite::Message>>>>,
+    client: Arc<RpcClient>,
 }
 
 async fn reconnect_websocket() -> Result<(SplitSink<WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>, tokio_tungstenite::tungstenite::Message>, 
@@ -320,4 +322,35 @@ pub async fn sol_swap(
             return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
         }
     }
+}
+
+
+/// Get the positions of a wallet
+/// 
+/// @GET
+/// 
+/// @path /sol/get_positions/{address}
+/// 
+/// # Arguments
+/// 
+/// * `address` - The address of the wallet
+/// 
+/// # Returns
+/// 
+/// A `Result` containing a `Response` or a `tide::Error`
+pub async fn get_positions(
+    AxumState(state): AxumState<State>,
+    Path(address): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    println!("@get_positions /sol/get_positions/{address} received request");
+
+    let pubkey = Pubkey::from_str(&address).expect("Invalid pubkey");
+    println!("@get_positions /sol/get_positions/{address} pubkey: {:?}", pubkey);
+
+    let rpc_client = Arc::clone(&state.client);
+
+    let positions = get_tokens_balance(rpc_client, &pubkey).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    println!("@get_positions /sol/get_positions/{address} positions: {:?}", positions);
+
+    Ok(Json(json!({ "positions": positions })))
 }

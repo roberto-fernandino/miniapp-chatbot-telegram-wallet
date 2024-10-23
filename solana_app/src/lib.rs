@@ -402,7 +402,7 @@ fn determine_transaction_type(transaction: &EncodedConfirmedTransactionWithStatu
 }
 
 /// Struct representing a token balance
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct TokenBalance {
     pub sol_amount: f64,
     pub lamports_amount: u64,
@@ -412,7 +412,7 @@ pub struct TokenBalance {
 }
 
 /// Struct representing multiple token balances
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct TokensBalance {
     pub token_balance: Vec<TokenBalance>,
 }
