@@ -567,6 +567,7 @@ pub async fn token_address_buy_info_handler(text: &str, bot: &teloxide::Bot, msg
     let token_usd_price = format!("{:.8}", scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0)).parse::<f64>().unwrap_or(0.0);
     let mkt_cap: String = format_number(scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
     let lp = scanner_response["pair"]["burnedAmount"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    let burnt = if scanner_response["pair"]["burnedAmount"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) == scanner_response["pair"]["burnedSupply"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) { "✓" } else { "x" };
     let renounced = if scanner_response["pair"]["renounced"].as_bool().unwrap_or(false) { "✓" } else { "x" };
 
     bot.send_message(
@@ -576,7 +577,7 @@ pub async fn token_address_buy_info_handler(text: &str, bot: &teloxide::Bot, msg
             <code> {token_address}</code> (Tap to copy)\n\
             • SOL Balance: {sol_balance} (${sol_balance_usd}) [TransferSOL]\n\
             • Price: <b>${token_usd_price}</b> LP: <b>${lp}</b> MC: <b>${mkt_cap}</b>\n\
-            • Renounced: {renounced} Burnt: {lp}
+            • Renounced: {renounced} Burnt: {burnt}
             "
         )
     )
