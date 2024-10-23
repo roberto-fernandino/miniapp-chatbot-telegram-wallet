@@ -335,6 +335,11 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to set custom buy amount: {:?}", e),
             }
         }
+        else if data == "back" {
+            let user_tg_id = query.from.id.to_string();
+            let user = get_user(&pool, &user_tg_id).await?;
+            start(&bot, &user_tg_id, &user.username.clone().unwrap_or("Unknown username".to_string()), query.message.as_ref().unwrap().chat().id, &pool).await?;
+        }
         else if data == "set_custom_slippage" {
             match handle_set_custom_slippage_callback(data.to_string(), &bot, &query, &pool).await {
                 Ok(_) => (),
