@@ -349,8 +349,26 @@ pub async fn get_positions(
 
     let rpc_client = Arc::clone(&state.client);
 
-    let positions = get_tokens_balance(rpc_client, &pubkey).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let positions = get_tokens_balance(rpc_client, &pubkey)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     println!("@get_positions /sol/get_positions/{address} positions: {:?}", positions);
 
-    Ok(Json(json!(positions)))
+    // Calculate total SOL balance
+    let total_sol_balance: f64 = positions.token_balance.iter().map(|token| token.sol_amount).sum();
+
+    // Create a JSON response including total SOL balance and UI amount for each token
+    let response = json!({
+        "total_sol_balance": total_sol_balance,
+        "tokens": positions.token_balance.iter().map(|token| {
+            json!({
+                "mint": token.mint,
+                "sol_amount": token.sol_amount,
+                "token_ui_amount": token.token_ui_amount,
+                "lamports_amount": token.lamports_amount,
+                "token_amount": token.token_amount
+            })
+        }).collect::<Vec<_>>()
+    });
+
+    Ok(Json(response))
 }
