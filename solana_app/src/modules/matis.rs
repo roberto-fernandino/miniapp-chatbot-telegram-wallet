@@ -43,7 +43,6 @@ pub struct SwapInfo {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Quote {
-    pub input_mint: String,
     pub in_amount: String,
     pub output_mint: String,
     pub out_amount: String,
