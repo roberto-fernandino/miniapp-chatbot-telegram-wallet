@@ -1,4 +1,5 @@
 use chrono::TimeZone;
+use serde_derive::Serialize;
 use reqwest::Url;
 use chrono::TimeDelta;
 use serde_json::Value;
@@ -459,7 +460,7 @@ pub async fn get_ath(timestamp: i64, token_address: &str, chain: &str) -> Result
 /// 
 /// # Arguments
 /// 
-/// * `num` - The number to format
+/// * `num - The number to format
 /// 
 /// # Returns
 /// 
@@ -1006,8 +1007,6 @@ pub fn create_call_keyboard(call_info_str: &str, call_id: &str, token_address: &
     InlineKeyboardMarkup::new(buttons)
 }
 
-
-
 /// Create the positions message
 /// 
 /// # Arguments
@@ -1028,8 +1027,25 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
         )
         .send()
         .await?;
+        let sol_balance = get_wallet_sol_balance(&solana_wallet_address).await?;
+        let sol_balance_usd = sol_to_usd(sol_balance.parse::<f64>().unwrap_or(0.0)).await?;
         let response_json = response.json::<serde_json::Value>().await?;
-        Ok(response_json.to_string())
+        let sol_token_balance = response_json["total_sol_balance"].as_f64().unwrap_or(0.0);
+        let sol_token_balance_usd = sol_to_usd(sol_token_balance).await?;
+        let mut tokens_balance_str = String::new();
+        for token in response_json["tokens"].as_array().unwrap_or(&Vec::new()).iter() {
+            let mint = token["mint"].as_str().unwrap_or("N/A");
+            let sol_amount = token["sol_amount"].as_f64().unwrap_or(0.0);
+            let token_ui_amount = token["token_ui_amount"].as_f64().unwrap_or(0.0);
+            tokens_balance_str.push_str(&format!("<code>{}</code>: {} SOL - {}\n", mint, sol_amount, token_ui_amount));
+        }
+        Ok(format!(
+            "<b>Manage tokens:</b>\n\
+            SOL Balance: <b> {} SOL (${})</b>\n\
+            Token balance: <b> {} SOL</b> (${})\n\
+            {tokens_balance_str}
+            ", sol_balance, sol_balance_usd, sol_token_balance, sol_token_balance_usd)
+        )
     } else {
         Err(anyhow::anyhow!("User not found"))
     }
