@@ -37,7 +37,7 @@ pub async fn get_user_calls(user_tg_id: i64, pool: SafePool) -> Result<String> {
         let pair_address = response["pairAddress"].as_str().unwrap_or("");
         let chain = response["chainName"].as_str().unwrap_or("");
         let scanner_response = get_scanner_search(pair_address, token_address, chain).await?;
-        let ath = get_ath(utils::helpers::async_time_to_timestamp(call.clone().time).await.expect("Failed to parse datetime."), &call.clone().token_address, &call.clone().chain).await?;
+        let ath = get_ath(call.clone().time.timestamp_millis(), &call.clone().token_address, &call.clone().chain).await?;
         let ath_price = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
         let total_supply = scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
 
@@ -433,7 +433,7 @@ pub async fn leaderboard(msg: &teloxide::types::Message, bot: &teloxide::Bot, po
         if unique_tokens.insert(call.token_address.clone()) {
             // If the token is not in the set, add it and process the call
             let ath = get_ath(
-                utils::helpers::async_time_to_timestamp(call.clone().time).await.expect("Failed to parse datetime."), 
+                call.clone().time.timestamp_millis(),
                 call.clone().token_address.as_str(),
                 call.clone().chain.as_str()).await?;
 
@@ -476,7 +476,7 @@ pub async fn best_call_user(user_tg_id: &str, pool: &SafePool) -> Result<Option<
     let mut best_call: Option<CallWithAth> = None;
     let mut count = 0;
     for call in user_calls {
-        let ath = get_ath(utils::helpers::async_time_to_timestamp(call.clone().time).await.expect("Failed to parse datetime."), call.clone().token_address.as_str(), call.clone().chain.as_str()).await?;
+        let ath = get_ath(call.clone().time.timestamp_millis(), call.clone().token_address.as_str(), call.clone().chain.as_str()).await?;
         let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
         let multiplier = ath_after_call / call.clone().price.parse::<f64>().unwrap_or(0.0);
         
@@ -525,7 +525,7 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
         }
         seen_tokens.insert(call.clone().token_symbol.clone()); // Mark token as seen
 
-        let ath = get_ath(utils::helpers::async_time_to_timestamp(call.clone().time).await.expect("Failed to parse datetime."), call.clone().token_address.as_str(), call.clone().chain.as_str()).await?;
+        let ath = get_ath(call.clone().time.timestamp_millis(), call.clone().token_address.as_str(), call.clone().chain.as_str()).await?;
         let ath_after_call = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
         let multiplier = ath_after_call / call.clone().price.parse::<f64>().unwrap_or(0.0);
         call_lb.push(CallWithAth {

@@ -195,7 +195,7 @@ pub async fn get_call_info(address: &String, pool: &PgPool, msg: &Message) -> Re
 
 
         // Calculating the age of the call
-        let timestamp = async_time_to_timestamp(first_call.time).await.expect("Failed to parse datetime.");
+        let timestamp = first_call.time.timestamp_millis();
         let call_time = Utc.timestamp_millis_opt(timestamp).unwrap();
         let current_time = Utc::now();
         let time_delta: TimeDelta = current_time.signed_duration_since(call_time);
