@@ -109,6 +109,11 @@ pub async fn get_legacy_quote(
     amount: String,
     slippage: f64
 ) -> Result<Quote> {
+    println!("@get_legacy_quote");
+    println!("@get_legacy_quote/ input_mint: {}", input_mint.clone());
+    println!("@get_legacy_quote/ output_mint: {}", output_mint.clone());
+    println!("@get_legacy_quote/ amount: {}", amount.clone());
+    println!("@get_legacy_quote/ slippage: {}", slippage);
     // Create a new reqwest client
     let client = reqwest::Client::new();
     let slippage_bps = (slippage * 100.0).round() as u64;
@@ -117,14 +122,16 @@ pub async fn get_legacy_quote(
         "{}/quote?inputMint={input_mint}&outputMint={output_mint}&amount={amount}&slippageBps={slippage_bps}&asLegacyTransaction=true",
         env::var("METIS_HTTP").expect("METIS_HTTP must be set")
     );
-
+    println!("@get_legacy_quote/ url: {}", url.clone());
     // Create the request
     let request: reqwest::RequestBuilder = client.request(reqwest::Method::GET, url);
 
     // Send the request
     let response = request.send().await?;
     let body = response.text().await?;
+    println!("@get_legacy_quote/ response body: {}", body.clone());
     let quote = deserialize_quote(&body)?;
+    println!("@get_legacy_quote/ quote: {:?}", quote);
 
     Ok(quote) 
 }
