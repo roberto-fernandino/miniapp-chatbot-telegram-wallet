@@ -55,7 +55,7 @@ pub struct User {
 #[derive(Debug, Serialize, Clone)]
 pub struct Call {
     pub id: i32,
-    pub time: String,
+    pub time: chrono::DateTime<chrono::Utc>,
     pub mkt_cap: String,
     pub token_address: String,
     pub token_mint: String,
@@ -139,7 +139,7 @@ pub async fn get_user(pool: &PgPool, tg_id: &str) -> Result<User> {
 /// An empty result indicating success or an error.
 pub async fn create_user_with_tg_id_and_username(pool: &PgPool, tg_id: &str, username: Option<&str>) -> Result<()> {
     println!("@create_user_with_tg_id_and_username/ tg_id: {}, username: {:?}", tg_id, username);
-    let mut q = "";
+    let mut q;
     if let Some(_) = username {
         q = "INSERT INTO users (tg_id, username) VALUES ($1, $2) ON CONFLICT (tg_id) DO NOTHING";
     }
@@ -272,10 +272,9 @@ pub async fn get_all_calls_chat_id(pool: &PgPool, chat_id: &str) -> Result<Vec<C
     .await?;
     let mut calls_vec: Vec<Call> = Vec::new();
     for call in calls {
-        let time_str: &str = call.get("time");
         calls_vec.push(Call {
             id: call.get("id"),
-            time: time_str.to_string(),
+            time: call.get("time"),
             mkt_cap: call.get("mkt_cap"),
             token_address: call.get("token_address"),
             token_mint: call.get("token_mint"),
@@ -304,10 +303,9 @@ pub async fn get_channel_calls_last_x_days(pool: &PgPool, chat_id: &str, days: i
     .await?;
     let mut calls_vec: Vec<Call> = Vec::new();
     for call in calls {
-        let time_str: &str = call.get("time");
         calls_vec.push(Call {
             id: call.get("id"),
-            time: time_str.to_string(),
+            time: call.get("time"),
             mkt_cap: call.get("mkt_cap"),
             token_address: call.get("token_address"),
             token_mint: call.get("token_mint"),
@@ -336,10 +334,9 @@ pub async fn get_channel_calls_last_x_hours(pool: &PgPool, chat_id: &str, hours:
     .await?;
     let mut calls_vec: Vec<Call> = Vec::new();
     for call in calls {
-        let time_str: &str = call.get("time");
         calls_vec.push(Call {
             id: call.get("id"),
-            time: time_str.to_string(),
+            time: call.get("time"),
             mkt_cap: call.get("mkt_cap"),
             token_address: call.get("token_address"),
             token_mint: call.get("token_mint"),             
@@ -368,10 +365,9 @@ pub async fn get_channel_calls_last_x_months(pool: &PgPool, chat_id: &str, month
     .await?;
     let mut calls_vec: Vec<Call> = Vec::new();
     for call in channels {
-        let time_str: &str = call.get("time");
         calls_vec.push(Call {
             id: call.get("id"),
-            time: time_str.to_string(),
+            time: call.get("time"),
             mkt_cap: call.get("mkt_cap"),
             token_address: call.get("token_address"),
             token_mint: call.get("token_mint"),
@@ -410,10 +406,9 @@ pub async fn get_user_calls_last_x_years(pool: &PgPool, tg_id: &str, years: i32)
     .await?;
     let mut calls_vec: Vec<Call> = Vec::new();
     for call in calls {
-        let time_str: &str = call.get("time");
         calls_vec.push(Call {
             id: call.get("id"),
-            time: time_str.to_string(),
+            time: call.get("time"),
             mkt_cap: call.get("mkt_cap"),
             token_address: call.get("token_address"),
             token_mint: call.get("token_mint"),
@@ -453,10 +448,9 @@ pub async fn get_user_calls_last_x_hours(pool: &PgPool, tg_id: &str, hours: i32)
 
     let mut calls_vec: Vec<Call> = Vec::new();
     for call in calls {
-        let time_str: &str = call.get("time");
         calls_vec.push(Call {
             id: call.get("id"),
-            time: time_str.to_string(),
+            time: call.get("time"),
             mkt_cap: call.get("mkt_cap"),
             token_address: call.get("token_address"),
             token_mint: call.get("token_mint"),     
@@ -495,10 +489,9 @@ pub async fn get_user_calls_last_x_months(pool: &PgPool, tg_id: &str, months: i3
     .await?;
     let mut calls_vec: Vec<Call> = Vec::new();
     for call in calls {
-        let time_str: &str = call.get("time");
         calls_vec.push(Call {
             id: call.get("id"),
-            time: time_str.to_string(),
+            time: call.get("time"),
             mkt_cap: call.get("mkt_cap"),
             token_address: call.get("token_address"),
             token_mint: call.get("token_mint"),
@@ -528,10 +521,9 @@ pub async fn get_all_user_firsts_calls_by_user_tg_id(pool: &PgPool, user_id: &st
 
     let mut calls_vec: Vec<Call> = Vec::new();
     for call in calls {
-        let time_str: &str = call.get("time");
         calls_vec.push(Call {
             id: call.get("id"),
-            time: time_str.to_string(),
+            time: call.get("time"),
             mkt_cap: call.get("mkt_cap"),
             token_address: call.get("token_address"),
             token_mint: call.get("token_mint"),
@@ -725,10 +717,9 @@ pub async fn get_first_call_token_chat(
         .fetch_one(pool)
         .await?;
 
-    let time_str: &str = call.get("time");
     Ok(Call {
         id: call.get("id"),
-        time: time_str.to_string(),
+        time: call.get("time"),
         mkt_cap: call.get("mkt_cap"),
         price: call.get("price"),
         token_address: call.get("token_address"),
@@ -854,10 +845,9 @@ pub async fn get_all_calls_user_tg_id(pool: &PgPool, user_tg_id: &str) -> Result
     
     let mut calls_vec: Vec<Call> = Vec::new();
     for call in calls {
-        let time_str: &str = call.get("time");
         calls_vec.push(Call {
             id: call.get("id"),
-            time: time_str.to_string(),
+            time: call.get("time"),
             mkt_cap: call.get("mkt_cap"),
             price: call.get("price"),
             token_address: call.get("token_address"),
