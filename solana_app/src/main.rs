@@ -312,9 +312,9 @@ pub async fn sol_swap(
 
     println!("@sol_swap /sol/swap signing and sending transaction");
     match sign_and_send_swap_transaction(swap_transacation, user).await {
-        Ok(tx) => {
-            println!("@sol_swap /sol/swap transaction sent: {:?}", tx);
-            Ok((StatusCode::OK, Json(json!({ "transaction": tx }))))
+        Ok(sig) => {
+            println!("@sol_swap /sol/swap transaction sent: {:?}", sig);
+            Ok((StatusCode::OK, Json(json!({ "transaction": sig.to_string() }))))
         },
         Err(e) => {
             return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
