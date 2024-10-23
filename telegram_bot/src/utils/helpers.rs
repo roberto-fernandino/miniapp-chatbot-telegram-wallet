@@ -1044,9 +1044,10 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
         let mut tokens_balance_str = String::new();
         for token in response_json["tokens"].as_array().unwrap_or(&Vec::new()).iter() {
             let mint = token["mint"].as_str().unwrap_or("N/A");
-            let sol_amount = token["sol_amount"].as_f64().unwrap_or(0.0);
             let token_ui_amount = token["token_ui_amount"].as_f64().unwrap_or(0.0);
-            tokens_balance_str.push_str(&format!("<code>{}</code>: {} SOL - {}\n", mint, sol_amount, token_ui_amount));
+            if token_ui_amount > 0.0 {
+                tokens_balance_str.push_str(&format!("<code>{}</code>: {}\n", mint, token_ui_amount));
+            }
         }
         Ok(format!(
             "<b>Manage tokens:</b>\n\
