@@ -332,14 +332,6 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to set custom buy amount: {:?}", e),
             }
         }
-        else if data == "back" {
-            if let Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) = query.message.as_ref() {
-                if let Some(from) = msg.from.as_ref() {
-                    println!("@handle_callback_query/ from: {:?}", from);
-                    start(&bot, msg, &pool).await?;
-                }
-            }
-        }
         else {
             log::info!("Unrecognized callback query data: {}", data);
         }
