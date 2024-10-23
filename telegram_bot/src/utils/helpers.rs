@@ -271,12 +271,41 @@ pub fn create_main_menu_keyboard() -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(buttons)
 }
 
+pub async fn create_sol_sell_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> Result<InlineKeyboardMarkup> {
+    let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
+    let user_settings = get_user_settings(&pool, user_tg_id).await.expect("User settings not found");
+
+    let user_has_settings = check_if_user_has_settings(&pool, user_tg_id).await.expect("Failed to check if user has settings");
+    if !user_has_settings {
+        create_user_settings_default(&pool, user_tg_id).await.expect("Failed to create user settings");
+    }
+
+    buttons.push(vec![
+        InlineKeyboardButton::callback("← Back", "back"),
+        InlineKeyboardButton::callback("↻ Refresh", "refresh"),
+    ]);
+    buttons.push(vec![
+        InlineKeyboardButton::callback("Sell 10%", "sell_10"),
+        InlineKeyboardButton::callback("Sell 25%", "sell_25"),
+        InlineKeyboardButton::callback("Sell 50%", "sell_50"),
+    ]);
+    buttons.push(vec![
+        InlineKeyboardButton::callback("Sell 75%", "sell_75"),
+        InlineKeyboardButton::callback("Sell 100%", "sell_100"),
+    ]);
+    buttons.push(vec![
+        InlineKeyboardButton::callback("Sell", "sell"),
+    ]);
+
+    Ok(InlineKeyboardMarkup::new(buttons))
+}
+
 /// Create the swap keyboard
 /// 
 /// # Returns
 /// 
 /// A InlineKeyboardMarkup struct to be used in the ReplyMarkup on the bot
-pub async fn create_sol_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> InlineKeyboardMarkup {
+pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> InlineKeyboardMarkup {
     let user_has_settings = check_if_user_has_settings(&pool, user_tg_id).await.expect("Failed to check if user has settings");
     if !user_has_settings {
         create_user_settings_default(&pool, user_tg_id).await.expect("Failed to create user settings");
@@ -1078,4 +1107,25 @@ pub async fn create_positions_keyboard(user_tg_id: &str, pool: &SafePool) -> Res
         vec![InlineKeyboardButton::callback("← Back","back"), InlineKeyboardButton::callback("🔄 Refresh", format!("refresh_positions"))]
     );
     Ok(InlineKeyboardMarkup::new(buttons))
+}
+
+/// Get the positions balance
+/// 
+/// # Arguments
+/// 
+/// * `solana_wallet_address` - The Solana wallet address
+/// 
+/// # Returns
+/// 
+/// A serde_json::Value representing the positions balance
+pub async fn get_positions_balance(solana_wallet_address: &str) -> Result<serde_json::Value> {
+    let client = reqwest::Client::new();
+    let response = client.get(
+            format!("http://solana_app:3030/get_positions/{solana_wallet_address}")
+        )
+        .send()
+        .await?;
+        println!("@create_positions_message/ solana_app response: {:?}", response);
+    let response_json = response.json::<serde_json::Value>().await?;
+    Ok(response_json)
 }
