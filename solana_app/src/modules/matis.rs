@@ -149,15 +149,23 @@ pub async fn get_legacy_swap_transaction(
     amount: u64,
     slippage: f64
 ) -> Result<SwapTransaction> {
- let client = reqwest::Client::new();
+    println!("@get_legacy_swap_transaction");
+    println!("@get_legacy_swap_transaction/ input_mint: {}", input_mint);
+    println!("@get_legacy_swap_transaction/ output_mint: {}", output_mint);
+    println!("@get_legacy_swap_transaction/ amount: {}", amount);
+    println!("@get_legacy_swap_transaction/ slippage: {}", slippage);
+    println!("@get_legacy_swap_transaction/ priorization_fee_lamports: {}", priorization_fee_lamports);
+    println!("@get_legacy_swap_transaction/ user_public_key: {}", user_public_key);
+    let client = reqwest::Client::new();
     let url = format!(
         "{}/swap",
         env::var("METIS_HTTP").expect("METIS_HTTP must be set")
     );
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert("Content-Type", "application/json".parse()?);
+    println!("@get_legacy_swap_transaction/ getting quote");
     let quote = get_legacy_quote(input_mint, output_mint, amount.to_string(), slippage).await.expect("Failed to get quote");
-
+    println!("@get_legacy_swap_transaction/ quote: {:?}", quote);
     let data = format!(
         r#"{{
         "userPublicKey": "{}",
@@ -170,13 +178,14 @@ pub async fn get_legacy_swap_transaction(
         serialize_quote(quote)?
     );
     let json: serde_json::Value = serde_json::from_str(&data)?;
-
+    println!("@get_legacy_swap_transaction/ getting swap transaction");
     let request = client
         .request(reqwest::Method::POST, url)
         .headers(headers)
         .json(&json);
 
     let response = request.send().await?;
+    println!("@get_legacy_swap_transaction/ response: {:?}", response);
     let body = response.text().await?;
     let swap_transaction: SwapTransaction = serde_json::from_str(&body)?;
 
