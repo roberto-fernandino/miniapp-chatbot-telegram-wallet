@@ -12,8 +12,9 @@ regex = "1.11.0"
 anyhow = "1.0.89"
 serde_json = "1.0.128"
 reqwest = { version = "0.12.8", features = ["json", "blocking"] }
-sqlx = { version = "0.8.2", features = ["postgres", "runtime-tokio-native-tls", "macros"] }
-chrono = {version= "0.4.38" }
+sqlx = { version = "0.8.2", features = ["postgres", "runtime-tokio-native-tls", "macros", "chrono"] }
+chrono = { version = "0.4", features = ["serde"] }
+serde_derive = "1.0.213"
 serde = "1.0.210"
 axum = "0.6"
 base64 = "0.22.0"
