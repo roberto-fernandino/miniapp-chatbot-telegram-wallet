@@ -1007,3 +1007,30 @@ pub fn create_call_keyboard(call_info_str: &str, call_id: &str, token_address: &
 }
 
 
+
+/// Create the positions message
+/// 
+/// # Arguments
+/// 
+/// * `user_tg_id` - The user Telegram ID
+/// * `pool` - The database connection
+/// 
+/// # Returns
+/// 
+/// A String representing the positions message
+pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Result<String> {
+    if crate::db::user_exists(pool, user_tg_id).await? {
+        let user = crate::db::get_user(&pool, user_tg_id).await?;
+        let solana_wallet_address = user.solana_address.expect("User has no solana address");
+        let client = reqwest::Client::new();
+        let response = client.get(
+            format!("http://solana_app:3030/get_positions/{solana_wallet_address}")
+        )
+        .send()
+        .await?;
+        let response_json = response.json::<serde_json::Value>().await?;
+        Ok(response_json.to_string())
+    } else {
+        Err(anyhow::anyhow!("User not found"))
+    }
+}
