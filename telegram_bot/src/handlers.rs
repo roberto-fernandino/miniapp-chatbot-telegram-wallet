@@ -332,6 +332,12 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to set custom buy amount: {:?}", e),
             }
         }
+        else if data == "set_custom_slippage" {
+            match handle_set_custom_slippage_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to set custom slippage: {:?}", e),
+            }
+        }
         else {
             log::info!("Unrecognized callback query data: {}", data);
         }
