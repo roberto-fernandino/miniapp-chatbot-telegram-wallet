@@ -55,12 +55,17 @@ pub async fn get_user_calls(user_tg_id: i64, pool: SafePool) -> Result<String> {
 }
 
 pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool) -> Result<()> {
+    println!("@start");
     let is_user_registered_in_mini_app = db::is_user_registered_in_mini_app(&pool, &msg).await?;
+    println!("@start/ is_user_registered_in_mini_app: {:?}", is_user_registered_in_mini_app);
     if is_user_registered_in_mini_app {
         let user = db::get_user(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await?;
+        println!("@start/ user: {:?}", user);
         let keyboard = create_main_menu_keyboard();
         let sol_balance = get_wallet_sol_balance(user.solana_address.clone().expect("Solana address not found").as_str()).await?;
         let sol_balance_usd = sol_to_usd(sol_balance.parse::<f64>().unwrap_or(0.0)).await?;
+        println!("@start/ sol_balance: {:?} usd: {:?}", sol_balance, sol_balance_usd);
+        println!("@start/ sending message");
         bot.send_message(
         msg.chat.id,
         format!("Solana Wallet address:\n\
@@ -73,6 +78,7 @@ pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &S
         .reply_markup(keyboard)
             .await?;
     } else {
+        println!("@start/ sending message");
         bot.send_message(msg.chat.id, "
         Welcome to Dexcelerate Telegram bot, the best way to manage your calls and your portfolio directly from your Telegram account.\n\n\
         You're not registered in the mini app yet.\n\n\
