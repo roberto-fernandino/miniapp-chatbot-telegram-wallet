@@ -196,6 +196,7 @@ pub async fn add_call(
     if !user_exists(pool, tg_id).await? {
         create_user_with_tg_id_and_username(pool, tg_id, username).await?;
     }
+    let time = time.parse::<chrono::DateTime<chrono::Utc>>()?;
     let q = "INSERT INTO calls (time, user_tg_id, mkt_cap, token_address, token_mint, token_symbol, price, chat_id, message_id, chain) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id";
     let result = sqlx::query_scalar(q)
     .bind(time)
