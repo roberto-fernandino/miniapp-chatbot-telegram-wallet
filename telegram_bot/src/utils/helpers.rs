@@ -1051,8 +1051,8 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
         }
         Ok(format!(
             "<b>Manage tokens:</b>\n\
-            SOL Balance: <b> {} SOL (${})</b>\n\
-            Token balance: <b> {} SOL</b> (${})\n\
+            SOL Balance: <b> {:.6} SOL (${:.2})</b>\n\
+            Token balance: <b> {:.6} SOL</b> (${:.2})\n\
             {tokens_balance_str}
             ", sol_balance, sol_balance_usd, sol_token_balance, sol_token_balance_usd)
         )
