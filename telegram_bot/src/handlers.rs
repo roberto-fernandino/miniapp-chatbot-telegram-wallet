@@ -334,7 +334,10 @@ pub async fn handle_callback_query(
         }
         else if data == "back" {
             if let Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) = query.message.as_ref() {
-                start(&bot, msg, &pool).await?;
+                if let Some(from) = msg.from.as_ref() {
+                    println!("@handle_callback_query/ from: {:?}", from);
+                    start(&bot, msg, &pool).await?;
+                }
             }
         }
         else {
