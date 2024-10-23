@@ -77,10 +77,16 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                 println!("@sign_and_send_swap_transaction/ transaction signed");
 
                 println!("@sign_and_send_swap_transaction/ sending transaction");
-                let tx_sig = rpc_client.send_and_confirm_transaction(&tx).expect("Failed to send transaction");
-                println!("@sign_and_send_swap_transaction/ transaction confirmed: {:?}", tx_sig);
-
-                Ok(tx_sig)
+                match rpc_client.send_and_confirm_transaction(&tx) {
+                    Ok(tx_sig) => {
+                        println!("@sign_and_send_swap_transaction/ transaction confirmed: {:?}", tx_sig);
+                        Ok(tx_sig)
+                    },
+                    Err(e) => {
+                        println!("Failed to send transaction: {:?}", e);
+                        Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to send transaction: {:?}", e))))
+                    }
+                }
             }
             Err(e) => {
                 println!("Failed to sign transaction: {:?}", e);
