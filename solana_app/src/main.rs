@@ -352,5 +352,5 @@ pub async fn get_positions(
     let positions = get_tokens_balance(rpc_client, &pubkey).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     println!("@get_positions /sol/get_positions/{address} positions: {:?}", positions);
 
-    Ok(Json(json!({ "positions": positions })))
+    Ok(Json(json!(positions)))
 }
