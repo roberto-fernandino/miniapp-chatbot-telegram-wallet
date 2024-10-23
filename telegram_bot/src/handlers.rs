@@ -539,11 +539,21 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
     let client = reqwest::Client::new();
     let url = format!("{}/sol/swap", "http://solana_app:3030");
     println!("@handle_execute_buy_sol_callback/ sending request to url: {:?}", url);
-    client.post(url)
+
+    let response = client.post(url)
     .json(&request)
     .send()
     .await?;
-    println!("@handle_execute_buy_sol_callback/ request sent");
+    println!("@handle_execute_buy_sol_callback/ response received");
+
+    if response.status().is_success() {
+        println!("@handle_execute_buy_sol_callback/ response is success");
+        let json_response = response.json::<serde_json::Value>().await?;
+        bot.send_message(q.message.as_ref().unwrap().chat().id, format!("https://solscan.io/tx/{}", json_response["transaction"].as_str().unwrap_or("N/A"))).await?;
+    } else {
+        bot.send_message(q.message.as_ref().unwrap().chat().id, format!("Failed to buy: {}", response.text().await?)).await?;
+        println!("@handle_execute_buy_sol_callback/ response is not success");
+    }   
     Ok(())
 }
 
