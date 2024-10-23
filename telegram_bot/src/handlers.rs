@@ -346,6 +346,12 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to set custom slippage: {:?}", e),
             }
         }
+        else if data == "positions" {
+            match handle_positions_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to handle positions callback: {:?}", e),
+            }
+        }
         else {
             log::info!("Unrecognized callback query data: {}", data);
         }
