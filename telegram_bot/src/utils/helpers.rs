@@ -1050,3 +1050,22 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
         Err(anyhow::anyhow!("User not found"))
     }
 }
+
+
+/// Create the positions keyboard
+/// 
+/// # Arguments
+/// 
+/// * `user_tg_id` - The user Telegram ID
+/// * `pool` - The database connection
+/// 
+/// # Returns
+/// 
+/// A InlineKeyboardMarkup struct
+pub async fn create_positions_keyboard(user_tg_id: &str, pool: &SafePool) -> Result<InlineKeyboardMarkup> {
+    let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
+    buttons.push(
+        vec![InlineKeyboardButton::callback("← Back","back"), InlineKeyboardButton::callback("🔄 Refresh", format!("refresh_positions"))]
+    );
+    Ok(InlineKeyboardMarkup::new(buttons))
+}

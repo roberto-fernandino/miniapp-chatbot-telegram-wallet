@@ -690,3 +690,24 @@ async fn handle_set_custom_slippage_callback(data: String, bot: &teloxide::Bot, 
     .await?;
     Ok(())
 }
+
+
+/// handle positions callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_positions_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let message = create_positions_message(&q.from.id.to_string(), pool).await?;
+    bot.send_message(q.message.as_ref().unwrap().chat().id, message)
+    .parse_mode(teloxide::types::ParseMode::Html)
+    .await?;
+    Ok(())
+}
