@@ -1,5 +1,6 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use teloxide::types::ChatId;
 use crate::*;
 use crate::db::{Call, PnlCall, ResponsePaylod, CallWithAth, create_user_with_tg_id_and_username};
 use reqwest::Client;
@@ -54,14 +55,13 @@ pub async fn get_user_calls(user_tg_id: i64, pool: SafePool) -> Result<String> {
     Ok(serde_json::to_string(&ResponsePaylod { calls: calls_with_ath, username: user.username.clone().unwrap_or("Unknown username".to_string()) })?)
 }
 
-pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool) -> Result<()> {
+pub async fn start(bot: &teloxide::Bot, user_tg_id: &str, username: &str, chat_id: ChatId, pool: &SafePool) -> Result<()> {
     println!("@start");
-    let user_tg_id = msg.from.as_ref().unwrap().id.to_string(); 
-    let username = msg.from.as_ref().unwrap().username.clone().unwrap_or("Unknown username".to_string());
+  
     let is_user_registered_in_mini_app = db::is_user_registered_in_mini_app(&pool, &user_tg_id, &username).await?;
     println!("@start/ is_user_registered_in_mini_app: {:?}", is_user_registered_in_mini_app);
     if is_user_registered_in_mini_app {
-        let user = db::get_user(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await?;
+        let user = db::get_user(&pool, user_tg_id).await?;
         println!("@start/ user: {:?}", user);
         let keyboard = create_main_menu_keyboard();
         let sol_balance = get_wallet_sol_balance(user.solana_address.clone().expect("Solana address not found").as_str()).await?;
@@ -69,11 +69,11 @@ pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &S
         println!("@start/ sol_balance: {:?} usd: {:?}", sol_balance, sol_balance_usd);
         println!("@start/ sending message");
         bot.send_message(
-        msg.chat.id,
-        format!("Solana Wallet address:\n\
-        <code>{}</code>\n\
-        SOL Balance: <b>{} SOL (${})</b>\n\n\
-        You can send SOL to this address or import your existing wallet.\n\n\
+            chat_id,
+            format!("Solana Wallet address:\n\
+            <code>{}</code>\n\
+            SOL Balance: <b>{} SOL (${})</b>\n\n\
+            You can send SOL to this address or import your existing wallet.\n\n\
         💵 Join our Telegram group <a href=\"https://t.me/dexcelerateapp\">Dexcelerate Lounge</a> for the state-of-the-art trading platform.", user.solana_address.expect("Solana address not found"), sol_balance, sol_balance_usd)
     )
     .parse_mode(teloxide::types::ParseMode::Html)
@@ -81,7 +81,7 @@ pub async fn start(bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &S
             .await?;
     } else {
         println!("@start/ sending message");
-        bot.send_message(msg.chat.id, "
+        bot.send_message(chat_id, "
         Welcome to Dexcelerate Telegram bot, the best way to manage your calls and your portfolio directly from your Telegram account.\n\n\
         You're not registered in the mini app yet.\n\n\
         Please, register in the mini app to use me.\n\n\

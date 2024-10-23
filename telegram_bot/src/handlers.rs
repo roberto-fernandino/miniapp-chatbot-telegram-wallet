@@ -249,7 +249,10 @@ pub async fn handle_message(
                     }
                 }
                 else if text.starts_with("/start") {
-                    match start(&bot, &msg, &pool).await {
+                    let user_tg_id = msg.from.as_ref().unwrap().id.to_string();
+                    let username = msg.from.as_ref().unwrap().username.clone().unwrap_or("Unknown username".to_string());
+                    let chat_id = msg.chat.id;
+                    match start(&bot, &user_tg_id, &username, chat_id, &pool).await {
                         Ok(_) => (),
                         Err(e) => log::error!("Failed to start: {:?}", e),
                     }
