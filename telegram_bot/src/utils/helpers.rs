@@ -1019,19 +1019,28 @@ pub fn create_call_keyboard(call_info_str: &str, call_id: &str, token_address: &
 /// A String representing the positions message
 pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Result<String> {
     if crate::db::user_exists(pool, user_tg_id).await? {
+        println!("@create_positions_message/ user_tg_id: {:?}", user_tg_id);
         let user = crate::db::get_user(&pool, user_tg_id).await?;
+        println!("@create_positions_message/ user: {:?}", user);
         let solana_wallet_address = user.solana_address.expect("User has no solana address");
+        println!("@create_positions_message/ solana_wallet_address: {:?}", solana_wallet_address);
         let client = reqwest::Client::new();
         let response = client.get(
             format!("http://solana_app:3030/get_positions/{solana_wallet_address}")
         )
         .send()
         .await?;
+        println!("@create_positions_message/ solana_app response: {:?}", response);
         let sol_balance = get_wallet_sol_balance(&solana_wallet_address).await?;
+        println!("@create_positions_message/ sol_balance: {:?}", sol_balance);
         let sol_balance_usd = sol_to_usd(sol_balance.parse::<f64>().unwrap_or(0.0)).await?;
+        println!("@create_positions_message/ sol_balance_usd: {:?}", sol_balance_usd);
         let response_json = response.json::<serde_json::Value>().await?;
+        println!("@create_positions_message/ solana_app response_json: {:?}", response_json);
         let sol_token_balance = response_json["total_sol_balance"].as_f64().unwrap_or(0.0);
+        println!("@create_positions_message/ sol_token_balance: {:?}", sol_token_balance);
         let sol_token_balance_usd = sol_to_usd(sol_token_balance).await?;
+        println!("@create_positions_message/ sol_token_balance_usd: {:?}", sol_token_balance_usd);
         let mut tokens_balance_str = String::new();
         for token in response_json["tokens"].as_array().unwrap_or(&Vec::new()).iter() {
             let mint = token["mint"].as_str().unwrap_or("N/A");
