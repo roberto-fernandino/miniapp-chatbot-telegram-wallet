@@ -15,6 +15,7 @@ pub struct UserSettings {
     pub slippage_tolerance: String,
     pub buy_amount: String,
     pub swap_or_limit: String,
+    pub sell_percentage: String,
 }
 
 /// Struct to hold the call with the ATH after the call
@@ -1035,8 +1036,8 @@ pub async fn is_user_registered_in_mini_app(pool: &PgPool, user_tg_id: &str, use
 /// # Returns
 /// 
 /// A result indicating whether the user settings were set
-pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str, last_sent_token: &str) -> Result<()> {
-    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit, last_sent_token) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (tg_id) DO UPDATE SET slippage_tolerance = $2, buy_amount = $3, swap_or_limit = $4, last_sent_token = $5")
+pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str, last_sent_token: &str, sell_percentage: &str) -> Result<()> {
+    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit, last_sent_token, sell_percentage) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (tg_id) DO UPDATE SET slippage_tolerance = $2, buy_amount = $3, swap_or_limit = $4, last_sent_token = $5, sell_percentage = $6")
     .bind(tg_id)
     .bind(slippage_tolerance)
     .bind(buy_amount)
@@ -1067,6 +1068,7 @@ pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSe
         slippage_tolerance: user_settings.get("slippage_tolerance"),
         buy_amount: user_settings.get("buy_amount"),
         swap_or_limit: user_settings.get("swap_or_limit"),
+        sell_percentage: user_settings.get("sell_percentage"),
     })
 }
 
@@ -1159,7 +1161,7 @@ pub async fn check_if_user_has_settings(pool: &PgPool, user_tg_id: &str) -> Resu
 /// 
 /// A result indicating whether the user settings were created
 pub async fn create_user_settings_default(pool: &PgPool, user_tg_id: &str) -> Result<()> {
-    upsert_user_settings(pool, user_tg_id, "0.18", "0.2", "swap", "").await.expect("Failed to create user settings");
+    upsert_user_settings(pool, user_tg_id, "0.18", "0.2", "swap", "", "100").await.expect("Failed to create user settings");
     Ok(())
 }
 

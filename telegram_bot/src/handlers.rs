@@ -434,7 +434,7 @@ pub async fn post_add_user_handler(
                 return (StatusCode::INTERNAL_SERVER_ERROR, "Could not add user to the db").into_response();
             }
         }
-        match upsert_user_settings(&pool, &user.tg_id, "0.18", "10", "swap", "").await {
+        match upsert_user_settings(&pool, &user.tg_id, "0.18", "10", "swap", "", "100").await {
             Ok(_) => println!("@add_user/ user settings added to the db."),
             Err(e) => {
                 println!("@add_user/ error adding user settings to the db: {:?}", e);
@@ -559,7 +559,7 @@ pub async fn token_address_buy_info_handler(text: &str, bot: &teloxide::Bot, msg
     set_user_last_sent_token(&pool, &user.tg_id, token_address.as_str()).await?;
     println!("@buy_sol_token_address_handler/ last sent token set");
     println!("@buy_sol_token_address_handler/ creating keyboard");
-    let keyboard = create_sol_swap_keyboard(&pool, user.tg_id.to_string().as_str()).await;
+    let keyboard = create_sol_buy_swap_keyboard(&pool, user.tg_id.to_string().as_str()).await;
     println!("@buy_sol_token_address_handler/ keyboard created");
     let token_pair_and_token_address  = get_pair_token_pair_and_token_address(token_address.as_str()).await?;
     println!("@buy_sol_token_address_handler/ token_pair_and_token_address: {:?}", token_pair_and_token_address);
@@ -615,7 +615,7 @@ async fn  handle_toggle_swap_limit_callback(data: String, bot: &teloxide::Bot, q
     let chat_id = q.message.as_ref().unwrap().chat().id;
     let limit_or_swap = data.strip_prefix("toggle_swap_limit:").unwrap_or("swap");
     set_user_swap_or_limit(&pool, &user_tg_id, limit_or_swap).await?;
-    let keyboard = create_sol_swap_keyboard( &pool, &user_tg_id).await;
+    let keyboard = create_sol_buy_swap_keyboard( &pool, &user_tg_id).await;
     bot.edit_message_reply_markup(chat_id, msg_id)
     .reply_markup(keyboard)
     .await?;
@@ -642,7 +642,7 @@ async fn handle_set_buy_amount_callback(data: String, bot: &teloxide::Bot, q: &t
     let chat_id = q.message.as_ref().unwrap().chat().id;
     let buy_amount = data.strip_prefix("amount:").unwrap_or("0.2");
     set_user_buy_amount(&pool, &user_tg_id, buy_amount).await?;
-    let keyboard = create_sol_swap_keyboard(&pool, &user_tg_id).await;
+    let keyboard = create_sol_buy_swap_keyboard(&pool, &user_tg_id).await;
     bot.edit_message_reply_markup(chat_id, msg_id)
     .reply_markup(keyboard)
     .await?;
