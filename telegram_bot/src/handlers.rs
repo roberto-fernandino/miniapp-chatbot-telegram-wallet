@@ -530,7 +530,7 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
     let request = SwapSolRequest {
         user: turnkey_user,
         user_public_key: user.solana_address.clone().expect("Solana address not found").to_string(),
-        priorization_fee_lamports: 0,
+        priorization_fee_lamports: 5000,
         output_mint: token_address.to_string(),
         input_mint: "So11111111111111111111111111111111111111112".to_string(),
         amount: sol_to_lamports(sol_amount),
