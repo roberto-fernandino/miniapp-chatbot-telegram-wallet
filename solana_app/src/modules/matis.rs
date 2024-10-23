@@ -150,7 +150,7 @@ pub async fn get_legacy_swap_transaction(
     slippage: f64
 ) -> Result<SwapTransaction> {
     println!("@get_legacy_swap_transaction");
-    println!("@get_legacy_swap_transaction/ input_mint: {}", input_mint);
+    println!("@get_legacy_swap_transaction/ input_mint: {}", input_mint.clone());
     println!("@get_legacy_swap_transaction/ output_mint: {}", output_mint);
     println!("@get_legacy_swap_transaction/ amount: {}", amount);
     println!("@get_legacy_swap_transaction/ slippage: {}", slippage);
@@ -354,3 +354,4 @@ pub async fn send_sell_swap_transaction(
     );
     Ok(())
 }
+
