@@ -545,8 +545,6 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
     .await?;
     println!("@handle_execute_buy_sol_callback/ request sent");
     Ok(())
-
-
 }
 
 
