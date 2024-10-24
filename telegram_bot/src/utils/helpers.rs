@@ -273,26 +273,41 @@ pub fn create_main_menu_keyboard() -> InlineKeyboardMarkup {
 
 pub async fn create_sol_sell_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> Result<InlineKeyboardMarkup> {
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
-    let user_settings = get_user_settings(&pool, user_tg_id).await.expect("User settings not found");
-
     let user_has_settings = check_if_user_has_settings(&pool, user_tg_id).await.expect("Failed to check if user has settings");
     if !user_has_settings {
         create_user_settings_default(&pool, user_tg_id).await.expect("Failed to create user settings");
     }
+    let user_settings = get_user_settings(&pool, user_tg_id).await.expect("User settings not found");
+
+    let sell_percentage = user_settings.sell_percentage.as_str();
+    let global_percentages = vec!["10", "25", "50", "75", "100"];
+    let sell_percentages1 = vec!["10", "25", "50"];
+    let row1 = sell_percentages1.iter().map(|&percentage| {
+        let is_selected = user_settings.sell_percentage == percentage;
+        InlineKeyboardButton::callback(
+            if is_selected { format!("✅ Sell {}%", percentage) } else { format!("Sell {}%", percentage) },
+            format!("sell_percentage:{}", percentage)
+        )
+    }).collect::<Vec<_>>();
+    buttons.push(row1);
+
+    let sell_percentages2 = vec!["75", "100"];
+    let mut row2 = sell_percentages2.iter().map(|&percentage| {
+        InlineKeyboardButton::callback(format!("Sell {}%", percentage), format!("sell_percentage:{}", percentage))
+    }).collect::<Vec<_>>();
+
+    if !global_percentages.contains(&sell_percentage) {
+        row2.push(InlineKeyboardButton::callback(format!("✅ Sell {}% 🖌", sell_percentage), "sell_percentage:custom"));
+    } else {
+        row2.push(InlineKeyboardButton::callback("Sell X% 🖌", "sell_percentage:custom"));
+    }
+    buttons.push(row2);
 
     buttons.push(vec![
         InlineKeyboardButton::callback("← Back", "back"),
         InlineKeyboardButton::callback("↻ Refresh", "refresh"),
     ]);
-    buttons.push(vec![
-        InlineKeyboardButton::callback("Sell 10%", "sell_10"),
-        InlineKeyboardButton::callback("Sell 25%", "sell_25"),
-        InlineKeyboardButton::callback("Sell 50%", "sell_50"),
-    ]);
-    buttons.push(vec![
-        InlineKeyboardButton::callback("Sell 75%", "sell_75"),
-        InlineKeyboardButton::callback("Sell 100%", "sell_100"),
-    ]);
+
     buttons.push(vec![
         InlineKeyboardButton::callback("Sell", "sell"),
     ]);

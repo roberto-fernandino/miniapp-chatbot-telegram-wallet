@@ -1114,6 +1114,26 @@ pub async fn set_user_buy_amount(pool: &PgPool, tg_id: &str, buy_amount: &str) -
 }
 
 
+/// Set user sell percentage
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `tg_id` - The user's Telegram ID
+/// * `sell_percentage` - The sell percentage
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user sell percentage was set
+pub async fn set_user_sell_percentage(pool: &PgPool, tg_id: &str, sell_percentage: &str) -> Result<()> {
+    sqlx::query("UPDATE user_settings SET sell_percentage = $1 WHERE tg_id = $2")
+    .bind(sell_percentage)
+    .bind(tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Set user slippage tolerance
 /// 
 /// # Arguments

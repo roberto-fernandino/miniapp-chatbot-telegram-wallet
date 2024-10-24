@@ -661,6 +661,31 @@ async fn handle_set_buy_amount_callback(data: String, bot: &teloxide::Bot, q: &t
     Ok(())
 }
 
+/// Handle set sell percentage callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_set_sell_percentage_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let user_tg_id = q.from.id.to_string();
+    let msg_id = q.message.as_ref().unwrap().id();
+    let chat_id = q.message.as_ref().unwrap().chat().id;
+    let sell_percentage = data.strip_prefix("sell_percentage:").unwrap_or("10");
+    set_user_sell_percentage(&pool, &user_tg_id, sell_percentage).await?;
+    let keyboard = create_sol_buy_swap_keyboard(&pool, &user_tg_id).await;
+    bot.edit_message_reply_markup(chat_id, msg_id)
+    .reply_markup(keyboard)
+    .await?;
+    Ok(())
+}
+
 
 /// Handle set custom buy amount callback
 /// 
