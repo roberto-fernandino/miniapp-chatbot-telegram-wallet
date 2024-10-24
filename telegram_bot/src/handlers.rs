@@ -753,8 +753,9 @@ async fn handle_sell_choose_token_callback(data: String, bot: &teloxide::Bot, q:
     }
     if has_any_token {
         bot.send_message(q.message.as_ref().unwrap().chat().id,format!("
-         <b>Select the token to sell</b>\n\
-         SOL BALANCE: <code> {sol_balance:.6} SOL</code> (${sol_balance_usd:.2})
+        <b>Select the token to sell</b>\n\
+        SOL BALANCE: <code> {sol_balance:.6} SOL</code> (${sol_balance_usd:.2})\n\
+        {tokens_str}
         ")).await?;
     } else {
         bot.send_message(q.message.as_ref().unwrap().chat().id,format!("
