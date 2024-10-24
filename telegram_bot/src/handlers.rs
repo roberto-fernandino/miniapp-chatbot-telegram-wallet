@@ -834,11 +834,10 @@ async fn handle_sell_choose_token_callback(data: String, bot: &teloxide::Bot, q:
 /// * `q` - The callback query
 /// * `pool` - The database pool
 async fn handle_execute_sell_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
-    let token_address = data.split(":").next().unwrap_or("N/A");
-    let token_address = address_handler(token_address).await?;
+    let token_address = data.split(":").nth(1).unwrap_or("N/A").to_string();
     let response = match &q.message {
         Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) => {
-            execute_swap(data, bot, msg, pool, token_address.as_str(), "So11111111111111111111111111111111111111112").await?
+            execute_swap(data, bot, msg, pool, &token_address, "So11111111111111111111111111111111111111112").await?
         },
         _ => return Err(anyhow::anyhow!("Message is inaccessible")),
     };
@@ -852,3 +851,4 @@ async fn handle_execute_sell_callback(data: String, bot: &teloxide::Bot, q: &tel
     }   
     Ok(())
 }   
+
