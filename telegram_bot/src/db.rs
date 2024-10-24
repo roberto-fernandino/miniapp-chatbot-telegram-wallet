@@ -1068,7 +1068,7 @@ pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSe
         slippage_tolerance: user_settings.get("slippage_tolerance"),
         buy_amount: user_settings.get("buy_amount"),
         swap_or_limit: user_settings.get("swap_or_limit"),
-        sell_percentage: user_settings.get("sell_percentage"),
+        sell_percentage: user_settings.get::<Option<String>, _>("sell_percentage").unwrap_or_else(|| "0".to_string()),
     })
 }
 
