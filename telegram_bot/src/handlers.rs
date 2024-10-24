@@ -196,6 +196,17 @@ pub async fn handle_callback_del_call(data: String, bot: &teloxide::Bot, query: 
 }
 
 
+/// Handle all the messages in all the chats
+/// 
+/// # Arguments
+/// 
+/// * `bot` - The bot
+/// * `msg` - The message
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
 pub async fn handle_message(
     bot: Bot, 
     msg: Message, 
@@ -287,6 +298,16 @@ pub async fn handle_message(
 }
 
 /// Handles callback queries by delegating to specific handlers.
+/// 
+/// # Arguments
+/// 
+/// * `bot` - The bot
+/// * `query` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
 pub async fn handle_callback_query(
     bot: Bot, 
     query: CallbackQuery, 
@@ -420,6 +441,16 @@ pub struct PostUserRequest {
     pub eth_address: String,
 }
 
+/// Post add user handler
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The database pool
+/// * `user` - The user request
+/// 
+/// # Returns
+/// 
+/// A response indicating the success of the operation
 pub async fn post_add_user_handler(
     State(pool): State<Arc<Pool<Postgres>>>,
     Json(user): Json<PostUserRequest>
