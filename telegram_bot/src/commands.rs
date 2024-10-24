@@ -601,7 +601,7 @@ pub async fn sell_token_page(msg: &teloxide::types::Message, bot: &teloxide::Bot
     let token_price = scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
     let token_amount = get_token_amount(&user.solana_address.clone().unwrap_or("".to_string()), token_address).await?;
     let token_name = scanner_response["pair"]["token1Name"].as_str().unwrap_or("");
-    let keyboard = create_sol_sell_swap_keyboard(&pool, user_tg_id.as_str(), token_address, token_amount.to_string().as_str()).await?;
+    let keyboard = create_sol_sell_swap_keyboard(&pool, user_tg_id.as_str(), token_address).await?;
     let sol_balance = get_wallet_sol_balance(&user.solana_address.clone().unwrap_or("".to_string())).await?.parse::<f64>().unwrap_or(0.0);
     let fdv = format_number(scanner_response["pair"]["fdv"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
     
