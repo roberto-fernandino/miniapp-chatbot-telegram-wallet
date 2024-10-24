@@ -1,4 +1,8 @@
 use anyhow::Result;
+use reqwest::Response;
+use crate::db::get_user_last_sent_token;
+use crate::handlers::{TurnkeyUser, SwapSolRequest};
+use crate::db::get_user_settings;
 use chrono::{DateTime, Utc};
 use teloxide::types::ChatId;
 use crate::*;
@@ -597,7 +601,7 @@ pub async fn sell_token_page(msg: &teloxide::types::Message, bot: &teloxide::Bot
     let token_price = scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
     let token_amount = get_token_amount(&user.solana_address.clone().unwrap_or("".to_string()), token_address).await?;
     let token_name = scanner_response["pair"]["token1Name"].as_str().unwrap_or("");
-    let keyboard = create_sol_sell_swap_keyboard(&pool, user_tg_id.as_str()).await?;
+    let keyboard = create_sol_sell_swap_keyboard(&pool, user_tg_id.as_str(), token_address, token_amount.to_string().as_str()).await?;
     let sol_balance = get_wallet_sol_balance(&user.solana_address.clone().unwrap_or("".to_string())).await?.parse::<f64>().unwrap_or(0.0);
     let fdv = format_number(scanner_response["pair"]["fdv"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
     
@@ -614,4 +618,70 @@ pub async fn sell_token_page(msg: &teloxide::types::Message, bot: &teloxide::Bot
     .parse_mode(teloxide::types::ParseMode::Html)
     .await?;
     Ok(())
+}
+
+
+pub async fn execute_swap(data: String, bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool, input_token: &str, output_token: &str) -> Result<Response> {
+    let user_settings = get_user_settings(pool, &msg.from.as_ref().unwrap().id.to_string()).await?;
+    let user = db::get_user(&pool, &msg.from.as_ref().unwrap().id.to_string()).await?;
+    let input_token_amount: f64;
+    if input_token == "So11111111111111111111111111111111111111112" {
+        input_token_amount = user_settings.buy_amount.parse::<f64>().unwrap_or(0.2);
+    } else {
+        input_token_amount = get_token_amount(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await? * user_settings.sell_percentage.parse::<f64>().expect("Sell percentage is not a number") / 100.0;
+    }
+    let slippage = user_settings.slippage_tolerance.parse::<f64>().unwrap_or(0.5);
+    println!("@commands/execute_swap/ input_token_amount: {:?}", input_token_amount);
+    println!("@commands/execute_swap/ slippage: {:?}", slippage);
+
+    let user_id = msg.from.as_ref().unwrap().id.to_string();
+    let user = db::get_user(&pool, &user_id).await?;
+    println!("@commands/execute_swap/ user_id: {:?}", user_id);
+
+    let solana_address = user.solana_address.clone();
+    println!("@commands/execute_swap/ solana_address: {:?}", solana_address);
+    
+    let turnkey_user = TurnkeyUser {
+        api_public_key: user.turnkey_info.api_public_key.clone().expect("API public key not found"),
+        api_private_key: user.turnkey_info.api_private_key.clone().expect("API private key not found"),
+        organization_id: user.turnkey_info.suborg_id.clone().expect("Suborg ID not found"),
+        public_key: solana_address.clone().expect("Solana address not found").to_string(),
+    };
+    println!("@commands/execute_swap/ turnkey_user: {:?}", turnkey_user);
+
+    let token_address = get_user_last_sent_token(pool, &msg.from.as_ref().unwrap().id.to_string()).await?;
+    println!("@commands/execute_swap/ token_address: {:?}", token_address);
+    println!("@commands/execute_swap/ preparing request");
+    let request: SwapSolRequest;
+    if input_token == "So11111111111111111111111111111111111111112" {
+        request = SwapSolRequest {
+            user: turnkey_user,
+            user_public_key: user.solana_address.clone().expect("Solana address not found").to_string(),
+            priorization_fee_lamports: 5000,
+            output_mint: output_token.to_string(),
+            input_mint: input_token.to_string(),
+            amount: sol_to_lamports(input_token_amount),
+            slippage,
+        };
+    } else {
+        request = SwapSolRequest {
+            user: turnkey_user,
+            user_public_key: user.solana_address.clone().expect("Solana address not found").to_string(),
+            priorization_fee_lamports: 5000,
+            output_mint: output_token.to_string(),
+            input_mint: input_token.to_string(),
+            amount: input_token_amount as u64,
+            slippage,
+        };
+    }
+    let client = reqwest::Client::new();
+    let url = format!("{}/sol/swap", "http://solana_app:3030");
+    println!("@commands/execute_swap/ sending request to url: {:?}", url);
+
+    let response = client.post(url)
+    .json(&request)
+    .send()
+    .await?;
+    println!("@commands/execute_swap/ response received");
+    Ok(response)
 }
