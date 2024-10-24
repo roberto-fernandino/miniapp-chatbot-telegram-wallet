@@ -257,6 +257,12 @@ pub async fn handle_message(
                         Err(e) => log::error!("Failed to start: {:?}", e),
                     }
                 }
+                else if text.starts_with("/start sell_token_") {
+                    match sell_token(&msg, &bot, &pool).await {
+                        Ok(_) => (),
+                        Err(e) => log::error!("Failed to sell token: {:?}", e),
+                    }
+                }
                 else if there_is_valid_solana_address(text) || there_is_valid_eth_address(text) {
                     match token_address_buy_info_handler(text, &bot, &msg, &pool).await {
                         Ok(_) => (),
@@ -717,5 +723,42 @@ async fn handle_positions_callback(data: String, bot: &teloxide::Bot, q: &teloxi
     .parse_mode(teloxide::types::ParseMode::Html)
     .reply_markup(keyboard)
     .await?;
+    Ok(())
+}
+
+/// Handle sell callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+async fn handle_sell_choose_token_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let user_tg_id = q.from.id.to_string();
+    let user = get_user(&pool, &user_tg_id).await?;
+    let tokens_balance = get_positions_balance(&user.clone().solana_address.expect("Solana address not found").as_str()).await?;
+    let has_any_token = tokens_balance["tokens"].as_array().unwrap_or(&Vec::new()).len() > 0;
+    let sol_balance = get_wallet_sol_balance(&user.solana_address.expect("Solana address not found").as_str()).await?;
+    let sol_balance_usd = sol_to_usd(sol_balance.parse::<f64>().unwrap_or(0.0)).await?;
+    let mut tokens_str = String::new();
+    for token in tokens_balance["tokens"].as_array().unwrap_or(&Vec::new()) {
+        tokens_str.push_str(&format!("{} <a href=\"https://t.me/sj_copyTradebot?start=sell_token_{}\">Sell</a>\n", token["mint"].as_str().unwrap_or("N/A"), token["mint"].as_str().unwrap_or("N/A")));
+    }
+    if has_any_token {
+        bot.send_message(q.message.as_ref().unwrap().chat().id,format!("
+         <b>Select the token to sell</b>\n\
+         SOL BALANCE: <code> {sol_balance:.6} SOL</code> (${sol_balance_usd:.2})
+        ")).await?;
+    } else {
+        bot.send_message(q.message.as_ref().unwrap().chat().id,format!("
+        <b>Select a token to sell:</b>\n\
+        SOL BALANCE: <code> {sol_balance:.6} SOL</code> (${sol_balance_usd:.2})\n\
+        No token holdings found
+        ")).await?;
+    }
+
+    println!("@handle_sell_callback/ tokens_balance: {:?}", tokens_balance);
+
     Ok(())
 }
