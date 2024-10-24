@@ -258,7 +258,7 @@ pub async fn handle_message(
                     }
                 }
                 else if text.starts_with("/start sell_token_") {
-                    match sell_token(&msg, &bot, &pool).await {
+                    match sell_token_page(&msg, &bot, &pool).await {
                         Ok(_) => (),
                         Err(e) => log::error!("Failed to sell token: {:?}", e),
                     }
@@ -356,6 +356,12 @@ pub async fn handle_callback_query(
             match handle_positions_callback(data.to_string(), &bot, &query, &pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to handle positions callback: {:?}", e),
+            }
+        }
+        else if data == "sell_page" {
+            match handle_sell_choose_token_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to handle sell page callback: {:?}", e),
             }
         }
         else {
