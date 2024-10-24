@@ -271,7 +271,19 @@ pub fn create_main_menu_keyboard() -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(buttons)
 }
 
-pub async fn create_sol_sell_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> Result<InlineKeyboardMarkup> {
+/// Create the sell keyboard
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The database pool
+/// * `user_tg_id` - The user's Telegram ID
+/// * `token_address` - The token address
+/// * `amount` - The amount
+/// 
+/// # Returns
+/// 
+/// A InlineKeyboardMarkup struct to be used in the ReplyMarkup on the bot
+pub async fn create_sol_sell_swap_keyboard(pool: &PgPool, user_tg_id: &str, token_address: &str, amount: &str) -> Result<InlineKeyboardMarkup> {
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
     let user_has_settings = check_if_user_has_settings(&pool, user_tg_id).await.expect("Failed to check if user has settings");
     if !user_has_settings {
@@ -309,7 +321,7 @@ pub async fn create_sol_sell_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> R
     ]);
 
     buttons.push(vec![
-        InlineKeyboardButton::callback("Sell", "sell"),
+        InlineKeyboardButton::callback("Sell", format!("sell:{}:{}", token_address, amount)),
     ]);
 
     Ok(InlineKeyboardMarkup::new(buttons))
