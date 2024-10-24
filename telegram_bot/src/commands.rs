@@ -587,7 +587,7 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
 /// # Returns
 /// 
 /// An Ok result
-pub async fn sell_token(msg: &teloxide::types::Message, bot: &teloxide::Bot, pool: &SafePool) -> Result<()> {
+pub async fn sell_token_page(msg: &teloxide::types::Message, bot: &teloxide::Bot, pool: &SafePool) -> Result<()> {
     let token_address = msg.text().unwrap().split("sell_token_").nth(1).unwrap_or("");
     let user_tg_id = msg.from.as_ref().unwrap().id.to_string();
     let user = db::get_user(&pool, &user_tg_id).await?;
