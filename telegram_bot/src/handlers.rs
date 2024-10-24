@@ -702,7 +702,8 @@ async fn handle_set_sell_percentage_callback(data: String, bot: &teloxide::Bot, 
     let chat_id = q.message.as_ref().unwrap().chat().id;
     let sell_percentage = data.strip_prefix("sell_percentage:").unwrap_or("10");
     set_user_sell_percentage(&pool, &user_tg_id, sell_percentage).await?;
-    let keyboard = create_sol_buy_swap_keyboard(&pool, &user_tg_id).await;
+    let last_token_address = get_user_last_sent_token(&pool, &user_tg_id).await?;
+    let keyboard = create_sol_sell_swap_keyboard(&pool, &user_tg_id, last_token_address.as_str()).await?;
     bot.edit_message_reply_markup(chat_id, msg_id)
     .reply_markup(keyboard)
     .await?;
