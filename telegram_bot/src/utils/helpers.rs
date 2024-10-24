@@ -321,7 +321,7 @@ pub async fn create_sol_sell_swap_keyboard(pool: &PgPool, user_tg_id: &str, toke
     ]);
 
     buttons.push(vec![
-        InlineKeyboardButton::callback("Sell", format!("sell:{}:{}", token_address, amount)),
+        InlineKeyboardButton::callback("Sell", format!("sell:{}", token_address)),
     ]);
 
     Ok(InlineKeyboardMarkup::new(buttons))
