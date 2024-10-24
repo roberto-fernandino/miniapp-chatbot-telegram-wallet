@@ -248,6 +248,12 @@ pub async fn handle_message(
                         }
                     }
                 }
+                else if text.starts_with("/start sell_token_") {
+                    match sell_token_page(&msg, &bot, &pool).await {
+                        Ok(_) => (),
+                        Err(e) => log::error!("Failed to sell token: {:?}", e),
+                    }
+                }
                 else if text.starts_with("/start") {
                     let user_tg_id = msg.from.as_ref().unwrap().id.to_string();
                     let username = msg.from.as_ref().unwrap().username.clone().unwrap_or("Unknown username".to_string());
@@ -255,12 +261,6 @@ pub async fn handle_message(
                     match start(&bot, &user_tg_id, &username, chat_id, &pool).await {
                         Ok(_) => (),
                         Err(e) => log::error!("Failed to start: {:?}", e),
-                    }
-                }
-                else if text.starts_with("/start sell_token_") {
-                    match sell_token_page(&msg, &bot, &pool).await {
-                        Ok(_) => (),
-                        Err(e) => log::error!("Failed to sell token: {:?}", e),
                     }
                 }
                 else if there_is_valid_solana_address(text) || there_is_valid_eth_address(text) {
@@ -756,13 +756,17 @@ async fn handle_sell_choose_token_callback(data: String, bot: &teloxide::Bot, q:
         <b>Select the token to sell</b>\n\
         SOL BALANCE: <code> {sol_balance:.6} SOL</code> (${sol_balance_usd:.2})\n\
         {tokens_str}
-        ")).await?;
+        "))
+        .parse_mode(teloxide::types::ParseMode::Html)
+        .await?;
     } else {
         bot.send_message(q.message.as_ref().unwrap().chat().id,format!("
         <b>Select a token to sell:</b>\n\
         SOL BALANCE: <code> {sol_balance:.6} SOL</code> (${sol_balance_usd:.2})\n\
         No token holdings found
-        ")).await?;
+        "))
+        .parse_mode(teloxide::types::ParseMode::Html)
+        .await?;
     }
 
     println!("@handle_sell_callback/ tokens_balance: {:?}", tokens_balance);
