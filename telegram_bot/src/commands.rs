@@ -572,3 +572,46 @@ pub async fn user_stats(user_tg_id: &str, bot: &teloxide::Bot, msg: &teloxide::t
     bot.send_message(msg.chat.id,user_stats_message(username, calls_count, multipliers_sum, multipliers_avg, learderboard_string, hit_rate)).parse_mode(teloxide::types::ParseMode::Html).await?;
     Ok(())
 }
+
+/// Sell token
+/// 
+/// # Description
+/// This function sends a message to the user with the token info and a keyboard to sell the token
+/// 
+/// # Arguments
+/// 
+/// * `msg` - The message to sell the token
+/// * `bot` - The bot to send the message to
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// An Ok result
+pub async fn sell_token(msg: &teloxide::types::Message, bot: &teloxide::Bot, pool: &SafePool) -> Result<()> {
+    let token_address = msg.text().unwrap().split("sell_token_").nth(1).unwrap_or("");
+    let user_tg_id = msg.from.as_ref().unwrap().id.to_string();
+    let user = db::get_user(&pool, &user_tg_id).await?;
+    let pair_token_address = get_pair_token_pair_and_token_address(token_address).await?;
+    let scanner_response = get_scanner_search(pair_token_address["pairAddress"].as_str().unwrap_or(""), pair_token_address["tokenAddress"].as_str().unwrap_or(""), pair_token_address["chainName"].as_str().unwrap_or("")).await?;
+    let token_symbol = scanner_response["pair"]["token1Symbol"].as_str().unwrap_or("");
+    let token_price = scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    let token_amount = get_token_amount(&user.solana_address.clone().unwrap_or("".to_string()), token_address).await?;
+    let token_name = scanner_response["pair"]["token1Name"].as_str().unwrap_or("");
+    let keyboard = create_sol_sell_swap_keyboard(&pool, user_tg_id.as_str()).await?;
+    let sol_balance = get_wallet_sol_balance(&user.solana_address.clone().unwrap_or("".to_string())).await?.parse::<f64>().unwrap_or(0.0);
+    let fdv = format_number(scanner_response["pair"]["fdv"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0));
+    
+    bot.send_message(
+        msg.chat.id, 
+        format!("
+       Swap ${token_symbol} 📈 - ({token_name})\n\
+       • SOL Balance: {:.6}\n\
+       • {token_symbol} Balance: {token_amount:.3}\n\
+       • Price: ${token_price:.6} MC: ${fdv}\n\
+        ", sol_balance)
+    )
+    .reply_markup(keyboard)
+    .parse_mode(teloxide::types::ParseMode::Html)
+    .await?;
+    Ok(())
+}
