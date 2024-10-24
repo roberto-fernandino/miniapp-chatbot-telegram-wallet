@@ -290,6 +290,10 @@ pub async fn create_sol_sell_swap_keyboard(pool: &PgPool, user_tg_id: &str, toke
         create_user_settings_default(&pool, user_tg_id).await.expect("Failed to create user settings");
     }
     let user_settings = get_user_settings(&pool, user_tg_id).await.expect("User settings not found");
+    buttons.push(vec![
+        InlineKeyboardButton::callback("← Back", "back"),
+        InlineKeyboardButton::callback("↻ Refresh", "refresh"),
+    ]);
 
     let sell_percentage = user_settings.sell_percentage.as_str();
     let global_percentages = vec!["10", "25", "50", "75", "100"];
@@ -315,10 +319,6 @@ pub async fn create_sol_sell_swap_keyboard(pool: &PgPool, user_tg_id: &str, toke
     }
     buttons.push(row2);
 
-    buttons.push(vec![
-        InlineKeyboardButton::callback("← Back", "back"),
-        InlineKeyboardButton::callback("↻ Refresh", "refresh"),
-    ]);
 
     buttons.push(vec![
         InlineKeyboardButton::callback("Sell", format!("sell:{}", token_address)),
