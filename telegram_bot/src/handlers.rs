@@ -749,7 +749,7 @@ async fn handle_sell_choose_token_callback(data: String, bot: &teloxide::Bot, q:
     let sol_balance_usd = sol_to_usd(sol_balance.parse::<f64>().unwrap_or(0.0)).await?;
     let mut tokens_str = String::new();
     for token in tokens_balance["tokens"].as_array().unwrap_or(&Vec::new()) {
-        if token["token_amount"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) > 0.0 {
+        if token["token_ui_amount"].as_f64().unwrap_or(0.0) > 0.0 {
             tokens_str.push_str(&format!("{} <a href=\"https://t.me/sj_copyTradebot?start=sell_token_{}\">Sell</a>\n", token["mint"].as_str().unwrap_or("N/A"), token["mint"].as_str().unwrap_or("N/A")));
         }
     }
