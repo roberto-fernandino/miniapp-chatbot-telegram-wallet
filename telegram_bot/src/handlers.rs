@@ -364,6 +364,18 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to handle sell page callback: {:?}", e),
             }
         }
+        else if data.starts_with("sell:") {
+            match handle_execute_sell_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to sell: {:?}", e),
+            }
+        }
+        else if data.starts_with("sell_percentage:") {
+            match handle_set_sell_percentage_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to set sell percentage: {:?}", e),
+            }
+        }
         else {
             log::info!("Unrecognized callback query data: {}", data);
         }
@@ -488,52 +500,32 @@ pub struct SwapSolRequest {
     pub slippage: f64,
 }
 
+/// Handle execute buy sol callback
+/// 
+/// # Description
+/// 
+/// Execute swap buy sol transaction
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
 pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     println!("@handle_execute_buy_sol_callback/ data: {:?}", data);
-
-    let user_settings = get_user_settings(pool, &q.from.id.to_string()).await?;
-    let sol_amount = user_settings.buy_amount.parse::<f64>().unwrap_or(0.2);
-    let slippage = user_settings.slippage_tolerance.parse::<f64>().unwrap_or(0.5);
-    println!("@handle_execute_buy_sol_callback/ sol_amount: {:?}", sol_amount);
-    println!("@handle_execute_buy_sol_callback/ slippage: {:?}", slippage);
-
-    let user_id = q.from.id.to_string();
-    let user = get_user(&pool, &user_id).await?;
-    println!("@handle_execute_buy_sol_callback/ user_id: {:?}", user_id);
-
-    let solana_address = user.solana_address.clone();
-    println!("@handle_execute_buy_sol_callback/ solana_address: {:?}", solana_address);
-    
-    let turnkey_user = TurnkeyUser {
-        api_public_key: user.turnkey_info.api_public_key.clone().expect("API public key not found"),
-        api_private_key: user.turnkey_info.api_private_key.clone().expect("API private key not found"),
-        organization_id: user.turnkey_info.suborg_id.clone().expect("Suborg ID not found"),
-        public_key: solana_address.clone().expect("Solana address not found").to_string(),
-    };
-    println!("@handle_execute_buy_sol_callback/ turnkey_user: {:?}", turnkey_user);
-
     let token_address = get_user_last_sent_token(pool, &q.from.id.to_string()).await?;
-    println!("@handle_execute_buy_sol_callback/ token_address: {:?}", token_address);
-    println!("@handle_execute_buy_sol_callback/ preparing request");
-    let request = SwapSolRequest {
-        user: turnkey_user,
-        user_public_key: user.solana_address.clone().expect("Solana address not found").to_string(),
-        priorization_fee_lamports: 5000,
-        output_mint: token_address.to_string(),
-        input_mint: "So11111111111111111111111111111111111111112".to_string(),
-        amount: sol_to_lamports(sol_amount),
-        slippage,
+    let response = match &q.message {
+        Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) => {
+            execute_swap(data, bot, msg, pool, "So11111111111111111111111111111111111111112", token_address.as_str()).await?
+        },
+        _ => return Err(anyhow::anyhow!("Message is inaccessible")),
     };
-    let client = reqwest::Client::new();
-    let url = format!("{}/sol/swap", "http://solana_app:3030");
-    println!("@handle_execute_buy_sol_callback/ sending request to url: {:?}", url);
-
-    let response = client.post(url)
-    .json(&request)
-    .send()
-    .await?;
-    println!("@handle_execute_buy_sol_callback/ response received");
-
+    
     if response.status().is_success() {
         println!("@handle_execute_buy_sol_callback/ response is success");
         let json_response = response.json::<serde_json::Value>().await?;
@@ -800,3 +792,31 @@ async fn handle_sell_choose_token_callback(data: String, bot: &teloxide::Bot, q:
 
     Ok(())
 }
+
+/// Handle sell callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+async fn handle_execute_sell_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let token_address = data.split(":").next().unwrap_or("N/A");
+    let token_address = address_handler(token_address).await?;
+    let response = match &q.message {
+        Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) => {
+            execute_swap(data, bot, msg, pool, token_address.as_str(), "So11111111111111111111111111111111111111112").await?
+        },
+        _ => return Err(anyhow::anyhow!("Message is inaccessible")),
+    };
+     if response.status().is_success() {
+        println!("@handle_execute_sell_sol_callback/ response is success");
+        let json_response = response.json::<serde_json::Value>().await?;
+        bot.send_message(q.message.as_ref().unwrap().chat().id, format!("https://solscan.io/tx/{}", json_response["transaction"].as_str().unwrap_or("N/A"))).await?;
+    } else {
+        bot.send_message(q.message.as_ref().unwrap().chat().id, format!("Failed to sell: {}", response.text().await?)).await?;
+        println!("@handle_execute_sell_sol_callback/ response is not success");
+    }   
+    Ok(())
+}   
