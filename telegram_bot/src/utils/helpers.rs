@@ -245,7 +245,7 @@ pub fn create_main_menu_keyboard() -> InlineKeyboardMarkup {
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
     buttons.push(vec![
         InlineKeyboardButton::callback("Buy", "buy"),
-        InlineKeyboardButton::callback("Sell", "sell")
+        InlineKeyboardButton::callback("Sell", "sell_page")
     ]);
     buttons.push(vec![
         InlineKeyboardButton::callback("🛫 Copy Trade", "copy_trade")
