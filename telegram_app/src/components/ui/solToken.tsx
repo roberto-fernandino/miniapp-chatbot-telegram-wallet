@@ -36,7 +36,12 @@ const SolToken: React.FC<{ token: TokenInfo }> = ({ token }) => {
               <span className="text-xs text-gray-500">
                 {token.account.data.parsed.info.tokenAmount.uiAmount.toFixed(2)}
               </span>
-              <TokenPrice ca={token.account.data.parsed.info.mint} />
+              <TokenPrice
+                ca={token.account.data.parsed.info.mint}
+                amount={parseFloat(
+                  token.account.data.parsed.info.tokenAmount.uiAmount
+                )}
+              />
             </div>
           </>
         )}
