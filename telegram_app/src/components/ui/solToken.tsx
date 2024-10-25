@@ -3,7 +3,7 @@ import { PublicKey, AccountInfo, ParsedAccountData } from "@solana/web3.js";
 import {
   getTokenData,
   getTokenInfo,
-  fetchDexcelerateInfo,
+  fetchDexcelerateScanner,
 } from "../../lib/utils";
 import TokenPrice from "./tokenPrice";
 interface TokenInfo {
@@ -23,7 +23,7 @@ const SolToken: React.FC<{
     });
   }, [token]);
   useEffect(() => {
-    fetchDexcelerateInfo(token.account.data.parsed.info.mint).then(
+    fetchDexcelerateScanner(token.account.data.parsed.info.mint).then(
       (response) => {
         setScannerResponse(response);
       }
