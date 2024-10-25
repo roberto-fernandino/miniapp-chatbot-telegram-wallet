@@ -299,7 +299,7 @@ pub async fn create_sol_sell_swap_keyboard(pool: &PgPool, user_tg_id: &str, toke
     let global_percentages = vec!["10", "25", "50", "75", "100"];
     let sell_percentages1 = vec!["10", "25", "50"];
     let row1 = sell_percentages1.iter().map(|&percentage| {
-        let is_selected = user_settings.sell_percentage == percentage;
+        let is_selected = sell_percentage == percentage;
         InlineKeyboardButton::callback(
             if is_selected { format!("✅ Sell {}%", percentage) } else { format!("Sell {}%", percentage) },
             format!("sell_percentage:{}", percentage)
@@ -308,10 +308,15 @@ pub async fn create_sol_sell_swap_keyboard(pool: &PgPool, user_tg_id: &str, toke
     buttons.push(row1);
 
     let sell_percentages2 = vec!["75", "100"];
-    let mut row2 = sell_percentages2.iter().map(|&percentage| {
-        InlineKeyboardButton::callback(format!("Sell {}%", percentage), format!("sell_percentage:{}", percentage))
+    let row2 = sell_percentages2.iter().map(|&percentage| {
+        let is_selected = sell_percentage == percentage;
+        InlineKeyboardButton::callback(
+            if is_selected { format!("✅ Sell {}%", percentage) } else { format!("Sell {}%", percentage) },
+            format!("sell_percentage:{}", percentage)
+        )
     }).collect::<Vec<_>>();
 
+    let mut row2 = Vec::from(row2);
     if !global_percentages.contains(&sell_percentage) {
         row2.push(InlineKeyboardButton::callback(format!("✅ Sell {}% 🖌", sell_percentage), "sell_percentage:custom"));
     } else {
