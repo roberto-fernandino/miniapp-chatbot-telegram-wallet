@@ -62,11 +62,11 @@ const SwapInterface: React.FC<SwapInterfaceProps> = ({
   useEffect(() => {
     if (tokenData) {
       setToToken({
-        symbol: tokenData.info.data[0].symbol,
-        name: tokenData.info.data[0].name,
-        logoURI: tokenData.info.data[0].logoURI,
+        symbol: tokenData?.pair.token1Symbol,
+        name: tokenData?.pair.token1Name,
+        logoURI: tokenData?.pair.token1LogoURI ?? "",
         balance: tokenAmount,
-        address: tokenData.info.data[0].address,
+        address: tokenData?.pair.token1Address,
       });
     }
   }, [tokenData, tokenAmount]);
