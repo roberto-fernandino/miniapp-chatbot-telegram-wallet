@@ -565,9 +565,11 @@ pub struct SwapSolRequest {
 pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     println!("@handle_execute_buy_sol_callback/ data: {:?}", data);
     let token_address = get_user_last_sent_token(pool, &q.from.id.to_string()).await?;
+    let user_id = q.from.id.to_string();
+    println!("@handle_execute_buy_sol_callback/ user_id: {:?}", user_id);
     let response = match &q.message {
         Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) => {
-            execute_swap(data, bot, msg, pool, "So11111111111111111111111111111111111111112", token_address.as_str()).await?
+            execute_swap(data, bot, msg, pool, "So11111111111111111111111111111111111111112", token_address.as_str(), user_id).await?
         },
         _ => return Err(anyhow::anyhow!("Message is inaccessible")),
     };
@@ -878,9 +880,12 @@ async fn handle_sell_choose_token_callback(data: String, bot: &teloxide::Bot, q:
 async fn handle_execute_sell_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     println!("@handle_execute_sell_callback/ data: {:?}", data);
     let token_address = data.split(":").nth(1).unwrap_or("N/A").to_string();
+    println!("@handle_execute_sell_callback/ token_address: {:?}", token_address);
+    let user_id = q.from.id.to_string();
+    println!("@handle_execute_sell_callback/ user_id: {:?}", user_id);
     let response = match &q.message {
         Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) => {
-            execute_swap(data, bot, msg, pool, &token_address, "So11111111111111111111111111111111111111112").await?
+            execute_swap(data, bot, msg, pool, &token_address, "So11111111111111111111111111111111111111112", user_id).await?
         },
         _ => return Err(anyhow::anyhow!("Message is inaccessible")),
     };

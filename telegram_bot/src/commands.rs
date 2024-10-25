@@ -621,11 +621,11 @@ pub async fn sell_token_page(msg: &teloxide::types::Message, bot: &teloxide::Bot
 }
 
 
-pub async fn execute_swap(data: String, bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool, input_token: &str, output_token: &str) -> Result<Response> {
+pub async fn execute_swap(data: String, bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool, input_token: &str, output_token: &str, user_id: String) -> Result<Response> {
     println!("@execute_swap: Starting execution");
-    
-    let user_id = msg.from.as_ref().unwrap().id.to_string();
     println!("@execute_swap: User ID: {}", user_id);
+    println!("@execute_swap: Input token: {}", input_token);
+    println!("@execute_swap: Output token: {}", output_token);
 
     let user_settings = match db::get_or_create_user_settings(pool, &user_id).await {
         Ok(settings) => {
