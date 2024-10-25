@@ -549,7 +549,7 @@ export async function fetchInfo(tokenMint: string) {
     );
     try {
       const response = await axios.get(
-        `https://api-rs.dexcelerate.com/scanner/${response_data.chainName}/${response_data.pair_address}/${response_data.token_address}`
+        `https://api-rs.dexcelerate.com/scanner/${response_data.chainName}/${response_data.pairAddress}/${response_data.tokenAddress}/pair-stats`
       );
       return response.data;
     } catch (error) {

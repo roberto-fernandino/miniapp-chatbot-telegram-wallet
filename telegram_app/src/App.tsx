@@ -143,36 +143,6 @@ const App: React.FC = () => {
   });
   const rootTurnkeyClient = turnkey.apiClient();
 
-  const fetchInfo = async (tokenMint: string) => {
-    try {
-      const response = await axios.get(
-        `https://api-rs.dexcelerate.com/pair/${tokenMint}/pair-and-token`
-      );
-      const response_data = response.data;
-      log(
-        `Fetching info for ${tokenMint}: ${JSON.stringify(response_data)}`,
-        "info"
-      );
-      log(
-        `Fetching scanner for ${tokenMint}: ${response_data.chainName}/${response_data.pairAddress}/${response_data.tokenAddress}`,
-        "info"
-      );
-      try {
-        const response = await axios.get(
-          `https://api-rs.dexcelerate.com/scanner/${response_data.chainName}/${response_data.pairAddress}/${response_data.tokenAddress}/pair-stats`
-        );
-        log(
-          `Fetching scanner for ${tokenMint}: ${JSON.stringify(response.data)}`,
-          "info"
-        );
-        return response.data;
-      } catch (error) {
-        throw error;
-      }
-    } catch (error) {
-      throw error;
-    }
-  };
   async function updateCopyTrades() {
     const getCopyTradesResponse = await getCopyTrades(
       WebApp.initDataUnsafe.user?.id.toString() ?? ""
