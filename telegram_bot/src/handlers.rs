@@ -234,6 +234,15 @@ pub async fn handle_message(
                 let last_token = get_user_last_sent_token(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await.unwrap();
                 token_address_buy_info_handler(&last_token, &bot, &msg, &pool).await?;
             }
+            else if reply_to_message.text().unwrap_or_default().starts_with("Enter the sell percentage") {
+                if let Ok(sell_percentage) = text.parse::<f64>() {
+                    set_user_sell_percentage(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), sell_percentage.to_string().as_str()).await.unwrap();
+                    bot.send_message(msg.chat.id, format!("Sell percentage set to: {}%", sell_percentage)).await?;
+                    sell_token_page(&msg, &bot, &pool).await?;
+                } else {
+                    bot.send_message(msg.chat.id, "Invalid sell percentage").await?;
+                }
+            }
         }
         if is_pnl_command(text) {
             log::info!("Message is a pnl command");
@@ -360,6 +369,12 @@ pub async fn handle_callback_query(
             match handle_set_custom_buy_amount_callback(data.to_string(), &bot, &query, &pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to set custom buy amount: {:?}", e),
+            }
+        }
+        else if data == "sell_percentage:custom" {
+            match handle_set_custom_sell_percentage_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to set custom sell percentage: {:?}", e),
             }
         }
         else if data == "back" {
@@ -735,6 +750,28 @@ async fn handle_set_sell_percentage_callback(data: String, bot: &teloxide::Bot, 
 async fn handle_set_custom_buy_amount_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     bot.send_message(q.message.as_ref().unwrap().chat().id, "Enter the amount of SOL to buy")
     .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the amount of SOL to buy".to_string()), selective: false})
+    .await?;
+    Ok(())
+}
+/// Handle set sell_percenteage amount callback
+/// 
+/// # Description
+/// 
+/// Set the sell percentage amount on the tg bot
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_set_custom_sell_percentage_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    bot.send_message(q.message.as_ref().unwrap().chat().id, "Enter the sell percentage")
+    .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the sell percentage".to_string()), selective: false})
     .await?;
     Ok(())
 }
