@@ -1181,3 +1181,5 @@ pub async fn get_token_amount(solana_wallet_address: &str, token_address: &str) 
     let positions = get_positions_balance(solana_wallet_address).await?;
     Ok(positions["tokens"].as_array().unwrap_or(&Vec::new()).iter().find(|token| token["mint"].as_str().unwrap_or("") == token_address).unwrap_or(&serde_json::Value::Null)["token_ui_amount"].as_f64().unwrap_or(0.0))
 }
+
+

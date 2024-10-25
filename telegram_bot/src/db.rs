@@ -1060,7 +1060,6 @@ pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance
 /// 
 /// A UserSettings struct
 pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSettings> {
-    println!("@db:get_user_settings/ user_tg_id: {}", user_tg_id);
     let user_settings = sqlx::query("SELECT * FROM user_settings WHERE tg_id = $1")
     .bind(user_tg_id)
     .fetch_one(pool)
@@ -1069,10 +1068,18 @@ pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSe
         slippage_tolerance: user_settings.get("slippage_tolerance"),
         buy_amount: user_settings.get("buy_amount"),
         swap_or_limit: user_settings.get("swap_or_limit"),
-        sell_percentage: user_settings.get::<Option<String>, _>("sell_percentage").unwrap_or_else(|| "0".to_string()),
+        sell_percentage: user_settings.get("sell_percentage"),
     })
 }
 
+pub async fn set_user_sell_percentage(pool: &PgPool, tg_id: &str, sell_percentage: &str) -> Result<()> {
+    sqlx::query("UPDATE user_settings SET sell_percentage = $1 WHERE tg_id = $2")
+    .bind(sell_percentage)
+    .bind(tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
 
 /// Set user swap or limit
 /// 
@@ -1114,26 +1121,6 @@ pub async fn set_user_buy_amount(pool: &PgPool, tg_id: &str, buy_amount: &str) -
     Ok(())
 }
 
-
-/// Set user sell percentage
-/// 
-/// # Arguments
-/// 
-/// * `pool` - The PostgreSQL connection pool
-/// * `tg_id` - The user's Telegram ID
-/// * `sell_percentage` - The sell percentage
-/// 
-/// # Returns
-/// 
-/// A result indicating whether the user sell percentage was set
-pub async fn set_user_sell_percentage(pool: &PgPool, tg_id: &str, sell_percentage: &str) -> Result<()> {
-    sqlx::query("UPDATE user_settings SET sell_percentage = $1 WHERE tg_id = $2")
-    .bind(sell_percentage)
-    .bind(tg_id)
-    .execute(pool)
-    .await?;
-    Ok(())
-}
 
 /// Set user slippage tolerance
 /// 
@@ -1224,4 +1211,17 @@ pub async fn get_user_last_sent_token(pool: &PgPool, tg_id: &str) -> Result<Stri
     .fetch_one(pool)
     .await?;
     Ok(last_sent_token)
+}
+
+
+/// Retrieves user settings or creates default settings if none exist.
+pub async fn get_or_create_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSettings> {
+    match get_user_settings(pool, user_tg_id).await {
+        Ok(settings) => Ok(settings),
+        Err(_) => {
+            create_user_settings_default(pool, user_tg_id).await?;
+            get_user_settings(pool, user_tg_id).await
+        },
+        Err(e) => Err(e.into()),
+    }
 }

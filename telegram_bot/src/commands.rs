@@ -627,14 +627,14 @@ pub async fn execute_swap(data: String, bot: &teloxide::Bot, msg: &teloxide::typ
     let user_id = msg.from.as_ref().unwrap().id.to_string();
     println!("@execute_swap: User ID: {}", user_id);
 
-    let user_settings = match get_user_settings(pool, &user_id).await {
+    let user_settings = match db::get_or_create_user_settings(pool, &user_id).await {
         Ok(settings) => {
             println!("@execute_swap: User settings retrieved successfully");
             settings
         },
         Err(e) => {
-            println!("@execute_swap: Error getting user settings: {:?}", e);
-            return Err(anyhow::anyhow!("Failed to get user settings: {}", e));
+            println!("@execute_swap: Error getting or creating user settings: {:?}", e);
+            return Err(anyhow::anyhow!("Failed to get or create user settings: {}", e));
         }
     };
 
@@ -677,6 +677,7 @@ pub async fn execute_swap(data: String, bot: &teloxide::Bot, msg: &teloxide::typ
     };
     println!("@execute_swap: turnkey_user created successfully");
 
+
     println!("@execute_swap: Preparing request");
     let request: SwapSolRequest = if input_token == "So11111111111111111111111111111111111111112" {
         SwapSolRequest {
@@ -715,3 +716,5 @@ pub async fn execute_swap(data: String, bot: &teloxide::Bot, msg: &teloxide::typ
         }
     }
 }
+
+
