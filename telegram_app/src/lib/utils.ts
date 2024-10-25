@@ -537,7 +537,7 @@ export async function getTokenData(tokenMint: string) {
     throw error;
   }
 }
-export async function fetchInfo(tokenMint: string) {
+export async function fetchDexcelerateInfo(tokenMint: string) {
   try {
     const response = await axios.get(
       `https://api-rs.dexcelerate.com/pair/${tokenMint}/pair-and-token`
