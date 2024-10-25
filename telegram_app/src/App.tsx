@@ -142,40 +142,6 @@ const App: React.FC = () => {
     defaultOrganizationId: import.meta.env.VITE_TURNKEY_ORGNIZATION!,
   });
   const rootTurnkeyClient = turnkey.apiClient();
-  const fetchInfo = async (tokenMint: string) => {
-    try {
-      log(
-        `Fetching info for ${tokenMint}: https://api-rs.dexcelerate.com/pair/${tokenMint}/pair-and-token`,
-        "info"
-      );
-      const response = await axios.get(
-        `https://api-rs.dexcelerate.com/pair/${tokenMint}/pair-and-token`
-      );
-      const response_data = response.data;
-      log(
-        `Fetching info for ${tokenMint}: ${JSON.stringify(response_data)}`,
-        "info"
-      );
-      try {
-        log(
-          `Fetching scanner for ${tokenMint}: https://api-rs.dexcelerate.com/scanner/${response_data.chainName}/${response_data.pairAddress}/${response_data.tokenAddress}/pair-stats`,
-          "info"
-        );
-        const response = await axios.get(
-          `https://api-rs.dexcelerate.com/scanner/${response_data.chainName}/${response_data.pairAddress}/${response_data.tokenAddress}/pair-stats`
-        );
-        log(
-          `Fetching scanner for ${tokenMint}: ${JSON.stringify(response.data)}`,
-          "info"
-        );
-        return response.data;
-      } catch (error) {
-        throw error;
-      }
-    } catch (error) {
-      throw error;
-    }
-  };
   async function updateCopyTrades() {
     const getCopyTradesResponse = await getCopyTrades(
       WebApp.initDataUnsafe.user?.id.toString() ?? ""
@@ -535,7 +501,6 @@ const App: React.FC = () => {
     WebApp.ready();
     setIsLoading(true);
     checkSessionApiKeys();
-    await fetchInfo("D4cfaQhhfdP9MsuhLwSCuRdfPjws4S5sjtgX5F8P83W7");
     const user = await TelegramApi.getItem(
       `user_${WebApp.initDataUnsafe.user?.id}`
     );
