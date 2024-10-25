@@ -523,21 +523,15 @@ export async function getTokenInfo(tokenMint: string) {
 
 export async function getTokenData(tokenMint: string) {
   try {
-    const info_response = await axios.get(
-      `https://api-v3.raydium.io/mint/ids?mints=${tokenMint}`
-    );
-    const price_response = await axios.get(
-      `https://api-v3.raydium.io/mint/price?mints=${tokenMint}`
-    );
+    const scannerResponse = await fetchDexcelerateScanner(tokenMint);
     return {
-      info: info_response.data,
-      price: price_response.data,
+      scannerResponse,
     };
   } catch (error) {
     throw error;
   }
 }
-export async function fetchDexcelerateInfo(tokenMint: string) {
+export async function fetchDexcelerateScanner(tokenMint: string) {
   try {
     const response = await axios.get(
       `https://api-rs.dexcelerate.com/pair/${tokenMint}/pair-and-token`
