@@ -14,6 +14,13 @@ interface TokensBalancesSwapProps {
   setTokenData: (token: any) => void;
   setTokenCa: (token: string) => void;
 }
+
+/**
+ * Component to display the tokens balances and allow to swap them
+ * @param address - The address of the user
+ * @param setTokenData - The function to set the token data
+ * @param setTokenCa - The function to set the token ca
+ */
 const TokensBalancesSwap: React.FC<TokensBalancesSwapProps> = ({
   address,
   setTokenData,
