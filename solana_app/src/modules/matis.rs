@@ -171,7 +171,13 @@ pub async fn get_legacy_swap_transaction(
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert("Content-Type", "application/json".parse()?);
     println!("@get_legacy_swap_transaction/ getting quote");
-    let quote = get_legacy_quote(input_mint, output_mint, amount.to_string(), slippage).await.expect("Failed to get quote");
+    let quote = match get_legacy_quote(input_mint, output_mint, amount.to_string(), slippage).await {
+        Ok(quote) => quote,
+        Err(e) => {
+            println!("@get_legacy_swap_transaction/ error getting quote: {:?}", e);
+            return Err(anyhow::anyhow!("Failed to get quote: {}", e));
+        }
+    };
     println!("@get_legacy_swap_transaction/ quote: {:?}", quote);
     let data = format!(
         r#"{{
