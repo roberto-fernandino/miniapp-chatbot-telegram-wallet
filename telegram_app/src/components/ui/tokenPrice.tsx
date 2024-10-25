@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { fetchTokenPrice } from "../../lib/utils";
+import { fetchInfo } from "../../lib/utils";
 
 const TokenPrice: React.FC<{ ca: string }> = ({ ca }) => {
   const [price, setPrice] = useState<any>(null);
 
   useEffect(() => {
-    fetchTokenPrice(ca).then((response) => {
-      setPrice(response.data);
+    fetchInfo(ca).then((response) => {
+      setPrice(response.pair.pairPrice1Usd);
     });
   }, [ca]);
 

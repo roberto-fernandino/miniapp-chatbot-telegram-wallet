@@ -510,12 +510,20 @@ export async function copyTrade(data: any) {
   }
 }
 
-export async function fetchTokenPrice(tokenMint: string) {
+export async function fetchInfo(tokenMint: string) {
   try {
     const response = await axios.get(
-      `https://api-v3.raydium.io/mint/price?mints=${tokenMint}`
+      `https://api-rs.dexcelerate.com/pair/${tokenMint}/pair-and-token`
     );
-    return response.data;
+    const response_data = response.data;
+    try {
+      const response = await axios.get(
+        `https://api-rs.dexcelerate.com/scanner/${response_data.chainName}/${response_data.pair_address}/${response_data.token_address}`
+      );
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   } catch (error) {
     throw error;
   }
