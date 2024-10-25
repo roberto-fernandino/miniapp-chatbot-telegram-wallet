@@ -510,25 +510,6 @@ export async function copyTrade(data: any) {
   }
 }
 
-export async function fetchInfo(tokenMint: string) {
-  try {
-    const response = await axios.get(
-      `https://api-rs.dexcelerate.com/pair/${tokenMint}/pair-and-token`
-    );
-    const response_data = response.data;
-    try {
-      const response = await axios.get(
-        `https://api-rs.dexcelerate.com/scanner/${response_data.chainName}/${response_data.pair_address}/${response_data.token_address}`
-      );
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  } catch (error) {
-    throw error;
-  }
-}
-
 export async function getTokenInfo(tokenMint: string) {
   try {
     const response = await axios.get(
@@ -556,7 +537,28 @@ export async function getTokenData(tokenMint: string) {
     throw error;
   }
 }
-
+export async function fetchInfo(tokenMint: string) {
+  try {
+    const response = await axios.get(
+      `https://api-rs.dexcelerate.com/pair/${tokenMint}/pair-and-token`
+    );
+    const response_data = response.data;
+    log(
+      `Fetching info for ${tokenMint}: ${JSON.stringify(response_data)}`,
+      "info"
+    );
+    try {
+      const response = await axios.get(
+        `https://api-rs.dexcelerate.com/scanner/${response_data.chainName}/${response_data.pair_address}/${response_data.token_address}`
+      );
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  } catch (error) {
+    throw error;
+  }
+}
 export async function getUserFirstCalls(userId: string) {
   const response = await axios.get(`${BOT_API_URL}/user_calls/${userId}`);
   return response.data;
