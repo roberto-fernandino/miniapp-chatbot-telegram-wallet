@@ -578,7 +578,7 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
         bot.send_message(q.message.as_ref().unwrap().chat().id, format!("https://solscan.io/tx/{}", json_response["transaction"].as_str().unwrap_or("N/A"))).await?;
     } else {
         bot.send_message(q.message.as_ref().unwrap().chat().id, format!("Failed to buy: {}", response.text().await?)).await?;
-        println!("@handle_execute_buy_sol_callback/ response is not success");
+        println!("@handle_execute_bexecute_swapuy_sol_callback/ response is not success");
     }   
     Ok(())
 }
@@ -876,6 +876,7 @@ async fn handle_sell_choose_token_callback(data: String, bot: &teloxide::Bot, q:
 /// * `q` - The callback query
 /// * `pool` - The database pool
 async fn handle_execute_sell_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    println!("@handle_execute_sell_callback/ data: {:?}", data);
     let token_address = data.split(":").nth(1).unwrap_or("N/A").to_string();
     let response = match &q.message {
         Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) => {
@@ -883,14 +884,17 @@ async fn handle_execute_sell_callback(data: String, bot: &teloxide::Bot, q: &tel
         },
         _ => return Err(anyhow::anyhow!("Message is inaccessible")),
     };
-     if response.status().is_success() {
-        println!("@handle_execute_sell_sol_callback/ response is success");
+    
+    if response.status().is_success() {
+        println!("@handle_execute_sell_callback/ response is success");
         let json_response = response.json::<serde_json::Value>().await?;
         bot.send_message(q.message.as_ref().unwrap().chat().id, format!("https://solscan.io/tx/{}", json_response["transaction"].as_str().unwrap_or("N/A"))).await?;
     } else {
-        bot.send_message(q.message.as_ref().unwrap().chat().id, format!("Failed to sell: {}", response.text().await?)).await?;
-        println!("@handle_execute_sell_sol_callback/ response is not success");
+        let error_text = response.text().await?;
+        println!("@handle_execute_sell_callback/ response is not success: {}", error_text);
+        bot.send_message(q.message.as_ref().unwrap().chat().id, format!("Failed to sell: {}", error_text)).await?;
     }   
     Ok(())
-}   
+}
+
 
