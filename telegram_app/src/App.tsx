@@ -153,9 +153,13 @@ const App: React.FC = () => {
         `Fetching info for ${tokenMint}: ${JSON.stringify(response_data)}`,
         "info"
       );
+      log(
+        `Fetching scanner for ${tokenMint}: ${response_data.chainName}/${response_data.pairAddress}/${response_data.tokenAddress}`,
+        "info"
+      );
       try {
         const response = await axios.get(
-          `https://api-rs.dexcelerate.com/scanner/${response_data.chainName}/${response_data.pair_address}/${response_data.token_address}`
+          `https://api-rs.dexcelerate.com/scanner/${response_data.chainName}/${response_data.pairAddress}/${response_data.tokenAddress}`
         );
         log(
           `Fetching scanner for ${tokenMint}: ${JSON.stringify(response.data)}`,
