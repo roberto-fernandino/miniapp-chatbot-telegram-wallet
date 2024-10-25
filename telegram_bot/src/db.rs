@@ -1043,6 +1043,7 @@ pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance
     .bind(buy_amount)
     .bind(swap_or_limit)
     .bind(last_sent_token)
+    .bind(sell_percentage)
     .execute(pool)
     .await?;
     Ok(())
