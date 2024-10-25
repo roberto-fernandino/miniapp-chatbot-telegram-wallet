@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { fetchInfo } from "../../lib/utils";
+import { Spinner } from "./spinner";
 
-const TokenPrice: React.FC<{ ca: string }> = ({ ca }) => {
+const TokenPrice: React.FC<{ ca: string; amount: number }> = ({
+  ca,
+  amount,
+}) => {
   const [price, setPrice] = useState<number | null>(null);
 
   useEffect(() => {
@@ -19,12 +23,9 @@ const TokenPrice: React.FC<{ ca: string }> = ({ ca }) => {
       });
   }, [ca]);
 
-  if (price === null)
-    return (
-      <span>![] Error: Price not found in response.pair.pairPrice1Usd</span>
-    );
+  if (price === null) return <Spinner />;
 
-  return <span>${price.toFixed(4)}</span>;
+  return <span>${(price * amount).toFixed(2)}</span>;
 };
 
 export default TokenPrice;
