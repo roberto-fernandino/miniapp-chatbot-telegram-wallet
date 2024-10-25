@@ -1060,6 +1060,7 @@ pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance
 /// 
 /// A UserSettings struct
 pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSettings> {
+    println!("@db:get_user_settings/ user_tg_id: {}", user_tg_id);
     let user_settings = sqlx::query("SELECT * FROM user_settings WHERE tg_id = $1")
     .bind(user_tg_id)
     .fetch_one(pool)

@@ -697,13 +697,18 @@ async fn handle_set_buy_amount_callback(data: String, bot: &teloxide::Bot, q: &t
 /// 
 /// A result indicating the success of the operation
 async fn handle_set_sell_percentage_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    println!("@handle_set_sell_percentage_callback/ data: {:?}", data);
     let user_tg_id = q.from.id.to_string();
     let msg_id = q.message.as_ref().unwrap().id();
     let chat_id = q.message.as_ref().unwrap().chat().id;
     let sell_percentage = data.strip_prefix("sell_percentage:").unwrap_or("10");
+    println!("@handle_set_sell_percentage_callback/ sell_percentage: {:?}", sell_percentage);
     set_user_sell_percentage(&pool, &user_tg_id, sell_percentage).await?;
     let last_token_address = get_user_last_sent_token(&pool, &user_tg_id).await?;
+    println!("@handle_set_sell_percentage_callback/ last_token_address: {:?}", last_token_address);
+    println!("@handle_set_sell_percentage_callback/ creating keyboard");
     let keyboard = create_sol_sell_swap_keyboard(&pool, &user_tg_id, last_token_address.as_str()).await?;
+    println!("@handle_set_sell_percentage_callback/ keyboard created");
     bot.edit_message_reply_markup(chat_id, msg_id)
     .reply_markup(keyboard)
     .await?;
