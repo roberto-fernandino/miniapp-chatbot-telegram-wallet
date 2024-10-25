@@ -502,7 +502,6 @@ const App: React.FC = () => {
     WebApp.ready();
     setIsLoading(true);
     checkSessionApiKeys();
-    await fetchInfo("D4cfaQhhfdP9MsuhLwSCuRdfPjws4S5sjtgX5F8P83W7");
     const user = await TelegramApi.getItem(
       `user_${WebApp.initDataUnsafe.user?.id}`
     );
