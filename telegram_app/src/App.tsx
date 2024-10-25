@@ -159,7 +159,7 @@ const App: React.FC = () => {
       );
       try {
         const response = await axios.get(
-          `https://api-rs.dexcelerate.com/scanner/${response_data.chainName}/${response_data.pairAddress}/${response_data.tokenAddress}`
+          `https://api-rs.dexcelerate.com/scanner/${response_data.chainName}/${response_data.pairAddress}/${response_data.tokenAddress}/pair-stats`
         );
         log(
           `Fetching scanner for ${tokenMint}: ${JSON.stringify(response.data)}`,
