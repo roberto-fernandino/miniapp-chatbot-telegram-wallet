@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { fetchDexcelerateInfo } from "../../lib/utils";
+import { fetchDexcelerateScanner } from "../../lib/utils";
 import { Spinner } from "./spinner";
 
 const TokenPrice: React.FC<{ ca: string; amount: number }> = ({
@@ -9,7 +9,7 @@ const TokenPrice: React.FC<{ ca: string; amount: number }> = ({
   const [price, setPrice] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchDexcelerateInfo(ca)
+    fetchDexcelerateScanner(ca)
       .then((response) => {
         const pairPrice1Usd = response.pair?.pairPrice1Usd;
         if (pairPrice1Usd) {
