@@ -298,7 +298,7 @@ pub fn create_main_menu_keyboard() -> InlineKeyboardMarkup {
 /// A InlineKeyboardMarkup struct to be used in the ReplyMarkup on the bot
 pub async fn create_sol_sell_swap_keyboard(pool: &PgPool, user_tg_id: &str, token_address: &str) -> Result<InlineKeyboardMarkup> {
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
-    let user_has_settings = check_if_user_has_settings(&pool, user_tg_id).await.expect("Failed to check if user has settings");
+    let user_has_settings = user_has_settings(&pool, user_tg_id).await.expect("Failed to check if user has settings");
     if !user_has_settings {
         create_user_settings_default(&pool, user_tg_id).await.expect("Failed to create user settings");
     }
@@ -351,7 +351,7 @@ pub async fn create_sol_sell_swap_keyboard(pool: &PgPool, user_tg_id: &str, toke
 /// 
 /// A InlineKeyboardMarkup struct to be used in the ReplyMarkup on the bot
 pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> InlineKeyboardMarkup {
-    let user_has_settings = check_if_user_has_settings(&pool, user_tg_id).await.expect("Failed to check if user has settings");
+    let user_has_settings = user_has_settings(&pool, user_tg_id).await.expect("Failed to check if user has settings");
     if !user_has_settings {
         create_user_settings_default(&pool, user_tg_id).await.expect("Failed to create user settings");
     }

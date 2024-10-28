@@ -1168,7 +1168,7 @@ pub async fn set_user_slippage_tolerance(pool: &PgPool, tg_id: &str, slippage_to
 /// # Returns
 /// 
 /// A boolean indicating whether the user has settings
-pub async fn check_if_user_has_settings(pool: &PgPool, user_tg_id: &str) -> Result<bool> {
+pub async fn user_has_settings(pool: &PgPool, user_tg_id: &str) -> Result<bool> {
     let user_settings = get_user_settings(pool, user_tg_id).await;
     Ok(user_settings.is_ok())
 }
