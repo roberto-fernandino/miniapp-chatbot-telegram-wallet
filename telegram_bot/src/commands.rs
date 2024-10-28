@@ -37,12 +37,9 @@ pub async fn get_user_calls(user_tg_id: i64, pool: SafePool) -> Result<String> {
     let user = db::get_user(&pool, user_tg_id.to_string().as_str()).await?;
     for call in calls_without_ath {
         // getting token information
-        let response = get_pair_token_pair_and_token_address(&call.clone().token_address).await?;
-        let token_address = response["tokenAddress"].as_str().unwrap_or("");
-        let pair_address = response["pairAddress"].as_str().unwrap_or("");
-        let chain = response["chainName"].as_str().unwrap_or("");
-        let scanner_response = get_scanner_search(pair_address, token_address, chain).await?;
-        let ath = get_ath(call.clone().time.timestamp_millis(), &call.clone().token_address, &call.clone().chain).await?;
+        let chain = call.clone().chain;
+        let scanner_response = get_scanner_search(&call.clone().token_address).await?;
+        let ath = get_ath(call.clone().time.timestamp_millis(), &call.clone().token_address, &chain).await?;
         let ath_price = ath["athTokenPrice"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
         let total_supply = scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
 
@@ -138,7 +135,10 @@ pub async fn run_axum_server(pool: SafePool) {
 /// # Returns
 /// 
 /// A JSON object containing the scanner search
-pub async fn get_scanner_search(pair_address: &str, token_address: &str, chain: &str) -> Result<Value> {
+pub async fn get_scanner_search(token_address: &str) -> Result<Value> {
+    let pair_token_pair_and_token_address = get_pair_token_pair_and_token_address(token_address).await?;
+    let pair_address = pair_token_pair_and_token_address["pairAddress"].as_str().unwrap_or("");
+    let chain = pair_token_pair_and_token_address["chainName"].as_str().unwrap_or("");
     let client = Client::new();
     let url = format!("https://api-rs.dexcelerate.com/scanner/{}/{}/{}/pair-stats", chain, pair_address, token_address);
     log::info!("url: {:?}", url);
@@ -216,16 +216,15 @@ pub async fn pnl(msg: &teloxide::types::Message, bot: &teloxide::Bot, pool: &Saf
         match get_pair_token_pair_and_token_address(token_address).await {
             Ok(token_pair_and_token) => {
             let pair_address = token_pair_and_token["pairAddress"].as_str().unwrap_or("");
-            let token_address = token_pair_and_token["tokenAddress"].as_str().unwrap_or("");
-            let chain = token_pair_and_token["chainName"].as_str().unwrap_or("");
+            let token_address_pair_address = token_pair_and_token["tokenAddress"].as_str().unwrap_or("");
             // scan the pair address and token address 
-            match get_scanner_search(pair_address, token_address, chain).await {
+            match get_scanner_search(token_address).await {
                 // if the scanner search is ok, get the mkt cap and symbol
                 Ok(scanner_search) => {
                     let mkt_cap = scanner_search["pair"]["fdv"].as_str().unwrap_or("0");
                     let symbol = scanner_search["pair"]["token1Symbol"].as_str().unwrap_or("");
                     // check the pnl call
-                    match check_pnl_call(&pool, mkt_cap, token_address, chat_id.as_str()).await {
+                    match check_pnl_call(&pool, mkt_cap, token_address_pair_address, chat_id.as_str()).await {
                         Ok(pnl_call) => {
                             // send the pnl message
                             bot.send_message(msg.chat.id, pnl_message(&pool, pnl_call, symbol, pair_address).await).parse_mode(teloxide::types::ParseMode::Html).await?;
@@ -316,7 +315,7 @@ pub async fn call(address: &str, bot: &teloxide::Bot, msg: &teloxide::types::Mes
                     Ok(_) => {}
                 }
                 // Get the scanner search
-                match get_scanner_search(pair_address, token_address, chain).await {
+                match get_scanner_search(address).await {
                     Ok(scanner_search) => {
                         // Parse datetime
                         let created_datetime_str = scanner_search["pair"]["pairCreatedAt"].as_str().unwrap_or("");
@@ -603,8 +602,7 @@ pub async fn sell_token_page(msg: &teloxide::types::Message, bot: &teloxide::Bot
     let token_address = msg.text().unwrap().split("sell_token_").nth(1).unwrap_or("");
     let user_tg_id = msg.from.as_ref().unwrap().id.to_string();
     let user = db::get_user(&pool, &user_tg_id).await?;
-    let pair_token_address = get_pair_token_pair_and_token_address(token_address).await?;
-    let scanner_response = get_scanner_search(pair_token_address["pairAddress"].as_str().unwrap_or(""), pair_token_address["tokenAddress"].as_str().unwrap_or(""), pair_token_address["chainName"].as_str().unwrap_or("")).await?;
+    let scanner_response = get_scanner_search(token_address).await?;
     let token_symbol = scanner_response["pair"]["token1Symbol"].as_str().unwrap_or("");
     let token_price = scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
     let token_amount = get_token_amount(&user.solana_address.clone().unwrap_or("".to_string()), token_address).await?;
@@ -712,16 +710,23 @@ pub async fn execute_swap(data: String, bot: &teloxide::Bot, msg: &teloxide::typ
     let url = format!("{}/sol/swap", "http://solana_app:3030");
     println!("@execute_swap: Sending request to url: {:?}", url);
 
-    match client.post(url).json(&request).send().await {
-        Ok(response) => {
+    // response.data = {transaction: "tx_hash"}
+    let response = match client.post(url).json(&request).send().await {
+        Ok(res) => {
             println!("@execute_swap: Response received successfully");
-            Ok(response)
+            res 
         },
         Err(e) => {
             println!("@execute_swap: Error sending request: {:?}", e);
-            Err(anyhow::anyhow!("Failed to send request: {}", e))
+            return Err(anyhow::anyhow!("Failed to send request: {}", e));
         }
-    }
+    };
+    let take_profits = user_settings.take_profits.clone();
+    let stop_losses = user_settings.stop_losses.clone();
+    let scanner_response = get_scanner_search(input_token).await?;
+    let token_price = scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    let position = db::insert_position(pool, &user_id, input_token, take_profits, stop_losses, input_token_amount, token_price).await?;
+    Ok(response)
 }
 
 
