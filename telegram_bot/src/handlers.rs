@@ -244,7 +244,7 @@ pub async fn handle_message(
                 }
             }
             else if reply_to_message.text().unwrap_or_default().starts_with("Enter the gas fee") {
-                let gas_lamports = match text.parse::<f64>() {
+                let gas_lamports: i32 = match text.parse::<f64>() {
                     Ok(sol_amount) => utils::helpers::sol_to_lamports_i32(sol_amount),
                     Err(_) => {
                         bot.send_message(msg.chat.id, "Invalid gas fee").await?;
