@@ -971,6 +971,35 @@ const App: React.FC = () => {
                           <h1 className="text-3xl font-bold mb-6 text-center bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 text-transparent bg-clip-text">
                             @{history?.username}
                           </h1>
+                          {history?.calls?.map((callWithAth: any) => (
+                            <div
+                              key={callWithAth.call.id}
+                              className="mb-4 p-4 bg-gray-800 rounded-lg shadow-md text-white w-full"
+                            >
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="font-semibold">
+                                  {callWithAth.call.token_symbol} /{" "}
+                                  {callWithAth.call.chain}
+                                </span>
+                                <span className="text-sm text-green-400 ml-3">
+                                  ATH: $
+                                  {formatNumber(callWithAth.ath_after_call)} [
+                                  {callWithAth.multiplier.toFixed(2)}x]
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs text-gray-400">
+                                  Called at $
+                                  {formatNumber(
+                                    parseFloat(callWithAth.call.mkt_cap)
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center text-xs text-gray-500">
+                                <span>{formatTime(callWithAth.call.time)}</span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </>
