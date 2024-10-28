@@ -497,12 +497,10 @@ const App: React.FC = () => {
           : parsedResponse;
 
       // log the history
-      log(`history: ${JSON.stringify(history)}`, "info");
-      log(`history.calls: ${JSON.stringify(history.calls)}`, "info");
-      log(`history.username: ${JSON.stringify(history.username)}`, "info");
+      log(`history: ${JSON.stringify(parsedHistory)}`, "info");
 
       // set the history
-      setHistory(parsedHistory);
+      // setHistory(parsedHistory);
     } catch (error) {
       log(`Failed to parse history response ${error}`, "error");
     }
