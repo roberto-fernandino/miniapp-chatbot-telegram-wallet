@@ -18,8 +18,8 @@ pub struct UserSettings {
     pub sell_percentage: String,
     pub gas_lamports: i32,
     pub anti_mev: bool,
-    pub take_profits: Vec<(f64, f64)>,
-    pub stop_losses: Vec<(f64, f64)>,
+    pub take_profits: Option<Vec<(f64, f64)>>,
+    pub stop_losses: Option<Vec<(f64, f64)>>,
 }
 
 /// Struct to hold the call with the ATH after the call
@@ -1090,8 +1090,8 @@ pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSe
         sell_percentage: user_settings.get("sell_percentage"),
         gas_lamports: user_settings.get("gas_lamports"),
         anti_mev: user_settings.get("anti_mev"),
-        take_profits: user_settings.get("take_profits"),
-        stop_losses: user_settings.get("stop_losses"),
+        take_profits: user_settings.try_get("take_profits").unwrap_or(None),
+        stop_losses: user_settings.try_get("stop_losses").unwrap_or(None),
     })
 }
 
