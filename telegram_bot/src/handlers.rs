@@ -527,7 +527,7 @@ pub async fn post_add_user_handler(
                 return (StatusCode::INTERNAL_SERVER_ERROR, "Could not add user to the db").into_response();
             }
         }
-        match upsert_user_settings(&pool, &user.tg_id, "0.18", "10", "swap", "", "100", 5000, false).await {
+        match create_user_settings_default(&pool, &user.tg_id).await {
             Ok(_) => println!("@add_user/ user settings added to the db."),
             Err(e) => {
                 println!("@add_user/ error adding user settings to the db: {:?}", e);
@@ -947,6 +947,9 @@ async fn handle_change_gas_lamports_callback(data: String, bot: &teloxide::Bot, 
 
 
 async fn handle_settings_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    if !user_has_settings(&pool, &q.from.id.to_string()).await? {
+        create_user_settings_default(&pool, &q.from.id.to_string()).await?;
+    }
     let user_settings = get_user_settings(&pool, &q.from.id.to_string()).await?;
     let keyboard = create_settings_keyboard(user_settings);
     let user = get_user(&pool, &q.from.id.to_string()).await?;
