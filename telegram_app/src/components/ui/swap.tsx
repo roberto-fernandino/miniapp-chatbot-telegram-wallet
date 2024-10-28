@@ -80,8 +80,11 @@ const SwapInterface: React.FC<SwapInterfaceProps> = ({
   }, [address]);
 
   useEffect(() => {
-    const prices = Object.values(tokenData.price.data as string);
-    setToTokenPrice(prices[0]);
+    const prices = [
+      tokenData?.pair.pairPrice0Usd,
+      tokenData?.pair.pairPrice1Usd,
+    ];
+    setToTokenPrice(prices[1]);
   }, [tokenData]);
 
   const handleSwapPositions = () => {
