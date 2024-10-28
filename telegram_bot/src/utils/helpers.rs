@@ -1206,7 +1206,7 @@ pub async fn get_token_amount(solana_wallet_address: &str, token_address: &str) 
 /// An InlineKeyboardMarkup object
 pub fn create_settings_keyboard(user_settings: UserSettings) -> InlineKeyboardMarkup {
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
-    buttons.push(vec![InlineKeyboardButton::callback(format!("Slippage: {}%", user_settings.slippage_tolerance), "settings_slippage"), InlineKeyboardButton::callback(format!("Gas Fee: {} SOL", lamports_to_sol(user_settings.gas_lamports)), "settings_gas")]);
+    buttons.push(vec![InlineKeyboardButton::callback(format!("Slippage: {}%", user_settings.slippage_tolerance), "set_custom_slippage"), InlineKeyboardButton::callback(format!("Gas Fee: {} SOL", lamports_to_sol(user_settings.gas_lamports)), "set_custom_gas")]);
     buttons.push(vec![InlineKeyboardButton::callback("Buy settings", "buy_settings"), InlineKeyboardButton::callback("Sell settings", "sell_settings")]);
     if user_settings.anti_mev {
         buttons.push(vec![InlineKeyboardButton::callback("Anti-MEV", "toggle_anti_mev")]);

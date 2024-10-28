@@ -399,6 +399,12 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to set custom slippage: {:?}", e),
             }
         }
+        else if data == "set_custom_gas" {
+            match handle_set_custom_gas_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to set custom gas: {:?}", e),
+            }
+        }
         else if data == "positions" {
             match handle_positions_callback(data.to_string(), &bot, &query, &pool).await {
                 Ok(_) => (),
@@ -959,6 +965,30 @@ async fn handle_settings_callback(data: String, bot: &teloxide::Bot, q: &teloxid
     )
     .reply_markup(keyboard)
     .parse_mode(teloxide::types::ParseMode::Html)
+    .await?;
+    Ok(())
+}
+
+/// Handle set custom gas callback
+/// 
+/// # Description
+/// 
+/// Set the custom gas lamports on the tg bot by sending a message with force reply that will be checked by the message handler when
+/// a reply with the value is sent
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_set_custom_gas_callback(_data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, _pool: &SafePool) -> Result<()> {
+    bot.send_message(q.message.as_ref().unwrap().chat().id, "Enter the gas fee")
+    .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the gas fee in SOL".to_string()), selective: false})
     .await?;
     Ok(())
 }
