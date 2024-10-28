@@ -729,4 +729,12 @@ pub async fn execute_swap(data: String, bot: &teloxide::Bot, msg: &teloxide::typ
     Ok(response)
 }
 
-
+/// Adds a user take profit if an equal one doesnt exists
+pub async fn add_user_take_profit_user_settings(user_tg_id: &str, take_profit: (f64, f64), pool: &SafePool) -> Result<()> {
+    let mut user_take_profits = db::get_user_settings_take_profits(pool, user_tg_id).await?;
+    if !user_take_profits.contains(&take_profit) {
+        user_take_profits.push(take_profit);
+    }
+    db::set_user_settings_take_profits(pool, user_tg_id, user_take_profits).await?;
+    Ok(())
+}
