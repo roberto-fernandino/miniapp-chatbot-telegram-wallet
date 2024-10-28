@@ -159,7 +159,7 @@ pub fn extract_years(command: &str) -> Option<u32> {
 /// 
 /// A Result containing an i64 timestamp or a Box<dyn std::error::Error>
 pub async fn async_time_to_timestamp(time: String) -> Result<i64, Box<dyn std::error::Error>> {
-    // Parse the RFC 3339 formatted string into a DateTime<Utc>
+    // Parse the RFC 3339 formatted string into a DateTime<Utc> object
     let datetime: DateTime<Utc> = DateTime::parse_from_rfc3339(&time)
         .map_err(|e| {
             eprintln!("Failed to parse datetime: {}", e);
@@ -193,8 +193,7 @@ pub async fn get_call_info(address: &String, pool: &PgPool, msg: &Message) -> Re
     // First call info
     let mut call_info_str = String::new();
     let is_first_call = crate::db::is_first_call(&pool,address.as_ref(), msg.chat.id.to_string().as_str()).await?;
-    let token_pair_and_token_address  = get_pair_token_pair_and_token_address(address).await?;
-    let scanner_response = get_scanner_search(token_pair_and_token_address["pairAddress"].as_str().unwrap_or(""), token_pair_and_token_address["tokenAddress"].as_str().unwrap_or(""), token_pair_and_token_address["chainName"].as_str().unwrap_or("")).await?;
+    let scanner_response = get_scanner_search(address).await?;
     let mkt_cap = scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0) * scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
     if !is_first_call {
         let chat_id_str = msg.chat.id.to_string();
@@ -357,7 +356,6 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
     }
     let user_settings = get_user_settings(&pool, user_tg_id).await.expect("User settings not found");
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
-    
     buttons.push(vec![
         InlineKeyboardButton::callback("← Back", "back"),
         InlineKeyboardButton::callback("Smart Money", "smart_money"),
@@ -377,6 +375,7 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
         ),
     ]);
 
+    // buys amounts
     let buy_amount = user_settings.buy_amount.as_str();
     let global_amounts = vec!["0.2", "0.5", "1", "2", "5"];
     let buy_amounts = vec!["0.2", "0.5", "1"];
@@ -389,7 +388,6 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
     }).collect::<Vec<_>>();
     buttons.push(row1);
     
-
     let buy_amounts2 = vec!["2", "5"];
     let mut row2 = buy_amounts2.iter().map(|&amount| {
         InlineKeyboardButton::callback(format!("Buy {} SOL", amount), format!("amount:{}", amount))
@@ -401,13 +399,30 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
         row2.push(InlineKeyboardButton::callback("Buy X SOL 🖌 ", "amount:custom"));
     }
     buttons.push(row2);
-    
+
     let slippage = user_settings.slippage_tolerance.parse::<f64>().unwrap_or(0.18);
     buttons.push(vec![
         InlineKeyboardButton::callback(if slippage == 0.18 { "✅ 18% Slippage" } else { "18% Slippage" }, "_"),
         InlineKeyboardButton::callback(if slippage != 0.18 { format!("✅ {}% Slippage 📝", slippage * 100.0) } else { "X Slippage 🖌".to_string() }, "set_custom_slippage")
     ]);
-    
+    buttons.push(vec![
+        InlineKeyboardButton::callback("Add Take Profit", "add_take_profit"),
+        InlineKeyboardButton::callback("Add Stop Loss", "add_stop_loss"),
+    ]);
+
+    // Add a row for take profits
+    let take_profits = user_settings.take_profits.clone();
+    let mut index = 0;
+    for take_profit in take_profits {
+        let row: Vec<InlineKeyboardButton> = vec![
+            InlineKeyboardButton::callback(format!("{}% up", take_profit.0), "_"),
+            InlineKeyboardButton::callback(format!("{}% to sell", take_profit.1), "_"),
+            InlineKeyboardButton::callback("❌", format!("delete_take_profit:{}", index)),
+        ];
+        index += 1;
+        buttons.push(row);
+    }
+
     buttons.push(vec![
         InlineKeyboardButton::callback("Buy", format!("buy:{}", buy_amount)),
     ]);
