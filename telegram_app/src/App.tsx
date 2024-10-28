@@ -980,12 +980,12 @@ const App: React.FC = () => {
                               try {
                                 // Check for NaN or invalid values
                                 const multiplier = isNaN(callWithAth.multiplier)
-                                  ? 0
-                                  : callWithAth.multiplier;
+                                  ? 0.0
+                                  : parseFloat(callWithAth.multiplier);
                                 const mktCap =
-                                  parseFloat(callWithAth.call.mkt_cap) || 0;
+                                  parseFloat(callWithAth.call.mkt_cap) || 0.0;
                                 const athAfterCall =
-                                  callWithAth.ath_after_call || 0;
+                                  parseFloat(callWithAth.ath_after_call) || 0.0;
 
                                 log(`Rendering call: ${callWithAth}`, "info");
 
