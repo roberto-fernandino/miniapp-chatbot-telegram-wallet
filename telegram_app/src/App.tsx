@@ -975,7 +975,7 @@ const App: React.FC = () => {
                               <Spinner />
                             )}
                           </h1>
-                          <div className="flex flex-col items-center justify-center w-full h-full overflow-y-auto">
+                          <div className="flex flex-col items-center justify-center w-full h-full overflow-y-auto max-h-96">
                             {history?.calls?.map((callWithAth: any) => {
                               // Check for NaN or invalid values
                               const multiplier = isNaN(callWithAth.multiplier)
@@ -983,6 +983,8 @@ const App: React.FC = () => {
                                 : callWithAth.multiplier;
                               const mktCap =
                                 parseFloat(callWithAth.call.mkt_cap) || 0;
+                              const athAfterCall =
+                                callWithAth.ath_after_call || 0;
 
                               return (
                                 <div
@@ -995,9 +997,8 @@ const App: React.FC = () => {
                                       {callWithAth.call.chain}
                                     </span>
                                     <span className="text-sm text-green-400 ml-3">
-                                      ATH: $
-                                      {formatNumber(callWithAth.ath_after_call)}{" "}
-                                      [{multiplier.toFixed(2)}x]
+                                      ATH: ${formatNumber(athAfterCall)} [
+                                      {multiplier.toFixed(2)}x]
                                     </span>
                                   </div>
                                   <div className="flex justify-between items-center mb-2">
