@@ -80,6 +80,18 @@ pub struct PnlCall {
 }
 
 #[derive(Debug, Serialize)]
+pub struct Position {
+    pub id: i32, // db id
+    pub tg_user_id: String, // Telegram user id
+    pub token_address: String, // Token address
+    pub take_profits: Vec<Vec<f64>>, // Array of arrays with the take profit [ [ +% price limit to sell, % tokens to sell], ... ]
+    pub stop_losses: Vec<Vec<f64>>, // Array of arrays with the stop [ [ -% price limit to sell, % tokens to sell], ... ]
+    pub amount: f64, // Amount of tokens bought
+    pub mc_entry: f64, // Market cap at entry
+    pub created_at: chrono::DateTime<chrono::Utc>, // Default value is the current timestamp
+}
+
+#[derive(Debug, Serialize)]
 pub struct ResponsePaylod {
     pub calls: Vec<CallWithAth>,
     pub username: String,
