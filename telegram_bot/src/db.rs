@@ -18,6 +18,8 @@ pub struct UserSettings {
     pub sell_percentage: String,
     pub gas_lamports: i32,
     pub anti_mev: bool,
+    pub take_profits: Vec<(f64, f64)>,
+    pub stop_losses: Vec<(f64, f64)>,
 }
 
 /// Struct to hold the call with the ATH after the call
@@ -84,8 +86,8 @@ pub struct Position {
     pub id: i32, // db id
     pub tg_user_id: String, // Telegram user id
     pub token_address: String, // Token address
-    pub take_profits: Vec<Vec<f64>>, // Array of arrays with the take profit [ [ +% price limit to sell, % tokens to sell], ... ]
-    pub stop_losses: Vec<Vec<f64>>, // Array of arrays with the stop [ [ -% price limit to sell, % tokens to sell], ... ]
+    pub take_profits: Vec<(f64, f64)>, // Array of arrays with the take profit [ [ +% price limit to sell, % tokens to sell], ... ]
+    pub stop_losses: Vec<(f64, f64)>, // Array of arrays with the stop [ [ -% price limit to sell, % tokens to sell], ... ]
     pub amount: f64, // Amount of tokens bought
     pub mc_entry: f64, // Market cap at entry
     pub created_at: chrono::DateTime<chrono::Utc>, // Default value is the current timestamp
@@ -1088,6 +1090,8 @@ pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSe
         sell_percentage: user_settings.get("sell_percentage"),
         gas_lamports: user_settings.get("gas_lamports"),
         anti_mev: user_settings.get("anti_mev"),
+        take_profits: user_settings.get("take_profits"),
+        stop_losses: user_settings.get("stop_losses"),
     })
 }
 
@@ -1252,4 +1256,78 @@ pub async fn get_or_create_user_settings(pool: &PgPool, user_tg_id: &str) -> Res
         },
         Err(e) => Err(e.into()),
     }
+}
+
+pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &str, take_profits: Vec<(f64, f64)>, stop_losses: Vec<(f64, f64)>, amount: f64, mc_entry: f64) -> Result<()> {
+    let take_profits_json = serde_json::to_value(take_profits).unwrap();
+    let stop_losses_json = serde_json::to_value(stop_losses).unwrap();
+    sqlx::query("INSERT INTO positions (tg_user_id, token_address, take_profits, stop_losses, amount, mc_entry, signature) VALUES ($1, $2, $3, $4, $5, $6, $7)")
+    .bind(tg_user_id)
+    .bind(token_address)
+    .bind(take_profits_json)
+    .bind(stop_losses_json)
+    .bind(amount)
+    .bind(mc_entry)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+
+/// Gets the user settings take profits
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A Vec<(f64, f64)> representing the take profits
+pub async fn get_user_settings_take_profits(pool: &PgPool, user_tg_id: &str) -> Result<Vec<(f64, f64)>> {
+    let take_profits = sqlx::query_scalar("SELECT take_profits FROM user_settings WHERE tg_id = $1")
+    .bind(user_tg_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(take_profits)
+}
+
+/// Sets the user settings take profits
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// * `take_profits` - The take profits
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user settings take profits were set
+pub async fn set_user_settings_take_profits(pool: &PgPool, user_tg_id: &str, take_profits: Vec<(f64, f64)>) -> Result<()> {
+    let take_profits_json = serde_json::to_value(take_profits).unwrap();
+    sqlx::query("UPDATE user_settings SET take_profits = $1 WHERE tg_id = $2")
+    .bind(take_profits_json)
+    .bind(user_tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+
+/// Deletes a user settings take profit
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `take_profit` - The take profit
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user settings take profit was deleted
+pub async fn delete_user_settings_take_profit(pool: &PgPool, take_profit: (f64, f64), user_tg_id: &str) -> Result<()> {
+    let mut user_take_profits = get_user_settings_take_profits(pool, user_tg_id).await?;
+    user_take_profits.retain(|&tp| tp != take_profit);
+    set_user_settings_take_profits(pool, user_tg_id, user_take_profits).await?;
+    Ok(())
 }
