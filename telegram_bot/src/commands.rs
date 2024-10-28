@@ -56,7 +56,9 @@ pub async fn get_user_calls(user_tg_id: i64, pool: SafePool) -> Result<String> {
         calls_with_ath.push(call_with_ath);
     }
     println!("calls_with_ath: {:?}", calls_with_ath);
-    Ok(serde_json::to_string(&ResponsePaylod { calls: calls_with_ath, username: user.username.clone().unwrap_or("Unknown username".to_string()) })?)
+    let payload = ResponsePaylod { calls: calls_with_ath, username: user.username.clone().unwrap_or("Unknown username".to_string()) };
+    println!("@get_user_calls/ Response payload: {:?}", payload);
+    Ok(serde_json::to_string(&payload)?)
 }
 
 pub async fn start(bot: &teloxide::Bot, user_tg_id: &str, username: &str, chat_id: ChatId, pool: &SafePool) -> Result<()> {
