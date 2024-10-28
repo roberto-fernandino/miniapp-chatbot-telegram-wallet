@@ -1004,6 +1004,14 @@ const App: React.FC = () => {
                                     Called at ${formatNumber(mktCap)}
                                   </span>
                                 </div>
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="text-xs text-gray-400">
+                                    MC: $
+                                    {formatNumber(
+                                      parseFloat(callWithAth.call.mkt_cap)
+                                    )}
+                                  </span>
+                                </div>
                                 <div className="flex justify-between items-center text-xs text-gray-500">
                                   <span>
                                     {formatTime(callWithAth.call.time)}
