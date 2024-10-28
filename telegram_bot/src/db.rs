@@ -17,6 +17,7 @@ pub struct UserSettings {
     pub swap_or_limit: String,
     pub sell_percentage: String,
     pub gas_lamports: i32,
+    pub anti_mev: bool,
 }
 
 /// Struct to hold the call with the ATH after the call
@@ -1037,8 +1038,8 @@ pub async fn is_user_registered_in_mini_app(pool: &PgPool, user_tg_id: &str, use
 /// # Returns
 /// 
 /// A result indicating whether the user settings were set
-pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str, last_sent_token: &str, sell_percentage: &str, gas_lamports: &str) -> Result<()> {
-    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit, last_sent_token, sell_percentage, gas_lamports) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (tg_id) DO UPDATE SET slippage_tolerance = $2, buy_amount = $3, swap_or_limit = $4, last_sent_token = $5, sell_percentage = $6, gas_lamports = $7")
+pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str, last_sent_token: &str, sell_percentage: &str, gas_lamports: i32, anti_mev: bool) -> Result<()> {
+    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit, last_sent_token, sell_percentage, gas_lamports, anti_mev) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (tg_id) DO UPDATE SET slippage_tolerance = $2, buy_amount = $3, swap_or_limit = $4, last_sent_token = $5, sell_percentage = $6, gas_lamports = $7, anti_mev = $8")
     .bind(tg_id)
     .bind(slippage_tolerance)
     .bind(buy_amount)
@@ -1046,6 +1047,7 @@ pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance
     .bind(last_sent_token)
     .bind(sell_percentage)
     .bind(gas_lamports)
+    .bind(anti_mev)
     .execute(pool)
     .await?;
     Ok(())
@@ -1073,12 +1075,22 @@ pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSe
         swap_or_limit: user_settings.get("swap_or_limit"),
         sell_percentage: user_settings.get("sell_percentage"),
         gas_lamports: user_settings.get("gas_lamports"),
+        anti_mev: user_settings.get("anti_mev"),
     })
 }
 
 pub async fn set_user_sell_percentage(pool: &PgPool, tg_id: &str, sell_percentage: &str) -> Result<()> {
     sqlx::query("UPDATE user_settings SET sell_percentage = $1 WHERE tg_id = $2")
     .bind(sell_percentage)
+    .bind(tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn set_user_gas_lamports(pool: &PgPool, tg_id: &str, gas_lamports: i32) -> Result<()> {
+    sqlx::query("UPDATE user_settings SET gas_lamports = $1 WHERE tg_id = $2")
+    .bind(gas_lamports)
     .bind(tg_id)
     .execute(pool)
     .await?;
@@ -1173,7 +1185,7 @@ pub async fn check_if_user_has_settings(pool: &PgPool, user_tg_id: &str) -> Resu
 /// 
 /// A result indicating whether the user settings were created
 pub async fn create_user_settings_default(pool: &PgPool, user_tg_id: &str) -> Result<()> {
-    upsert_user_settings(pool, user_tg_id, "0.18", "0.2", "swap", "", "100", "5000").await.expect("Failed to create user settings");
+    upsert_user_settings(pool, user_tg_id, "0.18", "0.2", "swap", "", "100", 5000, false).await.expect("Failed to create user settings");
     Ok(())
 }
 

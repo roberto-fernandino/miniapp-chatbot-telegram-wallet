@@ -685,16 +685,15 @@ pub async fn execute_swap(data: String, bot: &teloxide::Bot, msg: &teloxide::typ
     };
     println!("@execute_swap: turnkey_user created successfully");
 
-
     println!("@execute_swap: Preparing request");
     let request: SwapSolRequest = if input_token == "So11111111111111111111111111111111111111112" {
         SwapSolRequest {
             user: turnkey_user,
             user_public_key: user.solana_address.clone().expect("Solana address not found").to_string(),
-            priorization_fee_lamports: 5000,
+            priorization_fee_lamports: user_settings.gas_lamports as u64,
             output_mint: output_token.to_string(),
             input_mint: input_token.to_string(),
-            amount: sol_to_lamports(input_token_amount),
+            amount: sol_to_lamports_u64(input_token_amount),
             slippage,
         }
     } else {

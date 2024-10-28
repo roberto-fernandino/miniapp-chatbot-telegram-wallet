@@ -243,6 +243,17 @@ pub async fn handle_message(
                     bot.send_message(msg.chat.id, "Invalid sell percentage").await?;
                 }
             }
+            else if reply_to_message.text().unwrap_or_default().starts_with("Enter the gas fee") {
+                let gas_lamports = match text.parse::<f64>() {
+                    Ok(sol_amount) => utils::helpers::sol_to_lamports_i32(sol_amount),
+                    Err(_) => {
+                        bot.send_message(msg.chat.id, "Invalid gas fee").await?;
+                        return Ok(());
+                    }
+                };
+                set_user_gas_lamports(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), gas_lamports).await?;
+                bot.send_message(msg.chat.id, format!("Gas fee set to: {} SOL", utils::helpers::lamports_to_sol(gas_lamports))).await?;
+            }
         }
         if is_pnl_command(text) {
             log::info!("Message is a pnl command");
@@ -504,7 +515,7 @@ pub async fn post_add_user_handler(
                 return (StatusCode::INTERNAL_SERVER_ERROR, "Could not add user to the db").into_response();
             }
         }
-        match upsert_user_settings(&pool, &user.tg_id, "0.18", "10", "swap", "", "100", "5000").await {
+        match upsert_user_settings(&pool, &user.tg_id, "0.18", "10", "swap", "", "100", 5000, false).await {
             Ok(_) => println!("@add_user/ user settings added to the db."),
             Err(e) => {
                 println!("@add_user/ error adding user settings to the db: {:?}", e);
@@ -902,4 +913,22 @@ async fn handle_execute_sell_callback(data: String, bot: &teloxide::Bot, q: &tel
     Ok(())
 }
 
-
+/// Handle change gas lamports callback
+/// 
+/// # Description
+/// 
+/// Change the gas lamports on the tg bot by sending a message with force reply that will be checked by the message handler when
+/// a reply with the value is sent
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+async fn handle_change_gas_lamports_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    bot.send_message(q.message.as_ref().unwrap().chat().id, "Enter the gas lamports")
+    .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the gas lamports".to_string()), selective: false})
+    .await?;
+    Ok(())
+}
