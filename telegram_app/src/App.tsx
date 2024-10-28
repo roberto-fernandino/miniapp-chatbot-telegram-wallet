@@ -481,10 +481,7 @@ const App: React.FC = () => {
    */
   const handleGetHistory = async (userId: string) => {
     try {
-      // get the first user calls of a token
       const historyResponse = await getUserFirstCalls(userId);
-
-      // parse the response
       const parsedResponse = JSON.parse(historyResponse);
 
       // parse the response
@@ -972,16 +969,16 @@ const App: React.FC = () => {
                         </h2>
                         <div className="flex flex-col items-center justify-center w-full mt-1 h-full">
                           <h1 className="text-3xl font-bold mb-6 text-center bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 text-transparent bg-clip-text">
-                            @{history.username}
+                            @{history?.username}
                           </h1>
-                          {history.calls.map((callWithAth: any) => (
+                          {history?.calls?.map((callWithAth: any) => (
                             <div
                               key={callWithAth.call.id}
                               className="mb-4 p-4 bg-gray-800 rounded-lg shadow-md text-white w-full"
                             >
                               <div className="flex justify-between items-center mb-2">
                                 <span className="font-semibold">
-                                  {callWithAth.call.token_symbol} /
+                                  {callWithAth.call.token_symbol} /{" "}
                                   {callWithAth.call.chain}
                                 </span>
                                 <span className="text-sm text-green-400 ml-3">
