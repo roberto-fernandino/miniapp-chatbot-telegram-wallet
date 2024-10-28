@@ -43,14 +43,10 @@ pub async fn handle_callback_refresh_call(data: String, bot: &teloxide::Bot, que
     let call_id = data.strip_prefix("refresh:").unwrap_or_default();
     let call = crate::db::get_call_by_id(&pool, call_id.parse::<i64>().expect("Could not parse call id, maybe the value is not a number or to big.")).await?;
     let token_pair_token_address = get_pair_token_pair_and_token_address(&call.token_mint).await?;
-    let pair_address = token_pair_token_address["pairAddress"].as_str().unwrap_or("");
     let token_address = token_pair_token_address["tokenAddress"].as_str().unwrap_or("");
     let chain = token_pair_token_address["chainName"].as_str().unwrap_or("");
     let scanner_response = get_scanner_search(
-        pair_address,
-        token_address,
-        chain
-    ).await?;
+&call.token_mint).await?;
 
     let created_datetime_str = scanner_response["pair"]["pairCreatedAt"].as_str().unwrap_or("");
     let datetime: DateTime<Utc> = created_datetime_str.parse().expect("Failed to parse datetime.");
@@ -254,6 +250,19 @@ pub async fn handle_message(
                 set_user_gas_lamports(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), gas_lamports).await?;
                 bot.send_message(msg.chat.id, format!("Gas fee set to: {} SOL", utils::helpers::lamports_to_sol(gas_lamports))).await?;
             }
+            else if reply_to_message.text().unwrap_or_default().starts_with("Send '<multiplier>, <%_token_position_amount_to_sell>' ") {
+                
+                let take_profits = match parse_take_profit_message(text) {
+                    Ok(tp) => tp,
+                    Err(e) => {
+                        bot.send_message(msg.chat.id, "Invalid take profit format. Please use format: '<multiplier>, <%_token_position_amount_to_sell>'").await?;
+                        return Ok(());
+                    }
+                };
+
+                add_user_take_profit_user_settings(msg.clone().from.unwrap().id.to_string().as_str(), take_profits, &pool).await?;
+                bot.send_message(msg.chat.id, "Take profit set").await?;
+            }
         }
         if is_pnl_command(text) {
             log::info!("Message is a pnl command");
@@ -433,6 +442,18 @@ pub async fn handle_callback_query(
             match handle_settings_callback(data.to_string(), &bot, &query, &pool).await { 
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to handle settings callback: {:?}", e),
+            }
+        }
+        else if data.starts_with("delete_take_profit:") {
+            match handle_delete_take_profit_user_settings_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to delete take profit: {:?}", e),
+            }
+        }
+        else if data.starts_with("add_take_profit") {
+            match handle_add_take_profit_user_settings_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to add take profit: {:?}", e),
             }
         }
         else {
@@ -636,10 +657,8 @@ pub async fn token_address_buy_info_handler(text: &str, bot: &teloxide::Bot, msg
     println!("@buy_sol_token_address_handler/ creating keyboard");
     let keyboard = create_sol_buy_swap_keyboard(&pool, user.tg_id.to_string().as_str()).await;
     println!("@buy_sol_token_address_handler/ keyboard created");
-    let token_pair_and_token_address  = get_pair_token_pair_and_token_address(token_address.as_str()).await?;
-    println!("@buy_sol_token_address_handler/ token_pair_and_token_address: {:?}", token_pair_and_token_address);
     println!("@buy_sol_token_address_handler/ sending scanner request");
-    let scanner_response = get_scanner_search(token_pair_and_token_address["pairAddress"].as_str().unwrap_or(""), token_pair_and_token_address["tokenAddress"].as_str().unwrap_or(""), token_pair_and_token_address["chainName"].as_str().unwrap_or("")).await?;
+    let scanner_response = get_scanner_search(token_address.as_str()).await?;
     println!("@buy_sol_token_address_handler/ received response");
 
     // token info
@@ -993,5 +1012,52 @@ async fn handle_set_custom_gas_callback(_data: String, bot: &teloxide::Bot, q: &
     bot.send_message(q.message.as_ref().unwrap().chat().id, "Enter the gas fee")
     .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the gas fee in SOL".to_string()), selective: false})
     .await?;
+    Ok(())
+}
+
+/// Handle add take profit callback
+/// 
+/// # Description
+/// 
+/// Add a take profit on the tg bot by sending a message with force reply that will be checked by the message handler when
+/// a reply with the value is sent
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool    
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation    
+async fn handle_add_take_profit_user_settings_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    bot.send_message(q.message.as_ref().unwrap().chat().id, "Send '<take_profit_%_up>, <%_token_position_amount_to_sell>' ")
+    .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Send '<take_profit_%_up>, <%_token_position_amount_to_sell>' ".to_string()), selective: false})
+    .await?;
+    Ok(())
+}
+
+
+/// Handle delete take profit user settings callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_delete_take_profit_user_settings_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let user_tg_id = q.from.id.to_string();
+    // data = "delete_take_profit:<multiplier>_<percentage_to_sell>"k
+    let multiplier_and_percentage_to_sell= data.split(":").nth(1).unwrap_or("N/A");
+    let multiplier = multiplier_and_percentage_to_sell.split("_").nth(0).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
+    let percentage_to_sell = multiplier_and_percentage_to_sell.split("_").nth(1).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
+    delete_user_settings_take_profit(&pool, (multiplier, percentage_to_sell), &user_tg_id).await?;
     Ok(())
 }
