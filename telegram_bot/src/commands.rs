@@ -47,7 +47,13 @@ pub async fn get_user_calls(user_tg_id: i64, pool: SafePool) -> Result<String> {
         let total_supply = scanner_response["pair"]["token1TotalSupplyFormatted"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
 
         let ath_mkt_cap = ath_price * total_supply;
-        let multiplier = ath_price / call.clone().price.parse::<f64>().unwrap_or(0.0);
+        let multiplier;
+        if ath_mkt_cap != 0.0 {
+            multiplier = ath_price / call.clone().price.parse::<f64>().unwrap_or(0.0);
+        } else {
+            multiplier = 0.0;
+        }
+        
         let call_with_ath = CallWithAth {
             call: call.clone(),
             multiplier,
