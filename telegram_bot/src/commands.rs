@@ -725,7 +725,7 @@ pub async fn execute_swap(data: String, bot: &teloxide::Bot, msg: &teloxide::typ
     let stop_losses = user_settings.stop_losses.clone();
     let scanner_response = get_scanner_search(input_token).await?;
     let token_price = scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
-    let position = db::insert_position(pool, &user_id, input_token, take_profits, stop_losses, input_token_amount, token_price).await?;
+    let position = db::insert_position(pool, &user_id, input_token, take_profits.unwrap(), stop_losses.unwrap(), input_token_amount, token_price).await?;
     Ok(response)
 }
 
