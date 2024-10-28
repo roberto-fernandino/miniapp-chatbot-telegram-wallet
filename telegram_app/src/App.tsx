@@ -977,42 +977,49 @@ const App: React.FC = () => {
                           </h1>
                           <div className="flex flex-col items-center justify-center w-full h-full overflow-y-auto max-h-96">
                             {history?.calls?.map((callWithAth: any) => {
-                              // Check for NaN or invalid values
-                              const multiplier = isNaN(callWithAth.multiplier)
-                                ? 0
-                                : callWithAth.multiplier;
-                              const mktCap =
-                                parseFloat(callWithAth.call.mkt_cap) || 0;
-                              const athAfterCall =
-                                callWithAth.ath_after_call || 0;
+                              try {
+                                // Check for NaN or invalid values
+                                const multiplier = isNaN(callWithAth.multiplier)
+                                  ? 0
+                                  : callWithAth.multiplier;
+                                const mktCap =
+                                  parseFloat(callWithAth.call.mkt_cap) || 0;
+                                const athAfterCall =
+                                  callWithAth.ath_after_call || 0;
 
-                              return (
-                                <div
-                                  key={callWithAth.call.id}
-                                  className="mb-4 p-4 bg-gray-800 rounded-lg shadow-md text-white w-full"
-                                >
-                                  <div className="flex justify-between items-center mb-2">
-                                    <span className="font-semibold">
-                                      {callWithAth.call.token_symbol} /{" "}
-                                      {callWithAth.call.chain}
-                                    </span>
-                                    <span className="text-sm text-green-400 ml-3">
-                                      ATH: ${formatNumber(athAfterCall)} [
-                                      {multiplier.toFixed(2)}x]
-                                    </span>
+                                log(`Rendering call: ${callWithAth}`, "info");
+
+                                return (
+                                  <div
+                                    key={callWithAth.call.id}
+                                    className="mb-4 p-4 bg-gray-800 rounded-lg shadow-md text-white w-full"
+                                  >
+                                    <div className="flex justify-between items-center mb-2">
+                                      <span className="font-semibold">
+                                        {callWithAth.call.token_symbol} /{" "}
+                                        {callWithAth.call.chain}
+                                      </span>
+                                      <span className="text-sm text-green-400 ml-3">
+                                        ATH: ${formatNumber(athAfterCall)} [
+                                        {multiplier.toFixed(2)}x]
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between items-center mb-2">
+                                      <span className="text-xs text-gray-400">
+                                        Called at ${formatNumber(mktCap)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs text-gray-500">
+                                      <span>
+                                        {formatTime(callWithAth.call.time)} UTC
+                                      </span>
+                                    </div>
                                   </div>
-                                  <div className="flex justify-between items-center mb-2">
-                                    <span className="text-xs text-gray-400">
-                                      Called at ${formatNumber(mktCap)}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between items-center text-xs text-gray-500">
-                                    <span>
-                                      {formatTime(callWithAth.call.time)} UTC
-                                    </span>
-                                  </div>
-                                </div>
-                              );
+                                );
+                              } catch (error) {
+                                log(`Error rendering call: ${error}`, "error");
+                                return null;
+                              }
                             })}
                           </div>
                         </div>
