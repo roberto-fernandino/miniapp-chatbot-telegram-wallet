@@ -350,17 +350,30 @@ pub async fn create_sol_sell_swap_keyboard(pool: &PgPool, user_tg_id: &str, toke
 /// 
 /// A InlineKeyboardMarkup struct to be used in the ReplyMarkup on the bot
 pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> InlineKeyboardMarkup {
+    println!("@create_sol_buy_swap_keyboard/ user_tg_id: {:?}", user_tg_id);
+
     let user_has_settings = user_has_settings(&pool, user_tg_id).await.expect("Failed to check if user has settings");
+    println!("@create_sol_buy_swap_keyboard/ user_has_settings: {:?}", user_has_settings);
+
+
     if !user_has_settings {
+        println!("@create_sol_buy_swap_keyboard/ creating user settings");
         create_user_settings_default(&pool, user_tg_id).await.expect("Failed to create user settings");
+        println!("@create_sol_buy_swap_keyboard/ user settings created");
     }
+
+    println!("@create_sol_buy_swap_keyboard/ getting user settings");
     let user_settings = get_user_settings(&pool, user_tg_id).await.expect("User settings not found");
+    println!("@create_sol_buy_swap_keyboard/ user settings found");
+
+    println!("@create_sol_buy_swap_keyboard/ creating buttons");
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
     buttons.push(vec![
         InlineKeyboardButton::callback("← Back", "back"),
         InlineKeyboardButton::callback("Smart Money", "smart_money"),
         InlineKeyboardButton::callback("↻ Refresh", "refresh"),
     ]);
+
 
 
     let swap_or_limit = user_settings.swap_or_limit.as_str();
@@ -426,6 +439,7 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
     buttons.push(vec![
         InlineKeyboardButton::callback("Buy", format!("buy:{}", buy_amount)),
     ]);
+    println!("@create_sol_buy_swap_keyboard/ buttons created");
 
     InlineKeyboardMarkup::new(buttons)
 }
