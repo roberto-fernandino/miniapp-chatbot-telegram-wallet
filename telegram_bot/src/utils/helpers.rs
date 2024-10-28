@@ -417,7 +417,7 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
         let row: Vec<InlineKeyboardButton> = vec![
             InlineKeyboardButton::callback(format!("{}% up", take_profit.0), "_"),
             InlineKeyboardButton::callback(format!("{}% to sell", take_profit.1), "_"),
-            InlineKeyboardButton::callback("❌", format!("delete_take_profit:{}", index)),
+            InlineKeyboardButton::callback("❌", format!("delete_take_profit:{}_{}", take_profit.0, take_profit.1)),
         ];
         index += 1;
         buttons.push(row);
@@ -1230,4 +1230,25 @@ pub fn create_settings_keyboard(user_settings: UserSettings) -> InlineKeyboardMa
     }
     buttons.push(vec![InlineKeyboardButton::callback("← Back", "back")]);
     InlineKeyboardMarkup::new(buttons)
+}
+
+/// Parse the take profit message
+/// 
+/// # Arguments
+/// 
+/// * `text` - The text to parse
+/// 
+/// # Returns
+/// 
+/// A tuple representing the take profit
+pub fn parse_take_profit_message(text: &str) -> Result<(f64, f64)> {
+    let parts: Vec<&str> = text.split(',').collect();
+    if parts.len() != 2 {
+        return Err(anyhow::anyhow!("Invalid format"));
+    }
+
+    let multiplier = parts[0].trim().parse::<f64>()?;
+    let percentage = parts[1].trim().parse::<f64>()?;
+
+    Ok((multiplier, percentage))
 }
