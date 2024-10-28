@@ -1014,7 +1014,7 @@ const App: React.FC = () => {
                                 </div>
                                 <div className="flex justify-between items-center text-xs text-gray-500">
                                   <span>
-                                    {formatTime(callWithAth.call.time)}
+                                    {formatTime(callWithAth.call.time)} UTC
                                   </span>
                                 </div>
                               </div>
