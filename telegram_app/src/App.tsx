@@ -126,10 +126,7 @@ const App: React.FC = () => {
 
   // History
   const [historySheetOpen, setHistorySheetOpen] = useState(false);
-  const [history, setHistory] = useState<HistoryResponse>({
-    calls: [],
-    username: "",
-  });
+  const [history, setHistory] = useState<any>({});
 
   useEffect(() => {
     initializeApp();
@@ -500,7 +497,7 @@ const App: React.FC = () => {
       log(`history: ${JSON.stringify(parsedHistory)}`, "info");
 
       // set the history
-      // setHistory(parsedHistory);
+      setHistory(parsedHistory);
     } catch (error) {
       log(`Failed to parse history response ${error}`, "error");
     }
@@ -977,7 +974,7 @@ const App: React.FC = () => {
                           <h1 className="text-3xl font-bold mb-6 text-center bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 text-transparent bg-clip-text">
                             @{history.username}
                           </h1>
-                          {history.calls.map((callWithAth) => (
+                          {history.calls.map((callWithAth: any) => (
                             <div
                               key={callWithAth.call.id}
                               className="mb-4 p-4 bg-gray-800 rounded-lg shadow-md text-white w-full"
