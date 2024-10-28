@@ -48,7 +48,7 @@ interface Call {
   mkt_cap: string;
   token_address: string;
   token_mint: string;
-  token_symbol: string; // Added token_symbol
+  token_symbol: string;
   price: string;
   user_tg_id: string;
   chat_id: string;
@@ -466,6 +466,7 @@ const App: React.FC = () => {
 
   const handleGetTokenData = async (tokenCa: string) => {
     const data = await getTokenData(tokenCa);
+    log(`tokenData: ${JSON.stringify(data)}`, "info");
     setTokenData(data);
   };
 
@@ -477,18 +478,31 @@ const App: React.FC = () => {
     updateCopyTrades();
   };
 
+  /**
+   * Get the first user calls of a token and save it on the history state
+   * @param userId - The user id
+   */
   const handleGetHistory = async (userId: string) => {
     try {
+      // get the first user calls of a token
       const historyResponse = await getUserFirstCalls(userId);
+
+      // parse the response
       const parsedResponse = JSON.parse(historyResponse);
-      const history =
+
+      // parse the response
+      const parsedHistory =
         typeof parsedResponse === "string"
           ? JSON.parse(parsedResponse)
           : parsedResponse;
+
+      // log the history
       log(`history: ${JSON.stringify(history)}`, "info");
       log(`history.calls: ${JSON.stringify(history.calls)}`, "info");
       log(`history.username: ${JSON.stringify(history.username)}`, "info");
-      setHistory(history);
+
+      // set the history
+      setHistory(parsedHistory);
     } catch (error) {
       log(`Failed to parse history response ${error}`, "error");
     }
