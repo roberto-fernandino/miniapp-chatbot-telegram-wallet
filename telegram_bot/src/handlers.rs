@@ -504,7 +504,7 @@ pub async fn post_add_user_handler(
                 return (StatusCode::INTERNAL_SERVER_ERROR, "Could not add user to the db").into_response();
             }
         }
-        match upsert_user_settings(&pool, &user.tg_id, "0.18", "10", "swap", "", "100").await {
+        match upsert_user_settings(&pool, &user.tg_id, "0.18", "10", "swap", "", "100", "5000").await {
             Ok(_) => println!("@add_user/ user settings added to the db."),
             Err(e) => {
                 println!("@add_user/ error adding user settings to the db: {:?}", e);
