@@ -423,6 +423,12 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to set sell percentage: {:?}", e),
             }
         }
+        else if data.starts_with("settings") {
+            match handle_settings_callback(data.to_string(), &bot, &query, &pool).await { 
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to handle settings callback: {:?}", e),
+            }
+        }
         else {
             log::info!("Unrecognized callback query data: {}", data);
         }
@@ -929,6 +935,30 @@ async fn handle_execute_sell_callback(data: String, bot: &teloxide::Bot, q: &tel
 async fn handle_change_gas_lamports_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     bot.send_message(q.message.as_ref().unwrap().chat().id, "Enter the gas lamports")
     .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the gas lamports".to_string()), selective: false})
+    .await?;
+    Ok(())
+}
+
+
+async fn handle_settings_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let user_settings = get_user_settings(&pool, &q.from.id.to_string()).await?;
+    let keyboard = create_settings_keyboard(user_settings);
+    let user = get_user(&pool, &q.from.id.to_string()).await?;
+    bot.send_message(
+        q.message.as_ref().unwrap().chat().id,
+        format!(
+        "<b>Settings:</b>\n\
+        <code>{}</code>\n\n\
+        GAS Fee and MEV Tip will affect transaction speed. MEV Tip will only be used when Anti-MEV is turned on. Please set GAS Fee and MEV Tip reasonably.\n\n\
+        RAY Slippage:\n\
+        When you initiate a trade, your purchase amount is fixed, and the number of tokens you receive will decrease if the price rises. (If you set the slippage to 50%, then you will get 50% of the tokens, your cost will be 1/50%=2, and you will buy the token at a maximum of 2 times the price.)\n\n\
+        PUMP Slippage:\n\
+        When you initiate a trade, the number of tokens you receive is fixed, and the amount of SOL you spend will increase if the price rises. (If your slippage is set to 60%, the maximum sol you will spend is 1/(1-60%) = 2.5x SOL)
+        ", user.solana_address.expect("Solana address not found").as_str()
+        )
+    )
+    .reply_markup(keyboard)
+    .parse_mode(teloxide::types::ParseMode::Html)
     .await?;
     Ok(())
 }
