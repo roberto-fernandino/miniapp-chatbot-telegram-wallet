@@ -969,7 +969,11 @@ const App: React.FC = () => {
                         </h2>
                         <div className="flex flex-col items-center justify-center w-full mt-1 h-full">
                           <h1 className="text-3xl font-bold mb-6 text-center bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 text-transparent bg-clip-text">
-                            @{history?.username}
+                            {history?.username ? (
+                              `@${history?.username}`
+                            ) : (
+                              <Spinner />
+                            )}
                           </h1>
                           {history?.calls?.map((callWithAth: any) => (
                             <div
