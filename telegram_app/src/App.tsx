@@ -975,35 +975,43 @@ const App: React.FC = () => {
                               <Spinner />
                             )}
                           </h1>
-                          {history?.calls?.map((callWithAth: any) => (
-                            <div
-                              key={callWithAth.call.id}
-                              className="mb-4 p-4 bg-gray-800 rounded-lg shadow-md text-white w-full"
-                            >
-                              <div className="flex justify-between items-center mb-2">
-                                <span className="font-semibold">
-                                  {callWithAth.call.token_symbol} /{" "}
-                                  {callWithAth.call.chain}
-                                </span>
-                                <span className="text-sm text-green-400 ml-3">
-                                  ATH: $
-                                  {formatNumber(callWithAth.ath_after_call)} [
-                                  {callWithAth.multiplier.toFixed(2)}x]
-                                </span>
+                          {history?.calls?.map((callWithAth: any) => {
+                            // Check for NaN or invalid values
+                            const multiplier = isNaN(callWithAth.multiplier)
+                              ? 0
+                              : callWithAth.multiplier;
+                            const mktCap =
+                              parseFloat(callWithAth.call.mkt_cap) || 0;
+
+                            return (
+                              <div
+                                key={callWithAth.call.id}
+                                className="mb-4 p-4 bg-gray-800 rounded-lg shadow-md text-white w-full"
+                              >
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="font-semibold">
+                                    {callWithAth.call.token_symbol} /{" "}
+                                    {callWithAth.call.chain}
+                                  </span>
+                                  <span className="text-sm text-green-400 ml-3">
+                                    ATH: $
+                                    {formatNumber(callWithAth.ath_after_call)} [
+                                    {multiplier.toFixed(2)}x]
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="text-xs text-gray-400">
+                                    Called at ${formatNumber(mktCap)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs text-gray-500">
+                                  <span>
+                                    {formatTime(callWithAth.call.time)}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex justify-between items-center mb-2">
-                                <span className="text-xs text-gray-400">
-                                  Called at $
-                                  {formatNumber(
-                                    parseFloat(callWithAth.call.mkt_cap)
-                                  )}
-                                </span>
-                              </div>
-                              <div className="flex justify-between items-center text-xs text-gray-500">
-                                <span>{formatTime(callWithAth.call.time)}</span>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     </>
