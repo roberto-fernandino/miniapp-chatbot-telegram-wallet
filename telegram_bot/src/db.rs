@@ -1447,10 +1447,16 @@ pub async fn delete_position_target_reached(pool: &PgPool, token_address: &str, 
 /// 
 /// A result indicating whether the user take profit was added
 pub async fn add_user_take_profit_user_settings(user_tg_id: &str, take_profit: (f64, f64), pool: &SafePool) -> Result<()> {
+    println!("@add_user_take_profit_user_settings/ take_profit: {:?}", take_profit);
     let mut user_take_profits = get_user_settings_take_profits(pool, user_tg_id).await?;
+    println!("@add_user_take_profit_user_settings/ user_take_profits: {:?}", user_take_profits);
+    println!("@add_user_take_profit_user_settings/ check if take profit is in user_take_profit");
     if !user_take_profits.contains(&take_profit) {
+        println!("@add_user_take_profit_user_settings/ take_profit not in user_take_profits, adding");
         user_take_profits.push(take_profit);
     }
-    set_user_settings_take_profits(pool, user_tg_id, Some(user_take_profits)).await?;
+    println!("@add_user_take_profit_user_settings/ user_take_profits after adding: {:?}", user_take_profits);
+    set_user_settings_take_profits(pool, user_tg_id, Some(user_take_profits.clone())).await?;
+    println!("@add_user_take_profit_user_settings/ user_take_profits after setting: {:?}", user_take_profits);
     Ok(())
 }
