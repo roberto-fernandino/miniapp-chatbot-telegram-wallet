@@ -1,6 +1,5 @@
 use anyhow::Result;
 use serde_json::json;
-use axum::response::Response;
 use axum::http::StatusCode;
 use crate::modules::swap::sign_and_send_swap_transaction;
 use axum::{
