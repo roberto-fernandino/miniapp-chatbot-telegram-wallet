@@ -1,6 +1,6 @@
 use anyhow::Result;
 use reqwest::Response;
-use crate::db::get_user_last_sent_token;
+use crate::db::{get_user_last_sent_token, get_user_settings_take_profits};
 use crate::handlers::{TurnkeyUser, SwapSolRequest};
 use crate::db::get_user_settings;
 use chrono::{DateTime, Utc};
@@ -714,7 +714,7 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
             output_mint: output_token.to_string(),
             input_mint: input_token.to_string(),
             amount: input_token_amount as u64,
-            slippage: slippage * 100.0,
+            slippage: slippage,
         }
     };
 
@@ -733,13 +733,15 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
             return Err(anyhow::anyhow!("Failed to send request: {}", e));
         }
     };
-    let take_profits = user_settings.take_profits.clone();
-    let stop_losses = user_settings.stop_losses.clone();
-    let scanner_response = get_scanner_search(input_token).await?;
-    let token_price = scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
-    let token_amount_in_wallet = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await?;
-    db::insert_position(pool, &user_tg_id, input_token, take_profits.unwrap(), stop_losses.unwrap(), token_amount_in_wallet, token_price).await?;
-
+    // If the input token is SOL = buy
+    if input_token == "So11111111111111111111111111111111111111112" {
+        let take_profits = get_user_settings_take_profits(pool, &user_tg_id).await?;
+        let stop_losses = db::get_user_settings_stop_losses(pool, &user_tg_id).await?;
+        let scanner_response = get_scanner_search(input_token).await?;
+        let token_price = scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+        let token_amount_in_wallet = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await?;
+        db::insert_position(pool, &user_tg_id, input_token, take_profits, stop_losses, token_amount_in_wallet, token_price).await?;
+    } 
     Ok(response)
 }
 
