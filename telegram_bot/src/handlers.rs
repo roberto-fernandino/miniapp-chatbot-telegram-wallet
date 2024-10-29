@@ -630,7 +630,6 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
     };
     println!("@handle_execute_buy_sol_callback/ checking if response is success");
     if response.status().is_success() {
-        db::create_position(pool, user_id, token_address.as_str()).await?;
         println!("@handle_execute_buy_sol_callback/ response is success");
         let json_response = response.json::<serde_json::Value>().await?;
         println!("@handle_execute_buy_sol_callback/ json_response: {:?}", json_response);
