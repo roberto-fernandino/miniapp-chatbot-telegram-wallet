@@ -402,6 +402,12 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to set custom sell percentage: {:?}", e),
             }
         }
+        else if data.starts_with("delete_take_profit:") {
+            match handle_delete_take_profit_user_settings_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to delete take profit: {:?}", e),
+            }
+        }
         else if data == "back" {
             let user_tg_id = query.from.id.to_string();
             let user = get_user(&pool, &user_tg_id).await?;
@@ -1063,6 +1069,32 @@ async fn handle_delete_take_profit_user_settings_callback(data: String, bot: &te
     let multiplier_and_percentage_to_sell= data.split(":").nth(1).unwrap_or("N/A");
     let multiplier = multiplier_and_percentage_to_sell.split("_").nth(0).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
     let percentage_to_sell = multiplier_and_percentage_to_sell.split("_").nth(1).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
-    delete_user_settings_take_profit(&pool, (multiplier, percentage_to_sell), &user_tg_id).await?;
+    db::delete_user_settings_take_profit(&pool, (multiplier, percentage_to_sell), &user_tg_id).await?;
+    let last_token_address = get_user_last_sent_token(&pool, &user_tg_id).await?;
+    if let Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) = q.message.as_ref() {
+        token_address_buy_info_handler(last_token_address.as_str(), bot, msg, pool).await?;
+    }
+    Ok(())
+}
+
+
+/// Handle delete stop loss user settings callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_delete_stop_loss_user_settings_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let user_tg_id = q.from.id.to_string();
+    let multiplier_and_percentage_to_sell= data.split(":").nth(1).unwrap_or("N/A");
+    let multiplier = multiplier_and_percentage_to_sell.split("_").nth(0).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
+    let percentage_to_sell = multiplier_and_percentage_to_sell.split("_").nth(1).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
+    // db::delete_user_settings_stop_loss(&pool, (multiplier, percentage_to_sell), &user_tg_id).await?;
     Ok(())
 }
