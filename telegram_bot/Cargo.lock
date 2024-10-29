@@ -2630,6 +2630,7 @@ dependencies = [
  "sqlx",
  "teloxide",
  "tokio",
+ "tokio-native-tls",
  "tokio-tungstenite",
  "tungstenite",
  "url",
