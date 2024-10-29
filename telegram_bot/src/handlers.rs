@@ -684,7 +684,7 @@ pub async fn token_address_buy_info_handler(text: &str, bot: &teloxide::Bot, msg
         msg.chat.id, 
         format!(
             "Swap ${token_symbol}📈 - ({token_name})\n\
-            <code>{token_address}</code> (Tap to copy)\n\
+            <code> {token_address}</code> (Tap to copy)\n\
             • SOL Balance: {sol_balance} (${sol_balance_usd}) [TransferSOL]\n\
             • Price: <b>${token_usd_price}</b> LP: <b>${lp}</b> MC: <b>${mkt_cap}</b>\n\
             • Renounced: {renounced} Burnt: {burnt}
