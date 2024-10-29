@@ -1268,9 +1268,19 @@ pub async fn get_or_create_user_settings(pool: &PgPool, user_tg_id: &str) -> Res
     }
 }
 
-pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &str, take_profits: Vec<(f64, f64)>, stop_losses: Vec<(f64, f64)>, amount: f64, mc_entry: f64) -> Result<()> {
-    let take_profits_json = serde_json::to_value(take_profits).unwrap();
-    let stop_losses_json = serde_json::to_value(stop_losses).unwrap();
+pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &str, take_profits: Option<Vec<(f64, f64)>>, stop_losses: Option<Vec<(f64, f64)>>, amount: f64, mc_entry: f64) -> Result<()> {
+    let take_profits_json = if take_profits.is_some() {
+        Some(serde_json::to_value(take_profits).unwrap())
+    } else {
+        None
+    };
+
+    let stop_losses_json = if stop_losses.is_some() {
+        Some(serde_json::to_value(stop_losses).unwrap())
+    } else {
+        None
+    };
+
     sqlx::query("INSERT INTO positions (tg_user_id, token_address, take_profits, stop_losses, amount, mc_entry, signature) VALUES ($1, $2, $3, $4, $5, $6, $7)")
     .bind(tg_user_id)
     .bind(token_address)
@@ -1294,7 +1304,7 @@ pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &st
 /// # Returns
 /// 
 /// A Vec<(f64, f64)> representing the take profits
-pub async fn get_user_settings_take_profits(pool: &PgPool, user_tg_id: &str) -> Result<Vec<(f64, f64)>> {
+pub async fn get_user_settings_take_profits(pool: &PgPool, user_tg_id: &str) -> Result<Option<Vec<(f64, f64)>>> {
     let take_profits: Option<serde_json::Value> = sqlx::query_scalar(
         "SELECT take_profits FROM user_settings WHERE tg_id = $1"
     )
@@ -1303,8 +1313,8 @@ pub async fn get_user_settings_take_profits(pool: &PgPool, user_tg_id: &str) -> 
     .await?;
 
     match take_profits {
-        Some(json) => Ok(serde_json::from_value(json).unwrap_or_default()),
-        None => Ok(Vec::new())
+        Some(json) => Ok(Some(serde_json::from_value(json).unwrap_or_default())),
+        None => Ok(None)
     }
 }
 
@@ -1318,7 +1328,7 @@ pub async fn get_user_settings_take_profits(pool: &PgPool, user_tg_id: &str) -> 
 /// # Returns
 /// 
 /// A Vec<(f64, f64)> representing the stop losses
-pub async fn get_user_settings_stop_losses(pool: &PgPool, user_tg_id: &str) -> Result<Vec<(f64, f64)>> {
+pub async fn get_user_settings_stop_losses(pool: &PgPool, user_tg_id: &str) -> Result<Option<Vec<(f64, f64)>>> {
     let stop_losses: Option<serde_json::Value> = sqlx::query_scalar(
         "SELECT stop_losses FROM user_settings WHERE tg_id = $1"
     )
@@ -1327,8 +1337,8 @@ pub async fn get_user_settings_stop_losses(pool: &PgPool, user_tg_id: &str) -> R
     .await?;
 
     match stop_losses {
-        Some(json) => Ok(serde_json::from_value(json).unwrap_or_default()),
-        None => Ok(Vec::new())
+        Some(json) => Ok(Some(serde_json::from_value(json).unwrap_or_default())),
+        None => Ok(None)
     }
 }
 
@@ -1369,21 +1379,23 @@ pub async fn set_user_settings_take_profits(pool: &PgPool, user_tg_id: &str, tak
 pub async fn delete_user_settings_take_profit(pool: &PgPool, take_profit: (f64, f64), user_tg_id: &str) -> Result<()> {
     println!("@delete_user_settings_take_profit/ take_profit: {:?}", take_profit);
 
-    let mut user_take_profits = get_user_settings_take_profits(pool, user_tg_id).await?;
-    println!("@delete_user_settings_take_profit/ user_take_profits: {:?}", user_take_profits);
+    if let Some(mut user_take_profits) = get_user_settings_take_profits(pool, user_tg_id).await? {
+        println!("@delete_user_settings_take_profit/ user_take_profits: {:?}", user_take_profits);
+        
+        user_take_profits.retain(|&tp| tp != take_profit);
+        println!("@delete_user_settings_take_profit/ user_take_profits after retaining: {:?}", user_take_profits);
 
-    user_take_profits.retain(|&tp| tp != take_profit);
-    println!("@delete_user_settings_take_profit/ user_take_profits after retaining: {:?}", user_take_profits);
+        let take_profits = if user_take_profits.is_empty() {
+            None
+        } else {
+            Some(user_take_profits)
+        };
+        println!("@delete_user_settings_take_profit/ setting user_take_profits to: {:?}", take_profits);
 
-    let take_profits = if user_take_profits.is_empty() {
-        None
-    } else {
-        Some(user_take_profits)
-    };
-    println!("@delete_user_settings_take_profit/ setting user_take_profits to: {:?}", take_profits);
+        set_user_settings_take_profits(pool, user_tg_id, take_profits).await?;
+        println!("@delete_user_settings_take_profit/ user_take_profits was set.");
+    }
 
-    set_user_settings_take_profits(pool, user_tg_id, take_profits).await?;
-    println!("@delete_user_settings_take_profit/ user_take_profits was set.");
     Ok(())
 }
 
@@ -1494,16 +1506,25 @@ pub async fn delete_position_target_reached(pool: &PgPool, token_address: &str, 
 /// A result indicating whether the user take profit was added
 pub async fn add_user_take_profit_user_settings(user_tg_id: &str, take_profit: (f64, f64), pool: &SafePool) -> Result<()> {
     println!("@add_user_take_profit_user_settings/ take_profit: {:?}", take_profit);
+
     let mut user_take_profits = get_user_settings_take_profits(pool, user_tg_id).await?;
     println!("@add_user_take_profit_user_settings/ user_take_profits: {:?}", user_take_profits);
-    println!("@add_user_take_profit_user_settings/ check if take profit is in user_take_profit");
-    if !user_take_profits.contains(&take_profit) {
-        println!("@add_user_take_profit_user_settings/ take_profit not in user_take_profits, adding");
-        user_take_profits.push(take_profit);
+
+    if let Some(ref mut profits) = user_take_profits {
+        println!("@add_user_take_profit_user_settings/ check if take profit is in user_take_profit");
+        if !profits.contains(&take_profit) {
+            println!("@add_user_take_profit_user_settings/ take_profit not in user_take_profits, adding");
+            profits.push(take_profit);
+        }
+    } else {
+        // If there are no existing take profits, initialize with the new take profit
+        user_take_profits = Some(vec![take_profit]);
     }
+
     println!("@add_user_take_profit_user_settings/ user_take_profits after adding: {:?}", user_take_profits);
-    set_user_settings_take_profits(pool, user_tg_id, Some(user_take_profits.clone())).await?;
-    println!("@add_user_take_profit_user_settings/ user_take_profits after setting: {:?}", user_take_profits);
+    set_user_settings_take_profits(pool, user_tg_id, user_take_profits.clone()).await?;
+    println!("@add_user_take_profit_user_settings/ user_take_profits after setting: {:?}", user_take_profits.clone());
+
     Ok(())
 }
 
