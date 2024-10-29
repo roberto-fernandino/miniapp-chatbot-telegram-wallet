@@ -1094,9 +1094,17 @@ async fn handle_delete_take_profit_user_settings_callback(data: String, bot: &te
     let multiplier = multiplier_and_percentage_to_sell.split("_").nth(0).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
     println!("@handle_delete_take_profit_user_settings_callback/ multiplier: {:?}x", multiplier);
     let percentage_to_sell = multiplier_and_percentage_to_sell.split("_").nth(1).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
+
     println!("@handle_delete_take_profit_user_settings_callback/ percentage_to_sell: {:?}%", percentage_to_sell);
     db::delete_user_settings_take_profit(&pool, (multiplier, percentage_to_sell), &user_tg_id).await?;
+    println!("@handle_delete_take_profit_user_settings_callback/ take_profit removed from take_profit array in user settings");
+
+    println!("@handle_delete_take_profit_user_settings_callback/ getting last token address from user settings");
     let last_token_address = get_user_last_sent_token(&pool, &user_tg_id).await?;
+    println!("@handle_delete_take_profit_user_settings_callback/ last token address: {:?}", last_token_address);
+
+    // To dsiplay buy menu again we need to send the last token address to the token_address_buy_info_handler
+    println!("@handle_delete_take_profit_user_settings_callback/ sending last token address to token_address_buy_info_handler");
     if let Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) = q.message.as_ref() {
         token_address_buy_info_handler(last_token_address.as_str(), bot, msg, pool).await?;
     }
