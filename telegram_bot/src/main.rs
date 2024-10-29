@@ -6,6 +6,7 @@ use futures_util::SinkExt;
 use tokio_tungstenite::connect_async;
 use teloxide::{dispatching::UpdateFilterExt, Bot};
 use utils::helpers::check_raydiums_tokens;
+use utils::helpers::get_token_amount_in_wallet;
 use std::sync::Arc;
 use sqlx::Pool;
 use sqlx::Postgres;
@@ -151,7 +152,7 @@ async fn positions_watcher(pool: SafePool) {
         if let Ok(current_prices) = crate::utils::helpers::check_raydium_tokens_prices(
             raydium_tokens.iter().cloned().collect()
         ).await {
-            for position in &all_positions {
+            for position in &raydium_positions {
                 if let Some(current_price) = current_prices.get(&position.token_address) {
                     let current_price_float = current_price.parse::<f64>().unwrap_or_default();
                     if current_price_float >= (position.take_profits[0].0 * position.entry_price) {
@@ -164,6 +165,18 @@ async fn positions_watcher(pool: SafePool) {
                             "So11111111111111111111111111111111111111112"
                         ).await {
                             eprintln!("Error executing swap: {:?}", e);
+                        } else {
+                            println!("@positions_watcher/ take profit executed for position: {:?}", position);
+                            println!("@positions_watcher/ deleting position take profit");
+                            let user = db::get_user_by_tg_id(&pool, &position.tg_user_id).await.unwrap();
+                            let user_token_amount = get_token_amount_in_wallet(&user.solana_address.unwrap(), &position.token_address).await.unwrap();
+                            println!("@positions_watcher/ user token amount: {:?}", user_token_amount);
+                            if user_token_amount > 0.0 {
+                                db::remove_take_profit_from_position(&pool, &position.token_address, &position.tg_user_id, (position.take_profits[0].0, position.take_profits[0].1)).await.unwrap();
+                            } else {
+                                println!("@positions_watcher/ user has no tokens in wallet, deleting position");
+                                db::delete_position(&pool, &position.token_address, &position.tg_user_id).await.unwrap();
+                            }
                         }
 
                         if let Err(e) = db::delete_position_target_reached(
