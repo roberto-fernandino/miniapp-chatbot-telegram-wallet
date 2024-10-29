@@ -1312,7 +1312,7 @@ pub async fn get_user_settings_take_profits(pool: &PgPool, user_tg_id: &str) -> 
 pub async fn set_user_settings_take_profits(pool: &PgPool, user_tg_id: &str, take_profits: Option<Vec<(f64, f64)>>) -> Result<()> {
     let take_profits_json = serde_json::to_value(take_profits).unwrap_or(json!(null));
     sqlx::query(
-        "UPDATE user_settings SET take_profits = $1 WHERE user_tg_id = $2"
+        "UPDATE user_settings SET take_profits = $1 WHERE tg_id = $2"
     )
     .bind(take_profits_json)
     .bind(user_tg_id)
