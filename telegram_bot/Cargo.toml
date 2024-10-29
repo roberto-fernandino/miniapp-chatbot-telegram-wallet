@@ -13,7 +13,7 @@ anyhow = "1.0.89"
 serde_json = "1.0.128"
 reqwest = { version = "0.12.8", features = ["json", "blocking"] }
 sqlx = { version = "0.8.2", features = ["postgres", "runtime-tokio-native-tls", "macros", "chrono"] }
-tokio-tungstenite = "0.24.0"
+tokio-tungstenite = { version = "0.24", features = ["tls"] }
 tungstenite = "0.24"
 chrono = { version = "0.4", features = ["serde"] }
 serde_derive = "1.0.213"
