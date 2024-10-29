@@ -198,7 +198,6 @@ pub async fn get_legacy_swap_transaction(
         .json(&json);
 
     let response = request.send().await?;
-    println!("@get_legacy_swap_transaction/ response: {:?}", response);
     let body = response.text().await?;
     let swap_transaction: SwapTransaction = serde_json::from_str(&body)?;
 
