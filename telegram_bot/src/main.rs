@@ -35,13 +35,15 @@ async fn main() {
     // Spawn the Tide server on a separate task using Tokio runtime.
     let axum_pool = shared_pool.clone();
     tokio::spawn(async move {
+        println!("@main/ starting axum server");
         run_axum_server(axum_pool).await;
     });
 
     /// Check positions
     let positions_pool = shared_pool.clone();
     tokio::spawn(async move {
-        check_positions(positions_pool).await;
+        println!("@main/ running positions_watcher");
+        positions_watcher(positions_pool).await;
     });
 
     let bot = Bot::from_env();
@@ -66,14 +68,10 @@ pub struct PumpPayload {
     keys: Vec<String>,
 }
 
-async fn check_positions(pool: SafePool) {
+async fn positions_watcher(pool: SafePool) {
     let url = "wss://pumpportal.fun/api/data";
     let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to pumpportal");
     let (mut pump_write, mut pump_read) = ws_stream.split();
-    
-    // Track currently watched tokens
-    let mut current_raydium_tokens = std::collections::HashSet::new();
-    let mut current_pumpfun_tokens = std::collections::HashSet::new();
 
     // Spawn WebSocket listener
     let pump_read_handle = tokio::spawn(async move {
@@ -99,13 +97,18 @@ async fn check_positions(pool: SafePool) {
                 continue;
             }
         };
+        if !all_positions.is_empty() {
+            println!("@check_positions/ found {} positions open", all_positions.len());
+        } else {
+            println!("@check_positions/ no positions open");
+        }
 
         let tokens: Vec<String> = all_positions.iter()
             .map(|p| p.token_address.clone())
             .collect();
 
         // Get updated Raydium tokens
-        let new_raydium_tokens = match check_raydiums_tokens(tokens.clone()).await {
+        let raydium_tokens = match check_raydiums_tokens(tokens.clone()).await {
             Ok(tokens) => tokens.into_iter().collect::<std::collections::HashSet<_>>(),
             Err(e) => {
                 eprintln!("Error checking Raydium tokens: {:?}", e);
@@ -113,22 +116,28 @@ async fn check_positions(pool: SafePool) {
             }
         };
 
-        // Calculate new PumpFun tokens
-        let new_pumpfun_tokens: std::collections::HashSet<String> = tokens.into_iter()
-            .filter(|token| !new_raydium_tokens.contains(token))
-            .collect();
+        let raydium_positions = all_positions.iter()
+            .filter(|p| raydium_tokens.contains(&p.token_address))
+            .collect::<Vec<_>>();
+        println!("@positions_watcher/ raydium positions: {:?}", raydium_positions);
+        
 
-        // Check for new PumpFun tokens to subscribe
-        let new_subscriptions: Vec<String> = new_pumpfun_tokens
-            .difference(&current_pumpfun_tokens)
-            .cloned()
+        let pumpfun_positions = all_positions.iter()
+            .filter(|p| !raydium_tokens.contains(&p.token_address))
+            .collect::<Vec<_>>();
+        println!("@positions_watcher/ pumpfun positions: {:?}", pumpfun_positions);
+
+        // Calculate new PumpFun tokens
+        let pumpfun_tokens: std::collections::HashSet<String> = tokens.into_iter()
+            .filter(|token| !raydium_tokens.contains(token))
             .collect();
+       
 
         // If there are new tokens to subscribe
-        if !new_subscriptions.is_empty() {
+        if !pumpfun_tokens.is_empty() {
             let pump_payload = PumpPayload {
                 method: "subscribeTokenTrade".to_string(),
-                keys: new_subscriptions,
+                keys: pumpfun_tokens.iter().cloned().collect(),
             };
             
             if let Ok(payload_json) = serde_json::to_string(&pump_payload) {
@@ -138,13 +147,9 @@ async fn check_positions(pool: SafePool) {
             }
         }
 
-        // Update current token sets
-        current_raydium_tokens = new_raydium_tokens;
-        current_pumpfun_tokens = new_pumpfun_tokens;
-
         // Check Raydium prices
         if let Ok(current_prices) = crate::utils::helpers::check_raydium_tokens_prices(
-            current_raydium_tokens.iter().cloned().collect()
+            raydium_tokens.iter().cloned().collect()
         ).await {
             for position in &all_positions {
                 if let Some(current_price) = current_prices.get(&position.token_address) {
