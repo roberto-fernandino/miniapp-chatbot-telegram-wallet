@@ -734,8 +734,9 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
     };
     // If the input token is SOL = buy
     println!("@execute_swap: input_token: {:?}", input_token);
-    if input_token == "So11111111111111111111111111111111111111112" {
-        println!("@execute_swap: input_token is SOL, creating position");
+    if response.status().is_success() { 
+        if input_token == "So11111111111111111111111111111111111111112" {
+            println!("@execute_swap: input_token is SOL, creating position");
         let take_profits = get_user_settings_take_profits(pool, &user_tg_id).await?;
         let stop_losses = db::get_user_settings_stop_losses(pool, &user_tg_id).await?;
         println!("@execute_swap: take_profits: {:?}", take_profits);
@@ -748,8 +749,9 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
         println!("@execute_swap: token_amount_in_wallet: {:?}", token_amount_in_wallet);
         println!("@execute_swap: inserting position");
         db::insert_position(pool, &user_tg_id, input_token, take_profits, stop_losses, token_amount_in_wallet, token_price).await?;
-        println!("@execute_swap: position inserted");
-    } 
+            println!("@execute_swap: position inserted");
+        } 
+    }
     Ok(response)
 }
 
