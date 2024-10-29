@@ -1092,7 +1092,9 @@ async fn handle_delete_take_profit_user_settings_callback(data: String, bot: &te
     // data = "delete_take_profit:<multiplier>_<percentage_to_sell>"k
     let multiplier_and_percentage_to_sell= data.split(":").nth(1).unwrap_or("N/A");
     let multiplier = multiplier_and_percentage_to_sell.split("_").nth(0).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
+    println!("@handle_delete_take_profit_user_settings_callback/ multiplier: {:?}x", multiplier);
     let percentage_to_sell = multiplier_and_percentage_to_sell.split("_").nth(1).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
+    println!("@handle_delete_take_profit_user_settings_callback/ percentage_to_sell: {:?}%", percentage_to_sell);
     db::delete_user_settings_take_profit(&pool, (multiplier, percentage_to_sell), &user_tg_id).await?;
     let last_token_address = get_user_last_sent_token(&pool, &user_tg_id).await?;
     if let Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) = q.message.as_ref() {
