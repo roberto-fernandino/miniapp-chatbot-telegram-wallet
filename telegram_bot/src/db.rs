@@ -1506,3 +1506,46 @@ pub async fn add_user_take_profit_user_settings(user_tg_id: &str, take_profit: (
     println!("@add_user_take_profit_user_settings/ user_take_profits after setting: {:?}", user_take_profits);
     Ok(())
 }
+
+/// Removes a take profit from a position and sort it by multiplier
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `token_address` - The token address
+/// * `user_tg_id` - The user's Telegram ID
+/// * `take_profit` - The take profit
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the take profit was removed
+pub async fn remove_take_profit_from_position(pool: &PgPool, token_address: &str, user_tg_id: &str, take_profit: (f64, f64)) -> Result<()> {
+    let mut position_take_profits = get_position_take_profits(pool, token_address, user_tg_id).await?;
+    position_take_profits.retain(|&tp| tp != take_profit);
+    
+    // Sort the take profits by the multiplier (first element of the tuple)
+    position_take_profits.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    
+    set_position_take_profits(pool, token_address, user_tg_id, position_take_profits).await?;
+    Ok(())
+}
+
+/// Deletes a position
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `token_address` - The token address
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the position was deleted
+pub async fn delete_position(pool: &PgPool, token_address: &str, user_tg_id: &str) -> Result<()> {
+    sqlx::query("DELETE FROM positions WHERE token_address = $1 AND tg_user_id = $2")
+    .bind(token_address)
+    .bind(user_tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
