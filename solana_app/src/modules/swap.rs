@@ -51,7 +51,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     }).expect("Failed to decode transaction");
     println!("@sign_and_send_swap_transaction/ transaction decoded, length: {}", transaction_data.len());
 
-    let transaction = match bincode::deserialize::<Transaction>(&transaction_data) {
+    let mut transaction = match bincode::deserialize::<Transaction>(&transaction_data) {
         Ok(tx) => Some(tx),
         Err(e) => {
             println!("Failed to deserialize transaction: {:?}", e);
@@ -60,6 +60,16 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
             None
         }
     };
+    match rpc_client.get_latest_blockhash() {
+        Ok(recent_blockhash) => {
+            transaction.as_mut().unwrap().message.recent_blockhash = recent_blockhash;
+            println!("@sign_and_send_swap_transaction/ recent_blockhash updated: {}", recent_blockhash);
+        },
+        Err(e) => {
+            println!("Failed to fetch recent blockhash: {:?}", e);
+            return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to fetch recent blockhash: {:?}", e))));
+        }
+    }
 
     if let Some(mut transaction) = transaction {
         println!("@sign_and_send_swap_transaction/ transaction deserialized successfully");
