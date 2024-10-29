@@ -930,6 +930,10 @@ async fn handle_sell_choose_token_callback(data: String, bot: &teloxide::Bot, q:
 /// * `bot` - The Telegram bot
 /// * `q` - The callback query
 /// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
 async fn handle_execute_sell_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     println!("@handle_execute_sell_callback/ data: {:?}", data);
     let token_address = data.split(":").nth(1).unwrap_or("N/A").to_string();
