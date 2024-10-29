@@ -90,6 +90,7 @@ pub struct Position {
     pub stop_losses: Vec<(f64, f64)>, // Array of arrays with the stop [ [ -% price limit to sell, % tokens to sell], ... ]
     pub amount: f64, // Amount of tokens bought
     pub mc_entry: f64, // Market cap at entry
+    pub entry_price: f64, // Price at entry
     pub created_at: chrono::DateTime<chrono::Utc>, // Default value is the current timestamp
 }
 
@@ -1328,6 +1329,108 @@ pub async fn set_user_settings_take_profits(pool: &PgPool, user_tg_id: &str, tak
 pub async fn delete_user_settings_take_profit(pool: &PgPool, take_profit: (f64, f64), user_tg_id: &str) -> Result<()> {
     let mut user_take_profits = get_user_settings_take_profits(pool, user_tg_id).await?;
     user_take_profits.retain(|&tp| tp != take_profit);
+    set_user_settings_take_profits(pool, user_tg_id, user_take_profits).await?;
+    Ok(())
+}
+
+pub async fn get_all_positions(pool: &PgPool) -> Result<Vec<Position>> {
+    let positions = sqlx::query("SELECT * FROM positions")
+    .fetch_all(pool)
+    .await?;
+    let mut positions_vec: Vec<Position> = Vec::new();
+    for position in positions {
+        positions_vec.push(Position {
+            id: position.get("id"),
+            tg_user_id: position.get("tg_user_id"),
+            token_address: position.get("token_address"),
+            take_profits: position.get("take_profits"),
+            stop_losses: position.get("stop_losses"),
+            amount: position.get("amount"),
+            mc_entry: position.get("mc_entry"),
+            entry_price: position.get("entry_price"),
+            created_at: position.get("created_at"),
+        });
+    }
+    Ok(positions_vec)
+}
+
+
+pub async fn get_position_take_profits(pool: &PgPool, token_address: &str, user_tg_id: &str) -> Result<Vec<(f64, f64)>> {
+    let take_profits = sqlx::query_scalar("SELECT take_profits FROM positions WHERE token_address = $1 AND tg_user_id = $2")
+    .bind(token_address)
+    .fetch_one(pool)
+    .await?;
+    Ok(take_profits)
+}
+/// Sets the position take profits
+/// 
+/// # Description
+/// 
+/// Sorts the take profits by multiplier (first element of tuple) in ascending order before setting them
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `token_address` - The token address
+/// * `user_tg_id` - The user's Telegram ID
+/// * `take_profits` - The take profits
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the position take profits were set
+pub async fn set_position_take_profits(pool: &PgPool, token_address: &str, user_tg_id: &str, take_profits: Vec<(f64, f64)>) -> Result<()> {
+    // Sort take_profits by multiplier (first element of tuple) in ascending order
+    let mut sorted_take_profits = take_profits;
+    sorted_take_profits.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    let take_profits_json = serde_json::to_value(sorted_take_profits).unwrap();
+    sqlx::query("UPDATE positions SET take_profits = $1 WHERE token_address = $2 AND tg_user_id = $3")
+    .bind(take_profits_json)
+    .bind(token_address)
+    .bind(user_tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+
+/// Deletes a position take profit
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `token_address` - The token address
+/// * `user_tg_id` - The user's Telegram ID
+/// * `position` - The position
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the position take profit was deleted
+pub async fn delete_position_target_reached(pool: &PgPool, token_address: &str, user_tg_id: &str, position: (f64, f64)) -> Result<()> {
+    let mut position_take_profits = get_position_take_profits(pool, token_address, user_tg_id).await?;
+    if position_take_profits.contains(&position) {
+        position_take_profits.retain(|&tp| tp != position);
+        set_position_take_profits(pool, token_address, user_tg_id, position_take_profits).await?;
+        
+    }
+    Ok(())
+}
+
+/// Adds a user take profit if an equal one doesnt exists
+/// 
+/// # Arguments
+/// 
+/// * `user_tg_id` - The user's Telegram ID
+/// * `take_profit` - The take profit
+/// * `pool` - The PostgreSQL connection pool
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user take profit was added
+pub async fn add_user_take_profit_user_settings(user_tg_id: &str, take_profit: (f64, f64), pool: &SafePool) -> Result<()> {
+    let mut user_take_profits = get_user_settings_take_profits(pool, user_tg_id).await?;
+    if !user_take_profits.contains(&take_profit) {
+        user_take_profits.push(take_profit);
+    }
     set_user_settings_take_profits(pool, user_tg_id, user_take_profits).await?;
     Ok(())
 }
