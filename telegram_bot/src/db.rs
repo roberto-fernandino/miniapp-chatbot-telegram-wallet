@@ -1287,15 +1287,17 @@ pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &st
 /// 
 /// A Vec<(f64, f64)> representing the take profits
 pub async fn get_user_settings_take_profits(pool: &PgPool, user_tg_id: &str) -> Result<Vec<(f64, f64)>> {
-    let take_profits: Option<Vec<(f64, f64)>> = sqlx::query_scalar(
+    let take_profits: Option<serde_json::Value> = sqlx::query_scalar(
         "SELECT take_profits FROM user_settings WHERE tg_id = $1"
     )
     .bind(user_tg_id)
     .fetch_optional(pool)
-    .await?
-    .flatten(); // Handle null case
+    .await?;
 
-    Ok(take_profits.unwrap_or_default()) // Return empty vec if None
+    match take_profits {
+        Some(json) => Ok(serde_json::from_value(json).unwrap_or_default()),
+        None => Ok(Vec::new())
+    }
 }
 
 /// Sets the user settings take profits
