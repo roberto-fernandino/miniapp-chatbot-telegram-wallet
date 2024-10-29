@@ -82,8 +82,20 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                         println!("@sign_and_send_swap_transaction/ transaction confirmed: {:?}", tx_sig);
                         Ok(tx_sig)
                     },
-                    Err(e) => {
-                        println!("Failed to send transaction: {:?}", e);
+                     Err(e) => {
+                        println!("@sign_and_send_swap_transaction/ detailed error: {:?}", e);
+            
+                        // Get current blockhash
+                        let recent_blockhash = rpc_client.get_latest_blockhash().map_err(|e| TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to get latest blockhash: {:?}", e)))).unwrap();
+                        println!("@sign_and_send_swap_transaction/ recent blockhash: {:?}", recent_blockhash);
+            
+                        // Get account balance
+                        let balance = rpc_client.get_balance(&pubkey).map_err(|e| TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to get account balance: {:?}", e)))).unwrap();
+                        println!("@sign_and_send_swap_transaction/ account balance: {} SOL", balance as f64 / 1e9);
+            
+                        // Get transaction fee
+                        let fee = rpc_client.get_fee_for_message(&transaction.message).map_err(|e| TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to get transaction fee: {:?}", e)))).unwrap();
+                        println!("@sign_and_send_swap_transaction/ transaction fee: {} SOL", fee as f64 / 1e9);
                         Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to send transaction: {:?}", e))))
                     }
                 }
