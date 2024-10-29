@@ -1308,16 +1308,13 @@ pub async fn check_raydiums_tokens(token_address: Vec<String>) -> Result<Vec<Str
 /// A HashMap<String, String> representing the token prices
 pub async fn check_raydium_tokens_prices(token_addresses: Vec<String>) -> Result<HashMap<String, String>, reqwest::Error> {
     let client = Client::new();
-    let url = "https://api.example.com/get_prices"; // Replace with the actual API endpoint
+    let mut url = String::from("https://api-v3.raydium.io/mint/price");
+    let tokens_str = token_addresses.join(",");
 
-    // Prepare the request payload
-    let payload = serde_json::json!({
-        "tokens": token_addresses
-    });
+    url = format!("{url}?mints={tokens_str}");
 
     // Send the request
-    let response = client.post(url)
-        .json(&payload)
+    let response = client.get(url)
         .send()
         .await?;
 
