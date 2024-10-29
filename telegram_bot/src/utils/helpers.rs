@@ -1,5 +1,6 @@
 use chrono::TimeZone;
 use std::collections::HashMap;
+use serde_derive::Serialize;
 use reqwest::Url;
 use chrono::TimeDelta;
 use serde_json::Value;
@@ -393,7 +394,7 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
     let buy_amount = user_settings.buy_amount.as_str();
     let global_amounts = vec!["0.2", "0.5", "1", "2", "5"];
     let buy_amounts = vec!["0.2", "0.5", "1"];
-    let row1 = buy_amounts.iter().map(|&amount| {
+    let row1: Vec<InlineKeyboardButton> = buy_amounts.iter().map(|&amount| {
         let is_selected = user_settings.buy_amount == amount;
         InlineKeyboardButton::callback(
             if is_selected { format!("✅ Buy {} SOL", amount) } else { format!("Buy {} SOL", amount) },
@@ -424,9 +425,9 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
         InlineKeyboardButton::callback("Add Stop Loss", "add_stop_loss"),
     ]);
 
-    // Add a row for take profits
+// Add a row for take profits
     let take_profits = user_settings.take_profits.clone();
-    let mut index = 0;
+    println!("@create_sol_buy_swap_keyboard/ take_profits: {:?}", take_profits);
     if !take_profits.is_none() {
         for take_profit in take_profits.unwrap() {
             let row: Vec<InlineKeyboardButton> = vec![
@@ -434,7 +435,6 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
                 InlineKeyboardButton::callback(format!("{}% to sell", take_profit.1), "_"),
                 InlineKeyboardButton::callback("❌", format!("delete_take_profit:{}_{}", take_profit.0, take_profit.1)),
             ];
-            index += 1;
             buttons.push(row);
         }
     }

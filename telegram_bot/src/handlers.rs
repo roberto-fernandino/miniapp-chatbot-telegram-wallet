@@ -1,5 +1,4 @@
 use teloxide::payloads::SendMessageSetters;
-use std::env;
 use teloxide::payloads::EditMessageReplyMarkupSetters;
 use anyhow::Result;
 use axum::http::StatusCode;
@@ -17,8 +16,6 @@ use crate::commands::*;
 use teloxide::payloads::AnswerCallbackQuerySetters;
 use teloxide::payloads::EditMessageTextSetters;
 use teloxide::prelude::Requester;
-use teloxide::types::{InlineKeyboardMarkup, InlineKeyboardButton};
-use reqwest::Url;
 use chrono::{DateTime, Utc};
 use regex::Regex;
 use axum::extract::Path;
@@ -1041,7 +1038,7 @@ async fn handle_set_custom_gas_callback(_data: String, bot: &teloxide::Bot, q: &
 /// 
 /// A result indicating the success of the operation    
 async fn handle_add_take_profit_user_settings_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
-    bot.send_message(q.message.as_ref().unwrap().chat().id, "Send '<take_profit_%_up>, <%_token_position_amount_to_sell>' ")
+    bot.send_message(q.message.as_ref().unwrap().chat().id, "Send '<multiplier>, <%_token_position_amount_to_sell>' ")
     .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Send <multiplier to leave>, <% to sell> ".to_string()), selective: false})
     .await?;
     Ok(())
