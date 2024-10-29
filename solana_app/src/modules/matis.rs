@@ -119,7 +119,7 @@ pub async fn get_legacy_quote(
     let slippage_bps = (slippage * 100.0).round() as u64;
     // Setup the url
     let url = format!(
-        "{}/quote?inputMint={input_mint}&outputMint={output_mint}&amount={amount}&slippageBps={slippage_bps}&asLegacyTransaction=true",
+        "{}/quote?inputMint={input_mint}&outputMint={output_mint}&amount={amount}&slippageBps={slippage_bps}&asLegacyTransaction=true&platformFeeBps=0",
         env::var("METIS_HTTP").expect("METIS_HTTP must be set")
     );
     println!("@get_legacy_quote/ url: {}", url.clone());

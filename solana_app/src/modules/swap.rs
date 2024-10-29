@@ -20,8 +20,6 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     // Initialize Turnkey client
     println!("@sign_and_send_swap_transaction/ user: {:?}", user);
 
-
-
     // Remove surrounding quotes from keys if present
     let api_public_key = user.api_public_key.trim_matches('"');
     let api_private_key = user.api_private_key.trim_matches('"');
