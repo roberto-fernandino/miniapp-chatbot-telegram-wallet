@@ -100,7 +100,7 @@ async fn check_positions(pool: SafePool) {
         // New loop to check prices every 3 seconds
     loop {
         // Fetch current prices (this is a placeholder, replace with actual fetching logic)
-        let current_prices = crate::utils::helpers::check_raydium_tokens_prices(raydium_tokens_to_watch).await;
+        let current_prices = crate::utils::helpers::check_raydium_tokens_prices(raydium_tokens_to_watch.clone()).await;
         // Ensure current_prices is successfully retrieved
         let current_prices = match current_prices {
             Ok(prices) => prices,
