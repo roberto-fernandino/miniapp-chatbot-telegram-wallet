@@ -622,12 +622,16 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
     let token_address = get_user_last_sent_token(pool, &q.from.id.to_string()).await?;
     let user_id = q.from.id.to_string();
     println!("@handle_execute_buy_sol_callback/ user_id: {:?}", user_id);
-    let response = match &q.message {
-        Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) => {
-            execute_swap(pool, "So11111111111111111111111111111111111111112", token_address.as_str(), user_id).await?
-        },
-        _ => return Err(anyhow::anyhow!("Message is inaccessible")),
+
+    let response = match execute_swap(pool, "So11111111111111111111111111111111111111112", token_address.as_str(), user_id).await {
+        Ok(r) => r,
+        Err(e) => {
+            println!("@handle_execute_buy_sol_callback/ error executing swap: {:?}", e);
+            bot.send_message(q.message.as_ref().unwrap().chat().id, format!("❌ Failed to buy: {}", e)).await?;
+            return Err(e.into());
+        }
     };
+
     println!("@handle_execute_buy_sol_callback/ checking if response is success");
     if response.status().is_success() {
         println!("@handle_execute_buy_sol_callback/ response is success");
