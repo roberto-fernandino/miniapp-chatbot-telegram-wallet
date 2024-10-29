@@ -44,6 +44,15 @@ pub fn decode_signature_get_transaction(
     }
 }
 
+/// Get the account involved in a transaction
+/// 
+/// # Arguments
+/// 
+/// * `transaction` - The transaction
+/// 
+/// # Returns
+/// 
+/// The account involved in the transaction
 pub fn get_account_involved_in_transaction(
     transaction: &EncodedConfirmedTransactionWithStatusMeta,
 ) -> Result<Pubkey, Box<dyn Error + Send + Sync>> {
