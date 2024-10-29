@@ -976,6 +976,22 @@ async fn handle_change_gas_lamports_callback(data: String, bot: &teloxide::Bot, 
 }
 
 
+/// Handle settings callback
+/// 
+/// # Description
+/// 
+/// Show the user settings on the tg bot
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
 async fn handle_settings_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     if !user_has_settings(&pool, &q.from.id.to_string()).await? {
         create_user_settings_default(&pool, &q.from.id.to_string()).await?;
