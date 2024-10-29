@@ -1,5 +1,5 @@
 use chrono::TimeZone;
-use serde_derive::Serialize;
+use std::collections::HashMap;
 use reqwest::Url;
 use chrono::TimeDelta;
 use serde_json::Value;
@@ -364,6 +364,7 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
 
     println!("@create_sol_buy_swap_keyboard/ getting user settings");
     let user_settings = get_user_settings(&pool, user_tg_id).await.expect("User settings not found");
+    println!("@create_sol_buy_swap_keyboard/ user settings: {:?}", user_settings);
     println!("@create_sol_buy_swap_keyboard/ user settings found");
 
     println!("@create_sol_buy_swap_keyboard/ creating buttons");
@@ -442,7 +443,6 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
         InlineKeyboardButton::callback("Buy", format!("buy:{}", buy_amount)),
     ]);
     println!("@create_sol_buy_swap_keyboard/ buttons created");
-
     InlineKeyboardMarkup::new(buttons)
 }
 
@@ -1267,4 +1267,68 @@ pub fn parse_take_profit_message(text: &str) -> Result<(f64, f64)> {
     let percentage = parts[1].trim().parse::<f64>()?;
 
     Ok((multiplier, percentage))
+}
+
+
+/// Check if a token is a token with liquidity on Raydium
+/// 
+/// # Arguments
+/// 
+/// * `token_address` - The token address
+/// 
+/// # Returns
+/// 
+/// A Vec<String> representing the Raydium tokens
+pub async fn check_raydiums_tokens(token_address: Vec<String>) -> Result<Vec<String>> {
+    let tokens_str = token_address.join(",");
+    let client = reqwest::Client::new();
+    let response = client.get(
+        format!("https://api-v3.raydium.io/mint/price?mints={tokens_str}")
+    )
+    .send()
+    .await?;
+    let response_json = response.json::<serde_json::Value>().await?;
+    let result = response_json.as_object().unwrap()
+        .iter()
+        .filter(|(_, v)| **v != serde_json::Value::Null)
+        .map(|(k, _)| k.to_string())
+        .collect::<Vec<String>>();
+    Ok(result)
+}
+
+
+/// Check the Raydium tokens prices
+/// 
+/// # Arguments
+/// 
+/// * `token_addresses` - The token addresses
+/// 
+/// # Returns
+/// 
+/// A HashMap<String, String> representing the token prices
+pub async fn check_raydium_tokens_prices(token_addresses: Vec<String>) -> Result<HashMap<String, String>, reqwest::Error> {
+    let client = Client::new();
+    let url = "https://api.example.com/get_prices"; // Replace with the actual API endpoint
+
+    // Prepare the request payload
+    let payload = serde_json::json!({
+        "tokens": token_addresses
+    });
+
+    // Send the request
+    let response = client.post(url)
+        .json(&payload)
+        .send()
+        .await?;
+
+    // Parse the response
+    let response_body: Value = response.json().await?;
+    let data = response_body["data"].as_object().unwrap();
+
+    // Convert the response data to a HashMap
+    let prices = data.iter()
+        .map(|(key, value)| (key.clone(), value.as_str().unwrap().to_string()))
+        .collect::<HashMap<String, String>>();
+
+    Ok(prices)
 }
