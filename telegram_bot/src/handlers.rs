@@ -253,7 +253,6 @@ pub async fn handle_message(
             else if reply_to_message.text().unwrap_or_default().starts_with("Send '<multiplier>, <%_token_position_amount_to_sell>' ") {
                 let take_profits = match parse_take_profit_message(text) {
                     Ok(tp) => {
-                        bot.send_message(msg.chat.id, "Take profit set").await?;
                         tp
                     }
                     Err(e) => {
@@ -261,8 +260,10 @@ pub async fn handle_message(
                         return Ok(());
                     }
                 };
-
+                println!("@handle_message/ take_profits: {:?}", take_profits);
+                println!("@handle_message/ adding to user settings");
                 add_user_take_profit_user_settings(msg.clone().from.unwrap().id.to_string().as_str(), take_profits, &pool).await?;
+                println!("@handle_message/ added to user settings");
                 bot.send_message(msg.chat.id, "Take profit set").await?;
             }
         }
