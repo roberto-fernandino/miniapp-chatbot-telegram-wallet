@@ -1085,6 +1085,14 @@ pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSe
     .bind(user_tg_id)
     .fetch_one(pool)
     .await?;
+    let take_profits: Option<Vec<(f64, f64)>> = match user_settings.try_get("take_profits") {
+        Ok(Some(take_profits)) => Some(serde_json::from_value(take_profits).unwrap_or_default()),
+        _ => None,
+    };
+    let stop_losses: Option<Vec<(f64, f64)>> = match user_settings.try_get("stop_losses") {
+        Ok(Some(stop_losses)) => Some(serde_json::from_value(stop_losses).unwrap_or_default()),
+        _ => None,
+    };
     Ok(UserSettings {
         slippage_tolerance: user_settings.get("slippage_tolerance"),
         buy_amount: user_settings.get("buy_amount"),
@@ -1092,8 +1100,8 @@ pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSe
         sell_percentage: user_settings.get("sell_percentage"),
         gas_lamports: user_settings.get("gas_lamports"),
         anti_mev: user_settings.get("anti_mev"),
-        take_profits: user_settings.try_get("take_profits").unwrap_or(None),
-        stop_losses: user_settings.try_get("stop_losses").unwrap_or(None),
+        take_profits,
+        stop_losses,
     })
 }
 
