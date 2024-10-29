@@ -682,7 +682,8 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
         }
     }
     let slippage = user_settings.slippage_tolerance.parse::<f64>().unwrap_or(0.5);
-    println!("@execute_swap: input_token_amount: {:?}, slippage: {:?}", input_token_amount, slippage);
+    let slippage_bps = (slippage * 10000.0) as u64;
+    println!("@execute_swap: input_token_amount: {:?}, slippageBps: {:?}", input_token_amount, slippage_bps);
 
     let solana_address = user.solana_address.clone();
     println!("@execute_swap: solana_address: {:?}", solana_address);
@@ -704,7 +705,7 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
             output_mint: output_token.to_string(),
             input_mint: input_token.to_string(),
             amount: sol_to_lamports_u64(input_token_amount),
-            slippage,
+            slippage: slippage_bps as f64,
         }
     } else {
         SwapSolRequest {
@@ -714,7 +715,7 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
             output_mint: output_token.to_string(),
             input_mint: input_token.to_string(),
             amount: input_token_amount as u64,
-            slippage,
+            slippage: slippage_bps as f64,
         }
     };
 
