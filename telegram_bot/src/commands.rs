@@ -1,8 +1,7 @@
 use anyhow::Result;
 use reqwest::Response;
-use crate::db::{get_user_last_sent_token, get_user_settings_take_profits};
+use crate::db::get_user_settings_take_profits;
 use crate::handlers::{TurnkeyUser, SwapSolRequest};
-use crate::db::get_user_settings;
 use chrono::{DateTime, Utc};
 use teloxide::types::ChatId;
 use crate::*;
