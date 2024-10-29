@@ -316,6 +316,7 @@ pub async fn sol_swap(
     match sign_and_send_swap_transaction(swap_transacation, user).await {
         Ok(sig) => {
             println!("@sol_swap /sol/swap transaction sent: {:?}", sig);
+            println!("@sol_swap /sol/swap response: {:?}", json!({ "transaction": sig.to_string() }));
             Ok((StatusCode::OK, Json(json!({ "transaction": sig.to_string() }))))
         },
         Err(e) => {
