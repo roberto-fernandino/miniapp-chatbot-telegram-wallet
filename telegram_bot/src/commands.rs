@@ -627,6 +627,18 @@ pub async fn sell_token_page(msg: &teloxide::types::Message, bot: &teloxide::Bot
 }
 
 
+/// Execute a swap
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The database pool
+/// * `input_token` - The input token
+/// * `output_token` - The output token
+/// * `user_tg_id` - The user Telegram ID
+/// 
+/// # Returns
+/// 
+/// A Response
 pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str, user_tg_id: String) -> Result<Response> {
     println!("@execute_swap: Starting execution");
     println!("@execute_swap: User Telegram ID: {}", user_tg_id);
@@ -698,7 +710,7 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
         SwapSolRequest {
             user: turnkey_user,
             user_public_key: user.solana_address.clone().expect("Solana address not found").to_string(),
-            priorization_fee_lamports: 5000,
+            priorization_fee_lamports: user_settings.gas_lamports as u64,
             output_mint: output_token.to_string(),
             input_mint: input_token.to_string(),
             amount: input_token_amount as u64,
@@ -725,7 +737,81 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
     let stop_losses = user_settings.stop_losses.clone();
     let scanner_response = get_scanner_search(input_token).await?;
     let token_price = scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
-    db::insert_position(pool, &user_tg_id, input_token, take_profits.unwrap(), stop_losses.unwrap(), input_token_amount, token_price).await?;
+    let token_amount_in_wallet = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await?;
+    db::insert_position(pool, &user_tg_id, input_token, take_profits.unwrap(), stop_losses.unwrap(), token_amount_in_wallet, token_price).await?;
+
     Ok(response)
 }
 
+
+/// Execute a swap take profit
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The database pool
+/// * `user_tg_id` - The user Telegram ID
+/// * `take_profit` - The take profit
+/// * `input_token` - The input token
+/// * `output_token` - The output token
+/// 
+/// # Returns
+/// 
+/// A Result indicating whether the swap take profit was executed successfully
+pub async fn execute_swap_take_profit(pool: &SafePool, user_tg_id: String, take_profit: (f64, f64), input_token: &str, output_token: &str) -> Result<()> {
+    println!("@execute_swap_take_profit: Starting execution");
+    println!("@execute_swap_take_profit: User Telegram ID: {}", user_tg_id);
+    println!("@execute_swap_take_profit: Input token: {}", input_token);
+    println!("@execute_swap_take_profit: Output token: {}", output_token);
+
+    // Get user
+    let user = match db::get_user(&pool, &user_tg_id).await {
+        Ok(u) => {
+            println!("@execute_swap_take_profit: User retrieved successfully");
+            u
+        },
+        Err(e) => {
+            println!("@execute_swap_take_profit: Error getting user: {:?}", e);
+            return Err(anyhow::anyhow!("Failed to get user: {}", e));
+        }
+    };
+    let user_settings = db::get_or_create_user_settings(pool, &user_tg_id).await?;
+    
+    println!("@execute_swap_take_profit: Getting token amount in wallet");
+    let token_amount_in_wallet = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await?;
+    println!("@execute_swap_take_profit: Token amount in wallet: {:?}", token_amount_in_wallet);
+
+    // Calculate the amount to sell
+    println!("@execute_swap_take_profit: Calculating amount to sell");
+    let amount_to_sell = token_amount_in_wallet * take_profit.1 / 100.0;
+    println!("@execute_swap_take_profit: Amount to sell: {:?}", amount_to_sell);
+
+    println!("@execute_swap_take_profit: Getting slippage tolerance");
+    let slippage = user_settings.slippage_tolerance.parse::<f64>().unwrap_or(0.5);
+    println!("@execute_swap_take_profit: Slippage: {:?}", slippage);
+
+    println!("@execute_swap_take_profit: Creating turnkey user");
+    let turnkey_user = TurnkeyUser {
+        api_public_key: user.turnkey_info.api_public_key.clone().expect("API public key not found"),
+        api_private_key: user.turnkey_info.api_private_key.clone().expect("API private key not found"),
+        organization_id: user.turnkey_info.suborg_id.clone().expect("Suborg ID not found"),
+        public_key: user.solana_address.clone().expect("Solana address not found").to_string(),
+    };
+    println!("@execute_swap_take_profit: turnkey_user created successfully");
+    let request = SwapSolRequest {
+            user: turnkey_user,
+            user_public_key: user.solana_address.clone().expect("Solana address not found").to_string(),
+            priorization_fee_lamports: user_settings.gas_lamports as u64,
+            output_mint: output_token.to_string(),
+            input_mint: input_token.to_string(),
+            amount: amount_to_sell as u64,
+            slippage,
+        };
+
+    println!("@execute_swap_take_profit: Sending request");
+    let client = reqwest::Client::new();
+    let url = format!("{}/sol/swap", "http://solana_app:3030");
+    let response = client.post(url).json(&request).send().await?;
+    println!("@execute_swap_take_profit: Response received: {:?}", response);
+
+    Ok(())
+}
