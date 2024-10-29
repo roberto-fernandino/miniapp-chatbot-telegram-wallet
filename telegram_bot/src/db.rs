@@ -1,4 +1,5 @@
 use sqlx::{PgPool, postgres::PgPoolOptions};
+use serde_json::json;
 use sqlx::{Encode, Pool};
 use sqlx::Postgres;
 use crate::handlers::PostUserRequest;
@@ -1305,15 +1306,16 @@ pub async fn get_user_settings_take_profits(pool: &PgPool, user_tg_id: &str) -> 
 /// 
 /// A result indicating whether the user settings take profits were set
 pub async fn set_user_settings_take_profits(pool: &PgPool, user_tg_id: &str, take_profits: Option<Vec<(f64, f64)>>) -> Result<()> {
-    let take_profits_json = take_profits.map(|tp| serde_json::to_value(tp).unwrap());
-    sqlx::query("UPDATE user_settings SET take_profits = $1 WHERE tg_id = $2")
-        .bind(take_profits_json)
-        .bind(user_tg_id)
-        .execute(pool)
-        .await?;
+    let take_profits_json = serde_json::to_value(take_profits).unwrap_or(json!(null));
+    sqlx::query(
+        "UPDATE user_settings SET take_profits = $1 WHERE user_tg_id = $2"
+    )
+    .bind(take_profits_json)
+    .bind(user_tg_id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
-
 
 /// Deletes a user settings take profit
 /// 
@@ -1355,6 +1357,17 @@ pub async fn get_all_positions(pool: &PgPool) -> Result<Vec<Position>> {
 }
 
 
+/// Gets the position take profits
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `token_address` - The token address
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A Vec<(f64, f64)> representing the take profits
 pub async fn get_position_take_profits(pool: &PgPool, token_address: &str, user_tg_id: &str) -> Result<Vec<(f64, f64)>> {
     let take_profits = sqlx::query_scalar("SELECT take_profits FROM positions WHERE token_address = $1 AND tg_user_id = $2")
     .bind(token_address)
@@ -1362,6 +1375,7 @@ pub async fn get_position_take_profits(pool: &PgPool, token_address: &str, user_
     .await?;
     Ok(take_profits)
 }
+
 /// Sets the position take profits
 /// 
 /// # Description
