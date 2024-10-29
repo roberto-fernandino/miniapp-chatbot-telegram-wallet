@@ -1308,6 +1308,30 @@ pub async fn get_user_settings_take_profits(pool: &PgPool, user_tg_id: &str) -> 
     }
 }
 
+/// Gets the user settings stop losses
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A Vec<(f64, f64)> representing the stop losses
+pub async fn get_user_settings_stop_losses(pool: &PgPool, user_tg_id: &str) -> Result<Vec<(f64, f64)>> {
+    let stop_losses: Option<serde_json::Value> = sqlx::query_scalar(
+        "SELECT stop_losses FROM user_settings WHERE tg_id = $1"
+    )
+    .bind(user_tg_id)
+    .fetch_optional(pool)
+    .await?;
+
+    match stop_losses {
+        Some(json) => Ok(serde_json::from_value(json).unwrap_or_default()),
+        None => Ok(Vec::new())
+    }
+}
+
 /// Sets the user settings take profits
 /// 
 /// # Arguments
