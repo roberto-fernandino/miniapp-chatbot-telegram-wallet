@@ -1343,9 +1343,18 @@ pub async fn set_user_settings_take_profits(pool: &PgPool, user_tg_id: &str, tak
 /// 
 /// A result indicating whether the user settings take profit was deleted
 pub async fn delete_user_settings_take_profit(pool: &PgPool, take_profit: (f64, f64), user_tg_id: &str) -> Result<()> {
+    println!("@delete_user_settings_take_profit/ take_profit: {:?}", take_profit);
+
     let mut user_take_profits = get_user_settings_take_profits(pool, user_tg_id).await?;
+    println!("@delete_user_settings_take_profit/ user_take_profits: {:?}", user_take_profits);
+
     user_take_profits.retain(|&tp| tp != take_profit);
-    set_user_settings_take_profits(pool, user_tg_id, Some(user_take_profits)).await?;
+    println!("@delete_user_settings_take_profit/ user_take_profits after retaining: {:?}", user_take_profits);
+
+    println!("@delete_user_settings_take_profit/ setting user_take_profits");
+    set_user_settings_take_profits(pool, user_tg_id, Some(user_take_profits.clone())).await?;
+    println!("@delete_user_settings_take_profit/ user_take_profits after setting: {:?}", user_take_profits);
+
     Ok(())
 }
 
