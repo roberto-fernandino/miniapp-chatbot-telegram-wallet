@@ -1304,13 +1304,13 @@ pub async fn get_user_settings_take_profits(pool: &PgPool, user_tg_id: &str) -> 
 /// # Returns
 /// 
 /// A result indicating whether the user settings take profits were set
-pub async fn set_user_settings_take_profits(pool: &PgPool, user_tg_id: &str, take_profits: Vec<(f64, f64)>) -> Result<()> {
-    let take_profits_json = serde_json::to_value(take_profits).unwrap();
+pub async fn set_user_settings_take_profits(pool: &PgPool, user_tg_id: &str, take_profits: Option<Vec<(f64, f64)>>) -> Result<()> {
+    let take_profits_json = take_profits.map(|tp| serde_json::to_value(tp).unwrap());
     sqlx::query("UPDATE user_settings SET take_profits = $1 WHERE tg_id = $2")
-    .bind(take_profits_json)
-    .bind(user_tg_id)
-    .execute(pool)
-    .await?;
+        .bind(take_profits_json)
+        .bind(user_tg_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -1329,7 +1329,7 @@ pub async fn set_user_settings_take_profits(pool: &PgPool, user_tg_id: &str, tak
 pub async fn delete_user_settings_take_profit(pool: &PgPool, take_profit: (f64, f64), user_tg_id: &str) -> Result<()> {
     let mut user_take_profits = get_user_settings_take_profits(pool, user_tg_id).await?;
     user_take_profits.retain(|&tp| tp != take_profit);
-    set_user_settings_take_profits(pool, user_tg_id, user_take_profits).await?;
+    set_user_settings_take_profits(pool, user_tg_id, Some(user_take_profits)).await?;
     Ok(())
 }
 
@@ -1431,6 +1431,6 @@ pub async fn add_user_take_profit_user_settings(user_tg_id: &str, take_profit: (
     if !user_take_profits.contains(&take_profit) {
         user_take_profits.push(take_profit);
     }
-    set_user_settings_take_profits(pool, user_tg_id, user_take_profits).await?;
+    set_user_settings_take_profits(pool, user_tg_id, Some(user_take_profits)).await?;
     Ok(())
 }
