@@ -182,9 +182,9 @@ pub async fn get_legacy_swap_transaction(
     let data = format!(
         r#"{{
         "userPublicKey": "{}",
-        "priorizationFeeLamports": {},
+        "prioritizationFeeLamports": {},
+        "asLegacyTransaction": true,
         "quoteResponse": {},
-        "asLegacyTransaction": true
     }}"#,
         user_public_key.to_string(),
         priorization_fee_lamports,
