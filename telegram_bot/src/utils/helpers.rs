@@ -1288,11 +1288,15 @@ pub async fn check_raydiums_tokens(token_address: Vec<String>) -> Result<Vec<Str
     .send()
     .await?;
     let response_json = response.json::<serde_json::Value>().await?;
-    let result = response_json.as_object().unwrap()
+    
+    // Filter out tokens with null prices
+    let result = response_json.as_object()
+        .unwrap_or(&serde_json::Map::new())
         .iter()
-        .filter(|(_, v)| **v != serde_json::Value::Null)
+        .filter(|(_, v)| v.is_string()) // Only keep tokens with actual price strings
         .map(|(k, _)| k.to_string())
-        .collect::<Vec<String>>();
+        .collect();
+    
     Ok(result)
 }
 
@@ -1322,9 +1326,11 @@ pub async fn check_raydium_tokens_prices(token_addresses: Vec<String>) -> Result
     let response_body: Value = response.json().await?;
     let data = response_body["data"].as_object().unwrap();
 
-    // Convert the response data to a HashMap
+    // Convert the response data to a HashMap, filtering out null values
     let prices = data.iter()
-        .map(|(key, value)| (key.clone(), value.as_str().unwrap().to_string()))
+        .filter_map(|(key, value)| {
+            value.as_str().map(|v| (key.clone(), v.to_string()))
+        })
         .collect::<HashMap<String, String>>();
 
     Ok(prices)
