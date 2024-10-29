@@ -627,13 +627,13 @@ pub async fn sell_token_page(msg: &teloxide::types::Message, bot: &teloxide::Bot
 }
 
 
-pub async fn execute_swap(data: String, bot: &teloxide::Bot, msg: &teloxide::types::Message, pool: &SafePool, input_token: &str, output_token: &str, user_id: String) -> Result<Response> {
+pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str, user_tg_id: String) -> Result<Response> {
     println!("@execute_swap: Starting execution");
-    println!("@execute_swap: User ID: {}", user_id);
+    println!("@execute_swap: User Telegram ID: {}", user_tg_id);
     println!("@execute_swap: Input token: {}", input_token);
     println!("@execute_swap: Output token: {}", output_token);
 
-    let user_settings = match db::get_or_create_user_settings(pool, &user_id).await {
+    let user_settings = match db::get_or_create_user_settings(pool, &user_tg_id).await {
         Ok(settings) => {
             println!("@execute_swap: User settings retrieved successfully");
             settings
@@ -644,7 +644,7 @@ pub async fn execute_swap(data: String, bot: &teloxide::Bot, msg: &teloxide::typ
         }
     };
 
-    let user = match db::get_user(&pool, &user_id).await {
+    let user = match db::get_user(&pool, &user_tg_id).await {
         Ok(u) => {
             println!("@execute_swap: User retrieved successfully");
             u
@@ -725,16 +725,7 @@ pub async fn execute_swap(data: String, bot: &teloxide::Bot, msg: &teloxide::typ
     let stop_losses = user_settings.stop_losses.clone();
     let scanner_response = get_scanner_search(input_token).await?;
     let token_price = scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
-    let position = db::insert_position(pool, &user_id, input_token, take_profits.unwrap(), stop_losses.unwrap(), input_token_amount, token_price).await?;
+    db::insert_position(pool, &user_tg_id, input_token, take_profits.unwrap(), stop_losses.unwrap(), input_token_amount, token_price).await?;
     Ok(response)
 }
 
-/// Adds a user take profit if an equal one doesnt exists
-pub async fn add_user_take_profit_user_settings(user_tg_id: &str, take_profit: (f64, f64), pool: &SafePool) -> Result<()> {
-    let mut user_take_profits = db::get_user_settings_take_profits(pool, user_tg_id).await?;
-    if !user_take_profits.contains(&take_profit) {
-        user_take_profits.push(take_profit);
-    }
-    db::set_user_settings_take_profits(pool, user_tg_id, user_take_profits).await?;
-    Ok(())
-}
