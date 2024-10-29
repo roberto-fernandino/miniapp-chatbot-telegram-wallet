@@ -184,7 +184,7 @@ pub async fn get_legacy_swap_transaction(
         "userPublicKey": "{}",
         "prioritizationFeeLamports": {},
         "asLegacyTransaction": true,
-        "quoteResponse": {},
+        "quoteResponse": {}
     }}"#,
         user_public_key.to_string(),
         priorization_fee_lamports,
@@ -245,7 +245,7 @@ pub async fn get_swap_versioned_transaction(
         r#"{{
         "userPublicKey": "{}",
         "priorizationFeeLamports": {},
-        "quoteResponse": {} 
+        "quoteResponse": {}
     }}"#,
         user_public_key.to_string(),
         priorization_fee_lamports,
