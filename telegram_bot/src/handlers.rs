@@ -265,6 +265,11 @@ pub async fn handle_message(
                 add_user_take_profit_user_settings(msg.clone().from.unwrap().id.to_string().as_str(), take_profits, &pool).await?;
                 println!("@handle_message/ added to user settings");
                 bot.send_message(msg.chat.id, "Take profit set").await?;
+                let last_token = get_user_last_sent_token(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await.unwrap();
+                match token_address_buy_info_handler(last_token.as_str(), &bot, &msg, &pool).await {
+                    Ok(_) => (),
+                    Err(e) => log::error!("Failed to buy token address: {:?}", e),
+                }
             }
         }
         if is_pnl_command(text) {
