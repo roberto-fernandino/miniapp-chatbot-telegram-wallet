@@ -1351,10 +1351,15 @@ pub async fn delete_user_settings_take_profit(pool: &PgPool, take_profit: (f64, 
     user_take_profits.retain(|&tp| tp != take_profit);
     println!("@delete_user_settings_take_profit/ user_take_profits after retaining: {:?}", user_take_profits);
 
-    println!("@delete_user_settings_take_profit/ setting user_take_profits");
-    set_user_settings_take_profits(pool, user_tg_id, Some(user_take_profits.clone())).await?;
-    println!("@delete_user_settings_take_profit/ user_take_profits after setting: {:?}", user_take_profits);
+    let take_profits = if user_take_profits.is_empty() {
+        None
+    } else {
+        Some(user_take_profits)
+    };
+    println!("@delete_user_settings_take_profit/ setting user_take_profits to: {:?}", take_profits);
 
+    set_user_settings_take_profits(pool, user_tg_id, take_profits).await?;
+    println!("@delete_user_settings_take_profit/ user_take_profits was set.");
     Ok(())
 }
 
