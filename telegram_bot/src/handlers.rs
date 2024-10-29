@@ -628,7 +628,6 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
         },
         _ => return Err(anyhow::anyhow!("Message is inaccessible")),
     };
-    
     if response.status().is_success() {
         println!("@handle_execute_buy_sol_callback/ response is success");
         let json_response = response.json::<serde_json::Value>().await?;
