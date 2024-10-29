@@ -1,4 +1,4 @@
-use commands::execute_swap;
+use commands::{execute_swap, execute_swap_take_profit};
 use teloxide::prelude::*;
 use tungstenite::Message as WsMessage;
 use futures_util::stream::StreamExt;
@@ -70,59 +70,111 @@ async fn check_positions(pool: SafePool) {
     let url = "wss://pumpportal.fun/api/data";
     let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to pumpportal");
     let (mut pump_write, mut pump_read) = ws_stream.split();
-    let all_positions = db::get_all_positions(&pool).await.unwrap();
-    let mut raydium_tokens_to_watch = vec![];
-    let mut pumpfun_tokens_to_watch = vec![];
-    let mut positions_raydium: Vec<db::Position> = vec![];
-    let mut positions_pumpfun: Vec<db::Position> = vec![];
-
-    let tokens = all_positions.iter().map(|p| p.token_address.clone()).collect::<Vec<String>>();
-
-    raydium_tokens_to_watch = check_raydiums_tokens(tokens.clone()).await.unwrap();
-    pumpfun_tokens_to_watch = tokens.clone()
-        .iter()
-        .filter(|token| !raydium_tokens_to_watch.contains(token))
-        .cloned()
-        .collect::<Vec<String>>();
     
-    let pump_payload = PumpPayload {
-        method: "subscribeTokenTrade".to_string(),
-        keys: pumpfun_tokens_to_watch
-    };
-    let pump_payload_json = serde_json::to_string(&pump_payload).unwrap();
-    pump_write.send(WsMessage::Text(pump_payload_json)).await.unwrap();
+    // Track currently watched tokens
+    let mut current_raydium_tokens = std::collections::HashSet::new();
+    let mut current_pumpfun_tokens = std::collections::HashSet::new();
 
-    tokio::spawn(async move {
+    // Spawn WebSocket listener
+    let pump_read_handle = tokio::spawn(async move {
         while let Some(msg) = pump_read.next().await {
-            println!("Message received: {:?}", msg);
+            match msg {
+                Ok(WsMessage::Text(text)) => {
+                    // Handle the message (implement your price checking logic here)
+                    println!("Message received: {}", text);
+                },
+                Err(e) => eprintln!("Error receiving message: {:?}", e),
+                _ => {}
+            }
         }
     });
-        // New loop to check prices every 3 seconds
+
     loop {
-        // Fetch current prices (this is a placeholder, replace with actual fetching logic)
-        let current_prices = crate::utils::helpers::check_raydium_tokens_prices(raydium_tokens_to_watch.clone()).await;
-        // Ensure current_prices is successfully retrieved
-        let current_prices = match current_prices {
-            Ok(prices) => prices,
+        // Fetch all positions from database
+        let all_positions = match db::get_all_positions(&pool).await {
+            Ok(positions) => positions,
             Err(e) => {
-                eprintln!("Error fetching current prices: {:?}", e);
-                continue; // Skip this iteration if there's an error
+                eprintln!("Error fetching positions: {:?}", e);
+                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+                continue;
             }
         };
 
-        // Check if any position has reached its target price
-        for position in &all_positions {
-            if let Some(current_price) = current_prices.get(&position.token_address) {
-                let current_price_float = current_price.parse::<f64>().unwrap();
-                if current_price_float >= (position.take_profits[0].0 * position.entry_price) {
-                    // Handle the event (e.g., notify user, update database, etc.)
-                    println!("Target price reached for position: {:?}", position);
-                    db::delete_position_target_reached(&pool, &position.token_address, &position.tg_user_id, (position.take_profits[0].0, position.take_profits[0].1)).await.unwrap();
-                    execute_swap(&pool, &position.token_address, "So11111111111111111111111111111111111111112", position.tg_user_id.clone()).await.unwrap();
+        let tokens: Vec<String> = all_positions.iter()
+            .map(|p| p.token_address.clone())
+            .collect();
+
+        // Get updated Raydium tokens
+        let new_raydium_tokens = match check_raydiums_tokens(tokens.clone()).await {
+            Ok(tokens) => tokens.into_iter().collect::<std::collections::HashSet<_>>(),
+            Err(e) => {
+                eprintln!("Error checking Raydium tokens: {:?}", e);
+                continue;
+            }
+        };
+
+        // Calculate new PumpFun tokens
+        let new_pumpfun_tokens: std::collections::HashSet<String> = tokens.into_iter()
+            .filter(|token| !new_raydium_tokens.contains(token))
+            .collect();
+
+        // Check for new PumpFun tokens to subscribe
+        let new_subscriptions: Vec<String> = new_pumpfun_tokens
+            .difference(&current_pumpfun_tokens)
+            .cloned()
+            .collect();
+
+        // If there are new tokens to subscribe
+        if !new_subscriptions.is_empty() {
+            let pump_payload = PumpPayload {
+                method: "subscribeTokenTrade".to_string(),
+                keys: new_subscriptions,
+            };
+            
+            if let Ok(payload_json) = serde_json::to_string(&pump_payload) {
+                if let Err(e) = pump_write.send(WsMessage::Text(payload_json)).await {
+                    eprintln!("Error sending subscription: {:?}", e);
                 }
             }
         }
-        // Wait for 3 seconds before the next check
+
+        // Update current token sets
+        current_raydium_tokens = new_raydium_tokens;
+        current_pumpfun_tokens = new_pumpfun_tokens;
+
+        // Check Raydium prices
+        if let Ok(current_prices) = crate::utils::helpers::check_raydium_tokens_prices(
+            current_raydium_tokens.iter().cloned().collect()
+        ).await {
+            for position in &all_positions {
+                if let Some(current_price) = current_prices.get(&position.token_address) {
+                    let current_price_float = current_price.parse::<f64>().unwrap_or_default();
+                    if current_price_float >= (position.take_profits[0].0 * position.entry_price) {
+                        // Execute take profit
+                        if let Err(e) = execute_swap_take_profit(
+                            &pool,
+                            position.tg_user_id.clone(),
+                            (position.take_profits[0].0, position.take_profits[0].1),
+                            &position.token_address,
+                            "So11111111111111111111111111111111111111112"
+                        ).await {
+                            eprintln!("Error executing swap: {:?}", e);
+                        }
+
+                        if let Err(e) = db::delete_position_target_reached(
+                            &pool,
+                            &position.token_address,
+                            &position.tg_user_id,
+                            (position.take_profits[0].0, position.take_profits[0].1)
+                        ).await {
+                            eprintln!("Error deleting position: {:?}", e);
+                            continue;
+                        }
+                    } 
+                }
+            }
+        }
+
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
     }
 }
