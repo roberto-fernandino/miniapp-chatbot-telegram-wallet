@@ -251,9 +251,11 @@ pub async fn handle_message(
                 bot.send_message(msg.chat.id, format!("Gas fee set to: {} SOL", utils::helpers::lamports_to_sol(gas_lamports))).await?;
             }
             else if reply_to_message.text().unwrap_or_default().starts_with("Send '<multiplier>, <%_token_position_amount_to_sell>' ") {
-                
                 let take_profits = match parse_take_profit_message(text) {
-                    Ok(tp) => tp,
+                    Ok(tp) => {
+                        bot.send_message(msg.chat.id, "Take profit set").await?;
+                        tp
+                    }
                     Err(e) => {
                         bot.send_message(msg.chat.id, "Invalid take profit format. Please use format: '<multiplier>, <%_token_position_amount_to_sell>'").await?;
                         return Ok(());
