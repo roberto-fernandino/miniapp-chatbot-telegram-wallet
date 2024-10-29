@@ -247,7 +247,7 @@ pub async fn handle_message(
                 set_user_gas_lamports(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), gas_lamports).await?;
                 bot.send_message(msg.chat.id, format!("Gas fee set to: {} SOL", utils::helpers::lamports_to_sol(gas_lamports))).await?;
             }
-            else if reply_to_message.text().unwrap_or_default().starts_with("Send '<multiplier>, <%_token_position_amount_to_sell>' ") {
+            else if reply_to_message.text().unwrap_or_default().starts_with("Send '<multiplier>, <%_token_position_amount_to_sell>'") {
                 let take_profits = match parse_take_profit_message(text) {
                     Ok(tp) => {
                         tp
