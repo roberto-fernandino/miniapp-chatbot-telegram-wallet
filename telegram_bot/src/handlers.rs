@@ -613,7 +613,7 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
     println!("@handle_execute_buy_sol_callback/ user_id: {:?}", user_id);
     let response = match &q.message {
         Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) => {
-            execute_swap(data, bot, msg, pool, "So11111111111111111111111111111111111111112", token_address.as_str(), user_id).await?
+            execute_swap(pool, "So11111111111111111111111111111111111111112", token_address.as_str(), user_id).await?
         },
         _ => return Err(anyhow::anyhow!("Message is inaccessible")),
     };
@@ -927,7 +927,7 @@ async fn handle_execute_sell_callback(data: String, bot: &teloxide::Bot, q: &tel
     println!("@handle_execute_sell_callback/ user_id: {:?}", user_id);
     let response = match &q.message {
         Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) => {
-            execute_swap(data, bot, msg, pool, &token_address, "So11111111111111111111111111111111111111112", user_id).await?
+            execute_swap(&pool, &token_address, "So11111111111111111111111111111111111111112", user_id).await?
         },
         _ => return Err(anyhow::anyhow!("Message is inaccessible")),
     };
@@ -1034,7 +1034,7 @@ async fn handle_set_custom_gas_callback(_data: String, bot: &teloxide::Bot, q: &
 /// A result indicating the success of the operation    
 async fn handle_add_take_profit_user_settings_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     bot.send_message(q.message.as_ref().unwrap().chat().id, "Send '<take_profit_%_up>, <%_token_position_amount_to_sell>' ")
-    .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Send '<take_profit_%_up>, <%_token_position_amount_to_sell>' ".to_string()), selective: false})
+    .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Send <multiplier to leave>, <% to sell> ".to_string()), selective: false})
     .await?;
     Ok(())
 }
