@@ -10,6 +10,16 @@ use std::fs::File;
 use std::str::FromStr;
 use anyhow::Result;
 
+/// Decode a signature and get the transaction
+/// 
+/// # Arguments
+/// 
+/// * `signature_str` - The signature
+/// * `rpc_client` - The RPC client
+/// 
+/// # Returns
+/// 
+/// The transaction
 pub fn decode_signature_get_transaction(
     signature_str: &str,
     rpc_client: &RpcClient,
