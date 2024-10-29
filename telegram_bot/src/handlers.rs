@@ -958,13 +958,14 @@ async fn handle_execute_sell_callback(data: String, bot: &teloxide::Bot, q: &tel
     println!("@handle_execute_sell_callback/ token_address: {:?}", token_address);
     let user_id = q.from.id.to_string();
     println!("@handle_execute_sell_callback/ user_id: {:?}", user_id);
-    let response = match &q.message {
-        Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) => {
-            execute_swap(&pool, &token_address, "So11111111111111111111111111111111111111112", user_id).await?
-        },
-        _ => return Err(anyhow::anyhow!("Message is inaccessible")),
+    let response = match execute_swap(&pool, &token_address, "So11111111111111111111111111111111111111112", user_id).await {
+        Ok(r) => r,
+        Err(e) => {
+            println!("@handle_execute_sell_callback/ error executing swap: {:?}", e);
+            bot.send_message(q.message.as_ref().unwrap().chat().id, format!("❌ Failed to sell: {}", e)).await?;
+            return Ok(());
+        }
     };
-    
     if response.status().is_success() {
         println!("@handle_execute_sell_callback/ response is success");
         let json_response = response.json::<serde_json::Value>().await?;
