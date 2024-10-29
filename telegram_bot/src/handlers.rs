@@ -886,6 +886,10 @@ async fn handle_positions_callback(data: String, bot: &teloxide::Bot, q: &teloxi
 /// * `bot` - The Telegram bot
 /// * `q` - The callback query
 /// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
 async fn handle_sell_choose_token_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     let user_tg_id = q.from.id.to_string();
     let user = get_user(&pool, &user_tg_id).await?;
