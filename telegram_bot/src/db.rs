@@ -1272,7 +1272,7 @@ pub async fn get_or_create_user_settings(pool: &PgPool, user_tg_id: &str) -> Res
     }
 }
 
-pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &str, take_profits: Option<Vec<(f64, f64)>>, stop_losses: Option<Vec<(f64, f64)>>, amount: f64, mc_entry: f64) -> Result<()> {
+pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &str, take_profits: Option<Vec<(f64, f64)>>, stop_losses: Option<Vec<(f64, f64)>>, amount: f64, mc_entry: f64, token_price: f64) -> Result<()> {
     let take_profits_json = if take_profits.is_some() {
         Some(serde_json::to_value(take_profits).unwrap())
     } else {
@@ -1285,13 +1285,14 @@ pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &st
         None
     };
 
-    sqlx::query("INSERT INTO positions (tg_user_id, token_address, take_profits, stop_losses, amount, mc_entry) VALUES ($1, $2, $3, $4, $5, $6)")
+    sqlx::query("INSERT INTO positions (tg_user_id, token_address, take_profits, stop_losses, amount, mc_entry, entry_price) VALUES ($1, $2, $3, $4, $5, $6, $7)")
     .bind(tg_user_id)
     .bind(token_address)
     .bind(take_profits_json)
     .bind(stop_losses_json)
     .bind(amount)
     .bind(mc_entry)
+    .bind(token_price)
     .execute(pool)
     .await?;
     Ok(())
