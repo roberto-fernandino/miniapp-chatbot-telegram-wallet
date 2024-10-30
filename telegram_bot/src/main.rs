@@ -31,7 +31,7 @@ async fn main() {
         .await
         .expect("Failed to create pool");
 
-    /// Axum server
+    // Axum server
     let shared_pool = Arc::new(pool);
     // Spawn the Tide server on a separate task using Tokio runtime.
     let axum_pool = shared_pool.clone();
@@ -40,7 +40,7 @@ async fn main() {
         run_axum_server(axum_pool).await;
     });
 
-    /// Check positions
+    // Check positions
     let positions_pool = shared_pool.clone();
     tokio::spawn(async move {
         println!("@main/ running positions_watcher");
@@ -75,7 +75,7 @@ async fn positions_watcher(pool: SafePool) {
     let (mut pump_write, mut pump_read) = ws_stream.split();
 
     // Spawn WebSocket listener
-    let pump_read_handle = tokio::spawn(async move {
+    let _pump_read_handle = tokio::spawn(async move {
         while let Some(msg) = pump_read.next().await {
             match msg {
                 Ok(WsMessage::Text(text)) => {
@@ -116,12 +116,12 @@ async fn positions_watcher(pool: SafePool) {
                 continue;
             }
         };
+        println!("@main/positions_watcher/ raydium tokens: {:?}", raydium_tokens);
 
         let raydium_positions = all_positions.iter()
             .filter(|p| raydium_tokens.contains(&p.token_address))
             .collect::<Vec<_>>();
         println!("@positions_watcher/ raydium positions: {:?}", raydium_positions);
-        
 
         let pumpfun_positions = all_positions.iter()
             .filter(|p| !raydium_tokens.contains(&p.token_address))
@@ -132,7 +132,6 @@ async fn positions_watcher(pool: SafePool) {
         let pumpfun_tokens: std::collections::HashSet<String> = tokens.into_iter()
             .filter(|token| !raydium_tokens.contains(token))
             .collect();
-       
 
         // If there are new tokens to subscribe
         if !pumpfun_tokens.is_empty() {
@@ -140,14 +139,12 @@ async fn positions_watcher(pool: SafePool) {
                 method: "subscribeTokenTrade".to_string(),
                 keys: pumpfun_tokens.iter().cloned().collect(),
             };
-            
             if let Ok(payload_json) = serde_json::to_string(&pump_payload) {
                 if let Err(e) = pump_write.send(WsMessage::Text(payload_json)).await {
                     eprintln!("Error sending subscription: {:?}", e);
                 }
             }
         }
-
         // Check Raydium prices
         if let Ok(current_prices) = crate::utils::helpers::check_raydium_tokens_prices(
             raydium_tokens.iter().cloned().collect()
@@ -178,7 +175,6 @@ async fn positions_watcher(pool: SafePool) {
                                 db::delete_position(&pool, &position.token_address, &position.tg_user_id).await.unwrap();
                             }
                         }
-
                         if let Err(e) = db::delete_position_target_reached(
                             &pool,
                             &position.token_address,
@@ -192,7 +188,6 @@ async fn positions_watcher(pool: SafePool) {
                 }
             }
         }
-
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
     }
 }

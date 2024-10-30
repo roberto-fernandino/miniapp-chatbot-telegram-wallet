@@ -1287,7 +1287,9 @@ pub async fn check_raydiums_tokens(token_address: Vec<String>) -> Result<Vec<Str
     )
     .send()
     .await?;
+
     let response_json = response.json::<serde_json::Value>().await?;
+    println!("@bot/helpers/check_raydium_tokens/ response_json: {:?}", response_json);
     
     // Filter out tokens with null prices
     let result = response_json.as_object()
