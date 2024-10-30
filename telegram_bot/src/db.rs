@@ -1451,13 +1451,16 @@ pub async fn get_all_positions(pool: &PgPool) -> Result<Vec<Position>> {
 /// # Returns
 /// 
 /// A Vec<(f64, f64)> representing the take profits
-pub async fn get_position_take_profits(pool: &PgPool, token_address: &str, user_tg_id: &str) -> Result<Vec<(f64, f64)>> {
-    let take_profits = sqlx::query_scalar("SELECT take_profits FROM positions WHERE token_address = $1 AND tg_user_id = $2")
+pub async fn get_position_take_profits(pool: &PgPool, token_address: &str, user_tg_id: &str) -> Result<Option<Vec<(f64, f64)>>> {
+    let take_profits: Option<serde_json::Value> = sqlx::query_scalar("SELECT take_profits FROM positions WHERE token_address = $1 AND tg_user_id = $2")
     .bind(token_address)
     .bind(user_tg_id)
-    .fetch_one(pool)
+    .fetch_optional(pool)
     .await?;
-    Ok(take_profits)
+    match take_profits {
+        Some(json) => Ok(serde_json::from_value(json).unwrap_or_default()),
+        None => Ok(None)
+    }
 }
 
 /// Sets the position take profits
@@ -1504,11 +1507,12 @@ pub async fn set_position_take_profits(pool: &PgPool, token_address: &str, user_
 /// 
 /// A result indicating whether the position take profit was deleted
 pub async fn delete_position_target_reached(pool: &PgPool, token_address: &str, user_tg_id: &str, position: (f64, f64)) -> Result<()> {
-    let mut position_take_profits = get_position_take_profits(pool, token_address, user_tg_id).await?;
-    if position_take_profits.contains(&position) {
-        position_take_profits.retain(|&tp| tp != position);
-        set_position_take_profits(pool, token_address, user_tg_id, position_take_profits).await?;
-        
+    let position_take_profits = get_position_take_profits(pool, token_address, user_tg_id).await?;
+    if  position_take_profits.is_some()   {
+        if position_take_profits.clone().unwrap().contains(&position) {
+            position_take_profits.clone().unwrap().retain(|&tp| tp != position);
+            set_position_take_profits(pool, token_address, user_tg_id, position_take_profits.unwrap()).await?;
+        }
     }
     Ok(())
 }
@@ -1561,13 +1565,14 @@ pub async fn add_user_take_profit_user_settings(user_tg_id: &str, take_profit: (
 /// 
 /// A result indicating whether the take profit was removed
 pub async fn remove_take_profit_from_position(pool: &PgPool, token_address: &str, user_tg_id: &str, take_profit: (f64, f64)) -> Result<()> {
-    let mut position_take_profits = get_position_take_profits(pool, token_address, user_tg_id).await?;
-    position_take_profits.retain(|&tp| tp != take_profit);
-    
-    // Sort the take profits by the multiplier (first element of the tuple)
-    position_take_profits.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-    
-    set_position_take_profits(pool, token_address, user_tg_id, position_take_profits).await?;
+    let position_take_profits = get_position_take_profits(pool, token_address, user_tg_id).await?;
+    if position_take_profits.is_some() {
+        position_take_profits.clone().unwrap().retain(|&tp| tp != take_profit);
+        // Sort the take profits by the multiplier (first element of the tuple)
+        position_take_profits.clone().unwrap().sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        
+        set_position_take_profits(pool, token_address, user_tg_id, position_take_profits.unwrap()).await?;
+    } 
     Ok(())
 }
 
