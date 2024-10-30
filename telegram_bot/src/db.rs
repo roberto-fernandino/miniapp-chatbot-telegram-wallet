@@ -1285,7 +1285,7 @@ pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &st
         None
     };
 
-    sqlx::query("INSERT INTO positions (tg_user_id, token_address, take_profits, stop_losses, amount, mc_entry) VALUES ($1, $2, $3, $4, $5, $6, $7)")
+    sqlx::query("INSERT INTO positions (tg_user_id, token_address, take_profits, stop_losses, amount, mc_entry) VALUES ($1, $2, $3, $4, $5, $6)")
     .bind(tg_user_id)
     .bind(token_address)
     .bind(take_profits_json)
