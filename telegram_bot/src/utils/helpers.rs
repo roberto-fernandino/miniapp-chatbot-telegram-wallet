@@ -1352,7 +1352,7 @@ pub async fn get_token_amount_in_wallet(solana_wallet_address: &str, token_addre
     Ok(positions["tokens"].as_array().unwrap_or(&Vec::new())
         .iter()
         .find(|token| token["mint"].as_str().unwrap_or("") == token_address)
-        .unwrap_or(&serde_json::Value::Null)["token_ui_amount"]  // Changed from token_amount to token_ui_amount
+        .unwrap_or(&serde_json::Value::Null)["token_amount"]  
         .as_f64()
         .unwrap_or(0.0))
 }
