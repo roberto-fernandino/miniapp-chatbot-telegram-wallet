@@ -135,13 +135,24 @@ pub async fn run_axum_server(pool: SafePool) {
 /// 
 /// A JSON object containing the scanner search
 pub async fn get_scanner_search(token_mint_address: &str) -> Result<Value> {
+    println!("@get_scanner_search/ token_mint_address: {:?}", token_mint_address);
+
+    println!("@get_scanner_search/ getting pair token pair and token address");
     let pair_token_pair_and_token_address = get_pair_token_pair_and_token_address(token_mint_address).await?;
+    println!("@get_scanner_search/ pair token pair and token address retreived");
+
     let pair_address = pair_token_pair_and_token_address["pairAddress"].as_str().unwrap_or("");
     let token_address = pair_token_pair_and_token_address["tokenAddress"].as_str().unwrap_or("");
     let chain = pair_token_pair_and_token_address["chainName"].as_str().unwrap_or("");
+    println!("@get_scanner_search/ pair_address: {:?}", pair_address);
+    println!("@get_scanner_search/ token_address: {:?}", token_address);
+    println!("@get_scanner_search/ chain: {:?}", chain);
+    
     let client = Client::new();
+
     let url = format!("https://api-rs.dexcelerate.com/scanner/{}/{}/{}/pair-stats", chain, pair_address, token_address);
-    log::info!("url: {:?}", url);
+    println!("@get_scanner_search/ url: {:?}", url);
+
     let response = client.get(url)
         .send()
         .await?;
