@@ -1,4 +1,5 @@
 use sqlx::{PgPool, postgres::PgPoolOptions};
+use chrono::NaiveDateTime;
 use serde_json::json;
 use sqlx::{Encode, Pool};
 use sqlx::Postgres;
@@ -92,7 +93,7 @@ pub struct Position {
     pub amount: f64, // Amount of tokens bought
     pub mc_entry: f64, // Market cap at entry
     pub entry_price: f64, // Price at entry
-    pub created_at: chrono::DateTime<chrono::Utc>, // Default value is the current timestamp
+    pub created_at: NaiveDateTime, // Default value is the current timestamp
 }
 
 #[derive(Debug, Serialize)]
