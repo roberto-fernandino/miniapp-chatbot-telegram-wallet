@@ -19,8 +19,8 @@ pub struct UserSettings {
     pub sell_percentage: String,
     pub gas_lamports: i32,
     pub anti_mev: bool,
-    pub take_profits: Option<Vec<(f64, f64)>>,
-    pub stop_losses: Option<Vec<(f64, f64)>>,
+    pub take_profits: Vec<(f64, f64)>,
+    pub stop_losses: Vec<(f64, f64)>,
 }
 
 /// Struct to hold the call with the ATH after the call
@@ -1054,8 +1054,10 @@ pub async fn is_user_registered_in_mini_app(pool: &PgPool, user_tg_id: &str, use
 /// # Returns
 /// 
 /// A result indicating whether the user settings were set
-pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str, last_sent_token: &str, sell_percentage: &str, gas_lamports: i32, anti_mev: bool) -> Result<()> {
-    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit, last_sent_token, sell_percentage, gas_lamports, anti_mev) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (tg_id) DO UPDATE SET slippage_tolerance = $2, buy_amount = $3, swap_or_limit = $4, last_sent_token = $5, sell_percentage = $6, gas_lamports = $7, anti_mev = $8")
+pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str, last_sent_token: &str, sell_percentage: &str, gas_lamports: i32, anti_mev: bool, take_profits: Vec<(f64, f64)>, stop_losses: Vec<(f64, f64)>) -> Result<()> {
+    let take_profits_json = serde_json::to_value(take_profits).unwrap();
+    let stop_losses_json = serde_json::to_value(stop_losses).unwrap();
+    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit, last_sent_token, sell_percentage, gas_lamports, anti_mev, take_profits, stop_losses) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (tg_id) DO UPDATE SET slippage_tolerance = $2, buy_amount = $3, swap_or_limit = $4, last_sent_token = $5, sell_percentage = $6, gas_lamports = $7, anti_mev = $8, take_profits = $9, stop_losses = $10")
     .bind(tg_id)
     .bind(slippage_tolerance)
     .bind(buy_amount)
@@ -1064,6 +1066,8 @@ pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance
     .bind(sell_percentage)
     .bind(gas_lamports)
     .bind(anti_mev)
+    .bind(take_profits_json)
+    .bind(stop_losses_json)
     .execute(pool)
     .await?;
     Ok(())
@@ -1085,13 +1089,13 @@ pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSe
     .bind(user_tg_id)
     .fetch_one(pool)
     .await?;
-    let take_profits: Option<Vec<(f64, f64)>> = match user_settings.try_get("take_profits") {
-        Ok(Some(take_profits)) => Some(serde_json::from_value(take_profits).unwrap_or_default()),
-        _ => None,
+    let take_profits: Vec<(f64, f64)> = match user_settings.try_get("take_profits") {
+        Ok(Some(take_profits)) => serde_json::from_value(take_profits).unwrap_or_default(),
+        _ => vec![],
     };
-    let stop_losses: Option<Vec<(f64, f64)>> = match user_settings.try_get("stop_losses") {
-        Ok(Some(stop_losses)) => Some(serde_json::from_value(stop_losses).unwrap_or_default()),
-        _ => None,
+    let stop_losses: Vec<(f64, f64)> = match user_settings.try_get("stop_losses") {
+        Ok(Some(stop_losses)) => serde_json::from_value(stop_losses).unwrap_or_default(),
+        _ => vec![],
     };
     Ok(UserSettings {
         slippage_tolerance: user_settings.get("slippage_tolerance"),
@@ -1211,7 +1215,7 @@ pub async fn user_has_settings(pool: &PgPool, user_tg_id: &str) -> Result<bool> 
 /// 
 /// A result indicating whether the user settings were created
 pub async fn create_user_settings_default(pool: &PgPool, user_tg_id: &str) -> Result<()> {
-    upsert_user_settings(pool, user_tg_id, "0.18", "0.2", "swap", "", "100", 5000, false).await.expect("Failed to create user settings");
+    upsert_user_settings(pool, user_tg_id, "0.18", "0.2", "swap", "", "100", 5000, false, vec![], vec![]).await.expect("Failed to create user settings");
     Ok(())
 }
 
