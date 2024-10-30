@@ -134,9 +134,10 @@ pub async fn run_axum_server(pool: SafePool) {
 /// # Returns
 /// 
 /// A JSON object containing the scanner search
-pub async fn get_scanner_search(token_address: &str) -> Result<Value> {
-    let pair_token_pair_and_token_address = get_pair_token_pair_and_token_address(token_address).await?;
+pub async fn get_scanner_search(token_mint_address: &str) -> Result<Value> {
+    let pair_token_pair_and_token_address = get_pair_token_pair_and_token_address(token_mint_address).await?;
     let pair_address = pair_token_pair_and_token_address["pairAddress"].as_str().unwrap_or("");
+    let token_address = pair_token_pair_and_token_address["tokenAddress"].as_str().unwrap_or("");
     let chain = pair_token_pair_and_token_address["chainName"].as_str().unwrap_or("");
     let client = Client::new();
     let url = format!("https://api-rs.dexcelerate.com/scanner/{}/{}/{}/pair-stats", chain, pair_address, token_address);
@@ -672,6 +673,7 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
     } else {
         match get_token_amount(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await {
             Ok(amount) => {
+                println!("@execute_swap/ token_amount: {:?}", amount);
                 input_token_amount = amount * user_settings.sell_percentage.parse::<f64>().expect("Sell percentage is not a number") / 100.0;
             },
             Err(e) => {
@@ -732,21 +734,27 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
             return Err(anyhow::anyhow!("Failed to send request: {}", e));
         }
     };
-    // If the input token is SOL = buy
     println!("@execute_swap: input_token: {:?}", input_token);
     if response.status().is_success() { 
+        
+        // If the input token is SOL = buy
         if input_token == "So11111111111111111111111111111111111111112" {
             println!("@execute_swap: input_token is SOL, creating position");
             let take_profits = get_user_settings_take_profits(pool, &user_tg_id).await?;
             println!("@execute_swap: take_profits: {:?}", take_profits);
+
             let stop_losses = db::get_user_settings_stop_losses(pool, &user_tg_id).await?;
             println!("@execute_swap: stop_losses: {:?}", stop_losses);
+
             println!("@execute_swap: getting scanner response");
             let scanner_response = get_scanner_search(input_token).await?;
+
             let token_price = scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
             println!("@execute_swap: token_price: {:?}", token_price);
+
             let token_amount_in_wallet = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await?;
             println!("@execute_swap: token_amount_in_wallet: {:?}", token_amount_in_wallet);
+
             println!("@execute_swap: inserting position");
             db::insert_position(pool, &user_tg_id, input_token, take_profits, stop_losses, token_amount_in_wallet, token_price).await?;
             println!("@execute_swap: position inserted");
