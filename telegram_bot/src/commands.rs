@@ -738,8 +738,8 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
         if input_token == "So11111111111111111111111111111111111111112" {
             println!("@execute_swap: input_token is SOL, creating position");
             let take_profits = get_user_settings_take_profits(pool, &user_tg_id).await?;
-            let stop_losses = db::get_user_settings_stop_losses(pool, &user_tg_id).await?;
             println!("@execute_swap: take_profits: {:?}", take_profits);
+            let stop_losses = db::get_user_settings_stop_losses(pool, &user_tg_id).await?;
             println!("@execute_swap: stop_losses: {:?}", stop_losses);
             println!("@execute_swap: getting scanner response");
             let scanner_response = get_scanner_search(input_token).await?;
