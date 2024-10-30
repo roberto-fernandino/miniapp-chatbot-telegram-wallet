@@ -763,11 +763,11 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
             let token_price = scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
             println!("@execute_swap: token_price: {:?}", token_price);
 
-            let token_amount_in_wallet = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await?;
+            let token_amount_in_wallet = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), output_token).await?;
             println!("@execute_swap: token_amount_in_wallet: {:?}", token_amount_in_wallet);
 
             println!("@execute_swap: inserting position");
-            db::insert_position(pool, &user_tg_id, input_token, take_profits, stop_losses, token_amount_in_wallet, token_price).await?;
+            db::insert_position(pool, &user_tg_id, output_token, take_profits, stop_losses, token_amount_in_wallet, token_price).await?;
             println!("@execute_swap: position inserted");
         } 
     }
