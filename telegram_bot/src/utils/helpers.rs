@@ -428,8 +428,8 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
 // Add a row for take profits
     let take_profits = user_settings.take_profits.clone();
     println!("@create_sol_buy_swap_keyboard/ take_profits: {:?}", take_profits);
-    if !take_profits.is_none() {
-        for take_profit in take_profits.unwrap() {
+    if !take_profits.is_empty() {
+        for take_profit in take_profits {
             let row: Vec<InlineKeyboardButton> = vec![
                 InlineKeyboardButton::callback(format!("{}x 📈", take_profit.0), "_"),
                 InlineKeyboardButton::callback(format!("sell {}% 💰", take_profit.1), "_"),
