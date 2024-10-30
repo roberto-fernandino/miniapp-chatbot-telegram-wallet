@@ -1409,16 +1409,29 @@ pub async fn get_all_positions(pool: &PgPool) -> Result<Vec<Position>> {
     .await?;
     let mut positions_vec: Vec<Position> = Vec::new();
     for position in positions {
+        let take_profits_value = position.get::<Option<serde_json::Value>, _>("take_profits");
+        let stop_losses_value = position.get::<Option<serde_json::Value>, _>("stop_losses");
+
+        let take_profits: Vec<(f64, f64)> = match take_profits_value {
+            Some(v) => serde_json::from_value(v).unwrap_or_default(),
+            None => Vec::new(),
+        };
+
+        let stop_losses: Vec<(f64, f64)> = match stop_losses_value {
+            Some(v) => serde_json::from_value(v).unwrap_or_default(),
+            None => Vec::new(),
+        };
+
         positions_vec.push(Position {
             id: position.get("id"),
             tg_user_id: position.get("tg_user_id"),
             token_address: position.get("token_address"),
-            take_profits: position.get("take_profits"),
-            stop_losses: position.get("stop_losses"),
             amount: position.get("amount"),
             mc_entry: position.get("mc_entry"),
             entry_price: position.get("entry_price"),
             created_at: position.get("created_at"),
+            take_profits,
+            stop_losses,
         });
     }
     Ok(positions_vec)
