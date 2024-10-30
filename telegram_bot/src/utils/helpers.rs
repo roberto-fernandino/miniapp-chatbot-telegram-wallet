@@ -1290,16 +1290,15 @@ pub async fn check_raydiums_tokens(token_address: Vec<String>) -> Result<Vec<Str
 
     let response_json = response.json::<serde_json::Value>().await?;
     println!("@bot/helpers/check_raydium_tokens/ response_json: {:?}", response_json);
-    
-    // Filter out tokens with null prices
-    let result = response_json.as_object()
-        .unwrap_or(&serde_json::Map::new())
-        .iter()
-        .filter(|(_, v)| v.is_string()) // Only keep tokens with actual price strings
-        .map(|(k, _)| k.to_string())
-        .collect();
-    
-    Ok(result)
+    let mut tokens: Vec<String> = Vec::new();
+    if let Some(data) = response_json["data"].as_object() {
+        for (key, value) in data.iter() {
+            if value.is_string() {
+                tokens.push(key.to_string());
+            }
+        }
+    }
+    Ok(tokens)
 }
 
 
