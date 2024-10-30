@@ -758,7 +758,7 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
             println!("@execute_swap: stop_losses: {:?}", stop_losses);
 
             println!("@execute_swap: getting scanner response");
-            let scanner_response = get_scanner_search(input_token).await?;
+            let scanner_response = get_scanner_search(output_token).await?;
 
             let token_price = scanner_response["pair"]["pairPrice1Usd"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
             println!("@execute_swap: token_price: {:?}", token_price);
