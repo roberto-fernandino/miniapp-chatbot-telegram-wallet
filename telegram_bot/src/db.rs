@@ -1454,6 +1454,7 @@ pub async fn get_all_positions(pool: &PgPool) -> Result<Vec<Position>> {
 pub async fn get_position_take_profits(pool: &PgPool, token_address: &str, user_tg_id: &str) -> Result<Vec<(f64, f64)>> {
     let take_profits = sqlx::query_scalar("SELECT take_profits FROM positions WHERE token_address = $1 AND tg_user_id = $2")
     .bind(token_address)
+    .bind(user_tg_id)
     .fetch_one(pool)
     .await?;
     Ok(take_profits)
@@ -1567,6 +1568,77 @@ pub async fn remove_take_profit_from_position(pool: &PgPool, token_address: &str
     position_take_profits.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
     
     set_position_take_profits(pool, token_address, user_tg_id, position_take_profits).await?;
+    Ok(())
+}
+
+/// Get the postion stop losses
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `token_address` - The token address
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A Vec<(f64, f64)> representing the stop losses
+pub async fn get_position_stop_losses(pool: &PgPool, token_address:&str, user_tg_id: &str) ->  Result<Vec<(f64, f64)>> {
+    let stop_losses = sqlx::query_scalar(
+        "SELECT stop_losses FROM positions WHERE token_address = $1 AND tg_user_id = $2"
+    )
+    .bind(token_address)
+    .bind(user_tg_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(stop_losses)
+
+}
+
+
+/// Sets the position stop losses
+/// 
+/// # Description
+/// 
+/// Sorts the stop losses by % loss (first element of tuple) in ascending order before setting them
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `token_address` - The token address
+/// * `user_tg_id` - The user's Telegram ID
+/// * `take_profits` - The take profits
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the position take profits were set
+pub async fn set_position_stop_losses(pool: &PgPool, token_address: &str, user_tg_id: &str, take_profits: Vec<(f64, f64)>) -> Result<()> {
+
+    // Sort take_profits by % down (first element of tuple) in descending order
+    let mut sorted_stop_losses = take_profits;
+    sorted_stop_losses.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+    /// Adding to db
+    let stop_losses_json = serde_json::to_value(sorted_stop_losses).unwrap();
+    sqlx::query("UPDATE positions SET take_profits = $1 WHERE token_address = $2 AND tg_user_id = $3")
+    .bind(stop_losses_json)
+    .bind(token_address)
+    .bind(user_tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn remove_stop_loss_from_position(pool: &PgPool, token_address: &str, user_tg_id: &str, stop_loss: (f64, f64)) -> Result<()> {
+    let mut position_stop_losses = get_position_stop_losses(pool, token_address, user_tg_id).await?;
+
+    // Retain the stop loss
+    position_stop_losses.retain(|&sl| sl != stop_loss);
+
+    // Sort by loss %
+    position_stop_losses.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+    set_position_stop_losses(pool, token_address, user_tg_id, position_stop_losses).await?;
+
     Ok(())
 }
 
