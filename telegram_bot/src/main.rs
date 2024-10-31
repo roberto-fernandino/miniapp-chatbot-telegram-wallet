@@ -1,4 +1,5 @@
-use commands::{execute_swap, execute_swap_take_profit};
+use commands::{execute_swap, execute_swap_take_profit, execute_swap_stop_losses};
+use db::get_user_by_tg_id;
 use teloxide::prelude::*;
 use tungstenite::Message as WsMessage;
 use futures_util::stream::StreamExt;
@@ -169,9 +170,12 @@ async fn positions_watcher(pool: SafePool) {
                         } else {
                             println!("@positions_watcher/ take profit executed for position: {:?}", position);
                             println!("@positions_watcher/ deleting position take profit");
+
                             let user = db::get_user_by_tg_id(&pool, &position.tg_user_id).await.unwrap();
+
                             let user_token_amount = get_token_amount_in_wallet(&user.solana_address.unwrap(), &position.token_address).await.unwrap();
                             println!("@positions_watcher/ user token amount: {:?}", user_token_amount);
+
                             if user_token_amount > 0.0 {
                                 db::remove_take_profit_from_position(&pool, &position.token_address, &position.tg_user_id, (position.take_profits[0].0, position.take_profits[0].1)).await.unwrap();
                             } else {
@@ -191,6 +195,44 @@ async fn positions_watcher(pool: SafePool) {
                     } 
                     if current_price_float <= (position.stop_losses[0].0 * position.entry_price) {
                         println!("@bot/main/positions_watcher/ Stop loss reached for position: {}", count);
+                        if let Err(e) = execute_swap_stop_losses(
+                            &pool,
+                            position.tg_user_id.clone(),
+                            (position.stop_losses[0].0, position.stop_losses[0].1),
+                            &position.token_address,
+                            "So11111111111111111111111111111111111111112"
+                        ).await {
+                            eprintln!("Error executing swap: {:?}", e);
+                        } else {
+                            println!("@bot/main/positions_watcher/ Stop realized");
+                            println!("@positions_watcher/ deleting position take profit");
+                            let user = get_user_by_tg_id(&pool, &position.tg_user_id).await.expect("Could not get user");
+                            let user_token_amount = get_token_amount_in_wallet(&user.solana_address.unwrap(), &position.token_address).await.expect("Could not get token amount in wallet.");
+                            if user_token_amount > 0.0 {
+                                match db::remove_stop_loss_from_position(&pool, &position.token_address, &position.tg_user_id, (position.stop_losses[0].0, position.stop_losses[1].1)).await {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        eprintln!("@bot/main/positions_watcher/ error removing stop loss from position error: {}", e);
+                                    }
+
+                                }
+                            } else {
+                                println!("@positions_watcher/ user has no token in wallet, deleting position");
+                                match db::delete_position(&pool, &position.token_address, &position.tg_user_id).await {
+                                    Ok(_) => {},
+                                    Err(e) => {
+                                        eprintln!("@bot/main/positions_watcher/ error deleting position: {}", e);
+                                    }
+                                }
+                            }
+                            // Remove stop loss from position
+                            match db::remove_stop_loss_from_position(&pool, &position.token_address, &position.tg_user_id, (position.stop_losses[0].0, position.stop_losses[0].1)).await {
+                                Ok(_) => {},
+                                Err(e) => {
+                                    eprintln!("@bot/main/watcher_position/ error removing stop loss from position: {}", e);
+                                }
+                            }
+                        }
                     }
                 }
             }
