@@ -1405,6 +1405,40 @@ pub async fn delete_user_settings_take_profit(pool: &PgPool, take_profit: (f64, 
     Ok(())
 }
 
+/// Deletes a user settings stop loss
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `take_profit` - The take profit
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user settings stop loss was deleted
+pub async fn delete_user_settings_stop_loss(pool: &PgPool, stop_loss: (f64, f64), user_tg_id: &str) -> Result<()> {
+    println!("@delete_user_settings_stop_loss/ stop_loss: {:?}", stop_loss);
+
+    if let Some(mut user_stop_losses) = get_user_settings_stop_losses(pool, user_tg_id).await? {
+        println!("@delete_user_settings_stop_loss/ user_stop_losses: {:?}", user_stop_losses);
+        
+        user_stop_losses.retain(|&sl| sl != stop_loss);
+        println!("@delete_user_settings_stop_loss/ user_stop_losses after retaining: {:?}", user_stop_losses);
+
+        let stop_losses = if user_stop_losses.is_empty() {
+            None
+        } else {
+            Some(user_stop_losses)
+        };
+        println!("@delete_user_settings_stop_loss/ setting user_stop_losses to: {:?}", stop_losses);
+
+        set_user_settings_stop_losses(pool, user_tg_id, stop_losses).await?;
+        println!("@delete_user_settings_stop_loss/ user_stop_losses was set.");
+    }
+
+    Ok(())
+}
+
 pub async fn get_all_positions(pool: &PgPool) -> Result<Vec<Position>> {
     let positions = sqlx::query("SELECT * FROM positions")
     .fetch_all(pool)
