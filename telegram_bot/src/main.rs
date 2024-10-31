@@ -165,38 +165,49 @@ async fn positions_watcher(pool: SafePool, bot: &Bot) {
                         if current_price_float >= (position.take_profits[0].0 * position.entry_price) {
                             println!("@bot/main/positions_watcher/ Take profit reached for position: {}", count);
                             // Execute take profit
-                            if let Err(e) = execute_swap_take_profit(
+                            match execute_swap_take_profit(
                                 &pool,
                                 position.tg_user_id.clone(),
                                 (position.take_profits[0].0, position.take_profits[0].1),
                                 &position.token_address,
                                 "So11111111111111111111111111111111111111112"
                             ).await {
-                                eprintln!("Error executing swap: {:?}", e);
-                            } else {
-                                println!("@positions_watcher/ take profit executed for position: {:?}", position);
-                                println!("@positions_watcher/ deleting position take profit");
-
-                                let user = db::get_user_by_tg_id(&pool, &position.tg_user_id).await.unwrap();
-
-                                let user_token_amount = get_token_amount_in_wallet(&user.solana_address.unwrap(), &position.token_address).await.unwrap();
-                                println!("@positions_watcher/ user token amount: {:?}", user_token_amount);
-
-                                if user_token_amount > 0.0 {
-                                    db::remove_take_profit_from_position(&pool, &position.token_address, &position.tg_user_id, (position.take_profits[0].0, position.take_profits[0].1)).await.unwrap();
-                                } else {
-                                    println!("@positions_watcher/ user has no tokens in wallet, deleting position");
-                                    db::delete_position(&pool, &position.token_address, &position.tg_user_id).await.unwrap();
+                                Ok(_) => {
+                                    println!("@positions_watcher/ take profit executed for position: {:?}", position);
+                                    
+                                    // Get updated token amount after swap
+                                    if let Ok(user) = get_user_by_tg_id(&pool, &position.tg_user_id).await {
+                                        if let Some(solana_address) = user.solana_address {
+                                            match get_token_amount_in_wallet(&solana_address, &position.token_address).await {
+                                                Ok(user_token_amount) => {
+                                                    println!("@positions_watcher/ user_token_amount: {:?}", user_token_amount);
+                                                    if user_token_amount > 0.0 {
+                                                        // If user still has tokens, just remove the take profit
+                                                        if let Err(e) = db::remove_take_profit_from_position(
+                                                            &pool,
+                                                            &position.token_address,
+                                                            &position.tg_user_id,
+                                                            (position.take_profits[0].0, position.take_profits[0].1)
+                                                        ).await {
+                                                            eprintln!("Error removing take profit: {:?}", e);
+                                                        }
+                                                    } else {
+                                                        // If no tokens left, delete the entire position
+                                                        if let Err(e) = db::delete_position(
+                                                            &pool,
+                                                            &position.token_address,
+                                                            &position.tg_user_id
+                                                        ).await {
+                                                            eprintln!("Error deleting position: {:?}", e);
+                                                        }
+                                                    }
+                                                }
+                                                Err(e) => eprintln!("Error getting token amount: {:?}", e),
+                                            }
+                                        }
+                                    }
                                 }
-                            }
-                            if let Err(e) = db::delete_position_target_reached(
-                                &pool,
-                                &position.token_address,
-                                &position.tg_user_id,
-                                (position.take_profits[0].0, position.take_profits[0].1)
-                            ).await {
-                                eprintln!("Error deleting position: {:?}", e);
-                                continue;
+                                Err(e) => eprintln!("Error executing swap: {:?}", e),
                             }
                         } 
                     }
