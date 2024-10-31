@@ -491,6 +491,12 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to add take profit: {:?}", e),
             }
         }
+        else if data.starts_with("add_stop_loss") {
+            match handle_add_stop_loss_user_settings_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to add stop loss: {:?}", e),
+            }
+        }
         else {
             log::info!("Unrecognized callback query data: {}", data);
         }
