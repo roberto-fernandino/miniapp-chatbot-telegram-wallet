@@ -266,8 +266,25 @@ pub async fn handle_message(
                 let last_token = get_user_last_sent_token(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await.unwrap();
                 match token_address_buy_info_handler(last_token.as_str(), &bot, &msg, &pool).await {
                     Ok(_) => (),
-                    Err(e) => log::error!("Failed to buy token address: {:?}", e),
+                    Err(e) => log::error!("Failed to open buy menu for token address: {:?}", e),
                 }
+            }
+            else if reply_to_message.text().unwrap_or_default().starts_with("Send '<%_down>,<%_token_position_amount_to_sell>'") {
+                let stop_loss = match parse_stop_loss_message(text) {
+                    Ok(sl) => sl,
+                    Err(e) => {
+                        bot.send_message(msg.chat.id, "Invalid stop loss format. Please use format: '<%_down>,<%_token_position_amount_to_sell>'").await?;
+                        return Ok(());
+                    }
+                };
+                println!("@handle_message/ stop_loss: {:?}", stop_loss);
+                add_user_stop_loss_user_settings(msg.clone().from.unwrap().id.to_string().as_str(), stop_loss, &pool).await?;
+                bot.send_message(msg.chat.id, "Stop loss set").await?;
+                let last_token = get_user_last_sent_token(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await.unwrap();
+                match token_address_buy_info_handler(last_token.as_str(), &bot, &msg, &pool).await {
+                    Ok(_) => (),
+                    Err(e) => log::error!("Failed to open buy menu for token address: {:?}", e),
+                }   
             }
         }
         if is_pnl_command(text) {
@@ -1083,8 +1100,27 @@ async fn handle_set_custom_gas_callback(_data: String, bot: &teloxide::Bot, q: &
 /// 
 /// A result indicating the success of the operation    
 async fn handle_add_take_profit_user_settings_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
-    bot.send_message(q.message.as_ref().unwrap().chat().id, "Send '<multiplier>, <%_token_position_amount_to_sell>'")
+    bot.send_message(q.message.as_ref().unwrap().chat().id, "Send '<multiplier>,<%_token_position_amount_to_sell>' (eg: '1.5,100' that means if the price goes up 1.5x, sell 100% of the position)")
     .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Send <multiplier to leave>, <% to sell> ".to_string()), selective: false})
+    .await?;
+    Ok(())
+}
+
+/// handle add stop loss callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_add_stop_loss_user_settings_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    bot.send_message(q.message.as_ref().unwrap().chat().id, "Send '<%down>,<%_token_position_amount_to_sell>' (eg: '10,100' that means if the price goes down 10%, sell 100% of the position)")
+    .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Send <% down>,<% to sell> ".to_string()), selective: false})
     .await?;
     Ok(())
 }
