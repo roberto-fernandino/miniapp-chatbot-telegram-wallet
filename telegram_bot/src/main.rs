@@ -156,80 +156,84 @@ async fn positions_watcher(pool: SafePool) {
                 if let Some(current_price) = current_prices.get(&position.token_address) {
                     let current_price_float = current_price.parse::<f64>().unwrap_or_default();
                     println!("@bot/main/positions_watcher/ Position:{}\n\nposition: {:?}\ncurrent_price: {:?}\nentry_price: {:?}\ntake_profit: {:?}\nstop_loss: {:?}\n\n\n", count, position, current_price_float, position.entry_price, position.take_profits, position.stop_losses);
-                    if current_price_float >= (position.take_profits[0].0 * position.entry_price) {
-                        println!("@bot/main/positions_watcher/ Take profit reached for position: {}", count);
-                        // Execute take profit
-                        if let Err(e) = execute_swap_take_profit(
-                            &pool,
-                            position.tg_user_id.clone(),
-                            (position.take_profits[0].0, position.take_profits[0].1),
-                            &position.token_address,
-                            "So11111111111111111111111111111111111111112"
-                        ).await {
-                            eprintln!("Error executing swap: {:?}", e);
-                        } else {
-                            println!("@positions_watcher/ take profit executed for position: {:?}", position);
-                            println!("@positions_watcher/ deleting position take profit");
-
-                            let user = db::get_user_by_tg_id(&pool, &position.tg_user_id).await.unwrap();
-
-                            let user_token_amount = get_token_amount_in_wallet(&user.solana_address.unwrap(), &position.token_address).await.unwrap();
-                            println!("@positions_watcher/ user token amount: {:?}", user_token_amount);
-
-                            if user_token_amount > 0.0 {
-                                db::remove_take_profit_from_position(&pool, &position.token_address, &position.tg_user_id, (position.take_profits[0].0, position.take_profits[0].1)).await.unwrap();
+                    if position.take_profits.len() > 0 {
+                        if current_price_float >= (position.take_profits[0].0 * position.entry_price) {
+                            println!("@bot/main/positions_watcher/ Take profit reached for position: {}", count);
+                            // Execute take profit
+                            if let Err(e) = execute_swap_take_profit(
+                                &pool,
+                                position.tg_user_id.clone(),
+                                (position.take_profits[0].0, position.take_profits[0].1),
+                                &position.token_address,
+                                "So11111111111111111111111111111111111111112"
+                            ).await {
+                                eprintln!("Error executing swap: {:?}", e);
                             } else {
-                                println!("@positions_watcher/ user has no tokens in wallet, deleting position");
-                                db::delete_position(&pool, &position.token_address, &position.tg_user_id).await.unwrap();
-                            }
-                        }
-                        if let Err(e) = db::delete_position_target_reached(
-                            &pool,
-                            &position.token_address,
-                            &position.tg_user_id,
-                            (position.take_profits[0].0, position.take_profits[0].1)
-                        ).await {
-                            eprintln!("Error deleting position: {:?}", e);
-                            continue;
-                        }
-                    } 
-                    if current_price_float <= (position.stop_losses[0].0 * position.entry_price) {
-                        println!("@bot/main/positions_watcher/ Stop loss reached for position: {}", count);
-                        if let Err(e) = execute_swap_stop_loss(
-                            &pool,
-                            position.tg_user_id.clone(),
-                            (position.stop_losses[0].0, position.stop_losses[0].1),
-                            &position.token_address,
-                            "So11111111111111111111111111111111111111112"
-                        ).await {
-                            eprintln!("Error executing swap: {:?}", e);
-                        } else {
-                            println!("@bot/main/positions_watcher/ Stop realized");
-                            println!("@positions_watcher/ deleting position take profit");
-                            let user = get_user_by_tg_id(&pool, &position.tg_user_id).await.expect("Could not get user");
-                            let user_token_amount = get_token_amount_in_wallet(&user.solana_address.unwrap(), &position.token_address).await.expect("Could not get token amount in wallet.");
-                            if user_token_amount > 0.0 {
-                                match db::remove_stop_loss_from_position(&pool, &position.token_address, &position.tg_user_id, (position.stop_losses[0].0, position.stop_losses[1].1)).await {
-                                    Ok(_) => {}
-                                    Err(e) => {
-                                        eprintln!("@bot/main/positions_watcher/ error removing stop loss from position error: {}", e);
-                                    }
+                                println!("@positions_watcher/ take profit executed for position: {:?}", position);
+                                println!("@positions_watcher/ deleting position take profit");
 
+                                let user = db::get_user_by_tg_id(&pool, &position.tg_user_id).await.unwrap();
+
+                                let user_token_amount = get_token_amount_in_wallet(&user.solana_address.unwrap(), &position.token_address).await.unwrap();
+                                println!("@positions_watcher/ user token amount: {:?}", user_token_amount);
+
+                                if user_token_amount > 0.0 {
+                                    db::remove_take_profit_from_position(&pool, &position.token_address, &position.tg_user_id, (position.take_profits[0].0, position.take_profits[0].1)).await.unwrap();
+                                } else {
+                                    println!("@positions_watcher/ user has no tokens in wallet, deleting position");
+                                    db::delete_position(&pool, &position.token_address, &position.tg_user_id).await.unwrap();
                                 }
+                            }
+                            if let Err(e) = db::delete_position_target_reached(
+                                &pool,
+                                &position.token_address,
+                                &position.tg_user_id,
+                                (position.take_profits[0].0, position.take_profits[0].1)
+                            ).await {
+                                eprintln!("Error deleting position: {:?}", e);
+                                continue;
+                            }
+                        } 
+                    }
+                    if position.stop_losses.len() > 0 {
+                        if current_price_float <= (position.stop_losses[0].0 * position.entry_price) {
+                            println!("@bot/main/positions_watcher/ Stop loss reached for position: {}", count);
+                            if let Err(e) = execute_swap_stop_loss(
+                                &pool,
+                                position.tg_user_id.clone(),
+                                (position.stop_losses[0].0, position.stop_losses[0].1),
+                                &position.token_address,
+                                "So11111111111111111111111111111111111111112"
+                            ).await {
+                                eprintln!("Error executing swap: {:?}", e);
                             } else {
-                                println!("@positions_watcher/ user has no token in wallet, deleting position");
-                                match db::delete_position(&pool, &position.token_address, &position.tg_user_id).await {
+                                println!("@bot/main/positions_watcher/ Stop realized");
+                                println!("@positions_watcher/ deleting position take profit");
+                                let user = get_user_by_tg_id(&pool, &position.tg_user_id).await.expect("Could not get user");
+                                let user_token_amount = get_token_amount_in_wallet(&user.solana_address.unwrap(), &position.token_address).await.expect("Could not get token amount in wallet.");
+                                if user_token_amount > 0.0 {
+                                    match db::remove_stop_loss_from_position(&pool, &position.token_address, &position.tg_user_id, (position.stop_losses[0].0, position.stop_losses[1].1)).await {
+                                        Ok(_) => {}
+                                        Err(e) => {
+                                            eprintln!("@bot/main/positions_watcher/ error removing stop loss from position error: {}", e);
+                                        }
+
+                                    }
+                                } else {
+                                    println!("@positions_watcher/ user has no token in wallet, deleting position");
+                                    match db::delete_position(&pool, &position.token_address, &position.tg_user_id).await {
+                                        Ok(_) => {},
+                                        Err(e) => {
+                                            eprintln!("@bot/main/positions_watcher/ error deleting position: {}", e);
+                                        }
+                                    }
+                                }
+                                // Remove stop loss from position
+                                match db::remove_stop_loss_from_position(&pool, &position.token_address, &position.tg_user_id, (position.stop_losses[0].0, position.stop_losses[0].1)).await {
                                     Ok(_) => {},
                                     Err(e) => {
-                                        eprintln!("@bot/main/positions_watcher/ error deleting position: {}", e);
+                                        eprintln!("@bot/main/watcher_position/ error removing stop loss from position: {}", e);
                                     }
-                                }
-                            }
-                            // Remove stop loss from position
-                            match db::remove_stop_loss_from_position(&pool, &position.token_address, &position.tg_user_id, (position.stop_losses[0].0, position.stop_losses[0].1)).await {
-                                Ok(_) => {},
-                                Err(e) => {
-                                    eprintln!("@bot/main/watcher_position/ error removing stop loss from position: {}", e);
                                 }
                             }
                         }
