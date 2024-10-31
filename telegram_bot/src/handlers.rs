@@ -248,7 +248,8 @@ pub async fn handle_message(
                 set_user_gas_lamports(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), gas_lamports).await?;
                 bot.send_message(msg.chat.id, format!("Gas fee set to: {} SOL", utils::helpers::lamports_to_sol(gas_lamports))).await?;
             }
-            else if reply_to_message.text().unwrap_or_default().starts_with("Send '<multiplier>, <%_token_position_amount_to_sell>'") {
+            else if reply_to_message.text().unwrap_or_default().starts_with("Send '<multiplier>,<%_token_position_amount_to_sell>' (eg: '1.5,100' that means if the price goes up 1.5x, sell 100% of the position)") {
+                println!("@handle_message/ text: {:?}", text);
                 let take_profits = match parse_take_profit_message(text) {
                     Ok(tp) => {
                         tp
@@ -269,7 +270,8 @@ pub async fn handle_message(
                     Err(e) => log::error!("Failed to open buy menu for token address: {:?}", e),
                 }
             }
-            else if reply_to_message.text().unwrap_or_default().starts_with("Send '<%_down>,<%_token_position_amount_to_sell>'") {
+            else if reply_to_message.text().unwrap_or_default().starts_with("Send '<%down>,<%_token_position_amount_to_sell>' (eg: '10,100' that means if the price goes down 10%, sell 100% of the position)") {
+                println!("@handle_message/ text: {:?}", text);
                 let stop_loss = match parse_stop_loss_message(text) {
                     Ok(sl) => sl,
                     Err(e) => {

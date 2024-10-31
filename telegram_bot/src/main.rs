@@ -24,6 +24,7 @@ pub type SafePool = Arc<Pool<Postgres>>;
 async fn main() {
     pretty_env_logger::init();
     log::info!("Starting bot...");
+    let bot = Bot::from_env();
 
     // Initialize the PostgreSQL connection pool.
     let pool = PgPoolOptions::new()
@@ -43,12 +44,12 @@ async fn main() {
 
     // Check positions
     let positions_pool = shared_pool.clone();
+    let bot_clone = bot.clone();
     tokio::spawn(async move {
         println!("@main/ running positions_watcher");
-        positions_watcher(positions_pool).await;
+        positions_watcher(positions_pool, &bot_clone).await;
     });
 
-    let bot = Bot::from_env();
 
     let handler = dptree::entry()
         .branch(Update::filter_message().endpoint(handle_message))
@@ -70,7 +71,7 @@ pub struct PumpPayload {
     keys: Vec<String>,
 }
 
-async fn positions_watcher(pool: SafePool) {
+async fn positions_watcher(pool: SafePool, bot: &Bot) {
     let url = "wss://pumpportal.fun/api/data";
     let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to pumpportal");
     let (mut pump_write, mut pump_read) = ws_stream.split();
@@ -221,7 +222,6 @@ async fn positions_watcher(pool: SafePool) {
                                         Err(e) => {
                                             eprintln!("@bot/main/positions_watcher/ error removing stop loss from position error: {}", e);
                                         }
-
                                     }
                                 } else {
                                     println!("@positions_watcher/ user has no token in wallet, deleting position");
