@@ -337,6 +337,11 @@ pub async fn create_sol_sell_swap_keyboard(pool: &PgPool, user_tg_id: &str, toke
     }
     buttons.push(row2);
 
+   let slippage = user_settings.slippage_tolerance.parse::<f64>().unwrap_or(0.18);
+    buttons.push(vec![
+        InlineKeyboardButton::callback(if slippage == 0.18 { "✅ 18% Slippage" } else { "18% Slippage" }, "_"),
+        InlineKeyboardButton::callback(if slippage != 0.18 { format!("✅ {}% Slippage 📝", slippage * 100.0) } else { "X Slippage 🖌".to_string() }, "set_custom_slippage")
+    ]);
 
     buttons.push(vec![
         InlineKeyboardButton::callback("Sell", format!("sell:{}", token_address)),
