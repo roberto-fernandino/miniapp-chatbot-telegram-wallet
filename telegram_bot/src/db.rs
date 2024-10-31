@@ -1666,3 +1666,35 @@ pub async fn delete_position(pool: &PgPool, token_address: &str, user_tg_id: &st
     .await?;
     Ok(())
 }
+
+
+/// Get a position
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `token_address` - The token address
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the position was deleted
+pub async fn get_position(pool: &PgPool, token_address: &str, user_tg_id: &str) -> Result<Position> {
+    let query_result = sqlx::query("
+    GET * from position WHERE token_address = $1 AND tg_user_id $2")
+    .bind(token_address)
+    .bind(user_tg_id)
+    .fetch_one(pool)
+    .await?;
+    let take_profits_json: serde_json::Value = query_result.get("take_profits");
+    let take_profits = serde_json::from_value(take_profits_json).unwrap_or_default();
+    let stop_losses_json: serde_json::Value = query_result.get("stop_losses");
+    let stop_losses = serde_json::from_value(stop_losses_json).unwrap_or_default();
+
+    Ok(
+        Position { id: query_result.get("id"), tg_user_id: query_result.get("tg_user_id"), token_address: query_result.get("token_address"), amount: query_result.get("amount"), mc_entry: query_result.get("mc_entry"), entry_price: query_result.get("entry_price"), created_at: query_result.get("created_at"),
+        take_profits,
+        stop_losses
+        }
+    )
+}
