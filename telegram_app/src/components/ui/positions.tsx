@@ -16,6 +16,7 @@ interface Position {
   chat_id: string;
   currentPrice?: number;
   pnlPercentage?: number;
+  symbol?: string;
 }
 
 interface PositionsProps {
@@ -56,11 +57,13 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
           const pnlPercentage =
             ((currentPrice - position.entry_price) / position.entry_price) *
             100;
+          const symbol = scannerData.pair.token0Symbol;
 
           return {
             ...position,
             currentPrice,
             pnlPercentage,
+            symbol,
           };
         })
       );
@@ -111,7 +114,7 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
             >
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="font-medium">$SYMBOL</h3>
+                  <h3 className="font-medium"></h3>
                   <p className="text-sm text-gray-500">
                     {position.token_address.slice(0, 6)}...
                     {position.token_address.slice(-4)}
