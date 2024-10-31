@@ -1653,13 +1653,18 @@ pub async fn set_user_settings_stop_losses(pool: &PgPool, user_tg_id: &str, stop
 /// 
 /// A result indicating whether the take profit was removed
 pub async fn remove_take_profit_from_position(pool: &PgPool, token_address: &str, user_tg_id: &str, take_profit: (f64, f64)) -> Result<()> {
+    println!("@remove_take_profit_from_position/ take_profit to remove: {:?}", take_profit);
     let position_take_profits = get_position_take_profits(pool, token_address, user_tg_id).await?;
+    println!("@remove_take_profit_from_position/ position_take_profits: {:?}", position_take_profits);
     if position_take_profits.is_some() {
         position_take_profits.clone().unwrap().retain(|&tp| tp != take_profit);
+        println!("@remove_take_profit_from_position/ position_take_profits after retaining: {:?}", position_take_profits.clone().unwrap());
         // Sort the take profits by the multiplier (first element of the tuple)
         position_take_profits.clone().unwrap().sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-        
-        set_position_take_profits(pool, token_address, user_tg_id, position_take_profits.unwrap()).await?;
+        println!("@remove_take_profit_from_position/ position_take_profits after sorting: {:?}", position_take_profits.clone().unwrap());
+        println!("@remove_take_profit_from_position/ setting position_take_profits");
+        set_position_take_profits(pool, token_address, user_tg_id, position_take_profits.clone().unwrap()).await?;
+        println!("@remove_take_profit_from_position/ position_take_profits after setting: {:?}", position_take_profits.clone().unwrap());
     } 
     Ok(())
 }
