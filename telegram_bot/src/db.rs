@@ -1736,15 +1736,23 @@ pub async fn set_position_stop_losses(pool: &PgPool, token_address: &str, user_t
 }
 
 pub async fn remove_stop_loss_from_position(pool: &PgPool, token_address: &str, user_tg_id: &str, stop_loss: (f64, f64)) -> Result<()> {
+    println!("@remove_stop_loss_from_position/ stop_loss to remove: {:?}", stop_loss);
     let mut position_stop_losses = get_position_stop_losses(pool, token_address, user_tg_id).await?;
+    println!("@remove_stop_loss_from_position/ position_stop_losses: {:?}", position_stop_losses);
 
-    // Retain the stop loss
-    position_stop_losses.retain(|&sl| sl != stop_loss);
 
-    // Sort by loss %
+    // Remove the stop loss that matches
+    position_stop_losses.retain(|&sl| sl != stop_loss); 
+    println!("@remove_stop_loss_from_position/ position_stop_losses after retaining: {:?}", position_stop_losses);
+
+    // Sort by loss % (ascending order)
     position_stop_losses.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    println!("@remove_stop_loss_from_position/ position_stop_losses after sorting: {:?}", position_stop_losses);
 
-    set_position_stop_losses(pool, token_address, user_tg_id, position_stop_losses).await?;
+    // Update in db
+    println!("@remove_stop_loss_from_position/ setting position_stop_losses");
+    set_position_stop_losses(pool, token_address, user_tg_id, position_stop_losses.clone()).await?;
+    println!("@remove_stop_loss_from_position/ position_stop_losses after setting: {:?}", position_stop_losses);
 
     Ok(())
 }
