@@ -650,7 +650,7 @@ pub async fn sell_token_page(msg: &teloxide::types::Message, bot: &teloxide::Bot
 /// # Returns
 /// 
 /// A Response
-pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str, user_tg_id: String) -> Result<Response> {
+pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str, user_tg_id: String, chat_id: &str) -> Result<Response> {
     println!("@execute_swap: Starting execution");
     println!("@execute_swap: User Telegram ID: {}", user_tg_id);
     println!("@execute_swap: Input token: {}", input_token);
@@ -772,7 +772,7 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
             println!("@execute_swap: token_amount_in_wallet: {:?}", token_amount_in_wallet);
 
             println!("@execute_swap: inserting position");
-            db::insert_position(pool, &user_tg_id, output_token, take_profits, stop_losses, token_amount_in_wallet, fdv, token_price).await?;
+            db::insert_position(pool, &user_tg_id, output_token, take_profits, stop_losses, token_amount_in_wallet, fdv, token_price, chat_id).await?;
             println!("@execute_swap: position inserted");
         } 
     }
@@ -793,7 +793,7 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
 /// # Returns
 /// 
 /// A Result indicating whether the swap take profit was executed successfully
-pub async fn execute_swap_take_profit(pool: &SafePool, user_tg_id: String, take_profit: (f64, f64), input_token: &str, output_token: &str) -> Result<()> {
+pub async fn execute_swap_take_profit(pool: &SafePool, user_tg_id: String, take_profit: (f64, f64), input_token: &str, output_token: &str) -> Result<Response> {
     println!("@execute_swap_take_profit: Starting execution");
     println!("@execute_swap_take_profit: User Telegram ID: {}", user_tg_id);
     println!("@execute_swap_take_profit: Input token: {}", input_token);
@@ -860,7 +860,7 @@ pub async fn execute_swap_take_profit(pool: &SafePool, user_tg_id: String, take_
     let response = client.post(url).json(&request).send().await?;
     println!("@execute_swap_take_profit: Response received: {:?}", response);
 
-    Ok(())
+    Ok(response)
 }
 
 
