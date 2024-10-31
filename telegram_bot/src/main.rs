@@ -189,6 +189,9 @@ async fn positions_watcher(pool: SafePool) {
                             continue;
                         }
                     } 
+                    if current_price_float <= (position.stop_losses[0].0 * position.entry_price) {
+                        println!("@bot/main/positions_watcher/ Stop loss reached for position: {}", count);
+                    }
                 }
             }
         }
