@@ -175,7 +175,7 @@ async fn positions_watcher(pool: SafePool, bot: &Bot) {
                                 // TODO: Send message to user with the signature in the res
                                 Ok(_res) => {
                                     println!("@positions_watcher/ take profit executed for position: {:?}", position);
-                                    bot.send_message(position.chat_id.clone(), format!("🟢 Take profit executed sold at {}% 📈 {}% of token balance for", &position.take_profits[0].0, &position.take_profits[0].1)).await.expect("Could not send message");
+                                    bot.send_message(position.chat_id.clone(), format!("🟢 Take profit executed sold at {}x 📈 {}% of token balance for", &position.take_profits[0].0, &position.take_profits[0].1)).await.expect("Could not send message");
                                     // Get updated token amount after swap
                                     if let Ok(user) = get_user_by_tg_id(&pool, &position.tg_user_id).await {
                                         if let Some(solana_address) = user.solana_address {
@@ -226,7 +226,7 @@ async fn positions_watcher(pool: SafePool, bot: &Bot) {
                             } else {
                                 println!("@bot/main/positions_watcher/ Stop realized");
                                 println!("@positions_watcher/ deleting position take profit");
-                                bot.send_message(position.chat_id.clone(), format!("🔴 Stop loss executed sold at {} 📉 {}% of token balance for", &position.stop_losses[0].0, &position.stop_losses[0].1)).await.expect("Could not send message");
+                                bot.send_message(position.chat_id.clone(), format!("🔴 Stop loss executed sold at {}x 📉 {}% of token balance for", &position.stop_losses[0].0, &position.stop_losses[0].1)).await.expect("Could not send message");
                                 let user = get_user_by_tg_id(&pool, &position.tg_user_id).await.expect("Could not get user");
                                 let user_token_amount = get_token_amount_in_wallet(&user.solana_address.unwrap(), &position.token_address).await.expect("Could not get token amount in wallet.");
                                 if user_token_amount > 0.0 {
