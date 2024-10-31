@@ -31,7 +31,7 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
   const fetchPositions = async () => {
     try {
       const response = await fetch(
-        `https://srv617785.hstgr.cloud/bot_api/positions/${userTgId}`
+        `https://srv617785.hstgr.cloud/bot_api/get_positions/${userTgId}`
       );
       if (!response.ok) {
         throw new Error("Failed to fetch positions");
