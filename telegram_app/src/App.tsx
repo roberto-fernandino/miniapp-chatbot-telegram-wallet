@@ -19,6 +19,7 @@ import {
 import WebApp from "@twa-dev/sdk";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { DEFAULT_ETHEREUM_ACCOUNTS, Turnkey } from "@turnkey/sdk-server";
+import Positions from "./components/ui/positions";
 import {
   setCopyTradeWallet,
   getCopyTrades,
@@ -1012,6 +1013,9 @@ const App: React.FC = () => {
                       </div>
                     </>
                   </Sheet>
+                  <Positions
+                    userTgId={WebApp.initDataUnsafe.user?.id.toString() ?? ""}
+                  />
                   {userAccounts.map((account) => (
                     <div
                       key={account.walletId}
