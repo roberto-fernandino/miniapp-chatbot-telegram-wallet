@@ -426,6 +426,12 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to delete take profit: {:?}", e),
             }
         }
+        else if data.starts_with("delete_stop_loss:") {
+            match handle_delete_stop_loss_user_settings_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to delete stop loss: {:?}", e),
+            }
+        }
         else if data == "back" {
             let user_tg_id = query.from.id.to_string();
             let user = get_user(&pool, &user_tg_id).await?;
@@ -1180,6 +1186,6 @@ async fn handle_delete_stop_loss_user_settings_callback(data: String, bot: &telo
     let multiplier_and_percentage_to_sell= data.split(":").nth(1).unwrap_or("N/A");
     let multiplier = multiplier_and_percentage_to_sell.split("_").nth(0).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
     let percentage_to_sell = multiplier_and_percentage_to_sell.split("_").nth(1).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
-    // db::delete_user_settings_stop_loss(&pool, (multiplier, percentage_to_sell), &user_tg_id).await?;
+    db::delete_user_settings_stop_loss(&pool, (multiplier, percentage_to_sell), &user_tg_id).await?;
     Ok(())
 }
