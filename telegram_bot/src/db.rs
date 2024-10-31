@@ -1552,6 +1552,60 @@ pub async fn add_user_take_profit_user_settings(user_tg_id: &str, take_profit: (
     Ok(())
 }
 
+
+/// Adds a user stop loss in user settings
+/// 
+/// # Arguments
+/// 
+/// * `user_tg_id` - The user's Telegram ID
+/// * `stop_loss` - The stop loss
+/// * `pool` - The PostgreSQL connection pool
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user stop loss was added
+pub async fn add_user_stop_loss_user_settings(user_tg_id: &str, stop_loss: (f64, f64), pool: &SafePool) -> Result<()> {
+    println!("@add_user_stop_loss_user_settings/ stop_loss: {:?}", stop_loss);
+
+    let mut user_stop_losses = get_user_settings_stop_losses(pool, user_tg_id).await?;
+    println!("@add_user_stop_loss_user_settings/ user_stop_losses: {:?}", user_stop_losses);
+    if let Some(ref mut losses) = user_stop_losses {
+        println!("@add_user_stop_loss_user_settings/ check if stop_loss is in user_stop_losses");
+        if !losses.contains(&stop_loss) {
+            println!("@add_user_stop_loss_user_settings/ stop_loss not in user_stop_losses, adding");
+            losses.push(stop_loss);
+        }
+    } else {
+        user_stop_losses = Some(vec![stop_loss]);
+    }
+    println!("@add_user_stop_loss_user_settings/ user_stop_losses after adding: {:?}", user_stop_losses);
+    set_user_settings_stop_losses(pool, user_tg_id, user_stop_losses.clone()).await?;
+    println!("@add_user_stop_loss_user_settings/ user_stop_losses after setting: {:?}", user_stop_losses.clone());
+    Ok(())
+}
+
+
+/// Sets the user settings stop losses
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// * `stop_losses` - The stop losses
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user settings stop losses were set
+pub async fn set_user_settings_stop_losses(pool: &PgPool, user_tg_id: &str, stop_losses: Option<Vec<(f64, f64)>>) -> Result<()> {
+    let stop_losses_json = serde_json::to_value(stop_losses).unwrap_or(json!(null));
+    sqlx::query("UPDATE user_settings SET stop_losses = $1 WHERE tg_id = $2")
+    .bind(stop_losses_json)
+    .bind(user_tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Removes a take profit from a position and sort it by multiplier
 /// 
 /// # Arguments
