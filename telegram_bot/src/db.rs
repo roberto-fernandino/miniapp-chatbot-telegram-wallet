@@ -94,6 +94,7 @@ pub struct Position {
     pub mc_entry: f64, // Market cap at entry
     pub entry_price: f64, // Price at entry
     pub created_at: NaiveDateTime, // Default value is the current timestamp
+    pub chat_id: String, // Chat ID
 }
 
 #[derive(Debug, Serialize)]
@@ -1273,7 +1274,7 @@ pub async fn get_or_create_user_settings(pool: &PgPool, user_tg_id: &str) -> Res
     }
 }
 
-pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &str, take_profits: Option<Vec<(f64, f64)>>, stop_losses: Option<Vec<(f64, f64)>>, amount: f64, mc_entry: f64, token_price: f64) -> Result<()> {
+pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &str, take_profits: Option<Vec<(f64, f64)>>, stop_losses: Option<Vec<(f64, f64)>>, amount: f64, mc_entry: f64, token_price: f64, chat_id: &str) -> Result<()> {
     let take_profits_json = if take_profits.is_some() {
         Some(serde_json::to_value(take_profits).unwrap())
     } else {
@@ -1286,7 +1287,7 @@ pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &st
         None
     };
 
-    sqlx::query("INSERT INTO positions (tg_user_id, token_address, take_profits, stop_losses, amount, mc_entry, entry_price) VALUES ($1, $2, $3, $4, $5, $6, $7)")
+    sqlx::query("INSERT INTO positions (tg_user_id, token_address, take_profits, stop_losses, amount, mc_entry, entry_price, chat_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)")
     .bind(tg_user_id)
     .bind(token_address)
     .bind(take_profits_json)
@@ -1294,6 +1295,7 @@ pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &st
     .bind(amount)
     .bind(mc_entry)
     .bind(token_price)
+    .bind(chat_id)
     .execute(pool)
     .await?;
     Ok(())
@@ -1466,6 +1468,7 @@ pub async fn get_all_positions(pool: &PgPool) -> Result<Vec<Position>> {
             mc_entry: position.get("mc_entry"),
             entry_price: position.get("entry_price"),
             created_at: position.get("created_at"),
+            chat_id: position.get("chat_id"),
             take_profits,
             stop_losses,
         });
@@ -1785,7 +1788,7 @@ pub async fn get_position(pool: &PgPool, token_address: &str, user_tg_id: &str) 
     let stop_losses = serde_json::from_value(stop_losses_json).unwrap_or_default();
 
     Ok(
-        Position { id: query_result.get("id"), tg_user_id: query_result.get("tg_user_id"), token_address: query_result.get("token_address"), amount: query_result.get("amount"), mc_entry: query_result.get("mc_entry"), entry_price: query_result.get("entry_price"), created_at: query_result.get("created_at"),
+        Position { id: query_result.get("id"), tg_user_id: query_result.get("tg_user_id"), token_address: query_result.get("token_address"), amount: query_result.get("amount"), mc_entry: query_result.get("mc_entry"), entry_price: query_result.get("entry_price"), created_at: query_result.get("created_at"), chat_id: query_result.get("chat_id"),
         take_profits,
         stop_losses
         }
