@@ -1,6 +1,6 @@
 use anyhow::Result;
 use reqwest::Response;
-use crate::db::get_user_settings_take_profits;
+use crate::db::{get_user_by_tg_id, get_user_settings_take_profits};
 use crate::handlers::{TurnkeyUser, SwapSolRequest};
 use chrono::{DateTime, Utc};
 use teloxide::types::ChatId;
@@ -806,8 +806,19 @@ pub async fn execute_swap_take_profit(pool: &SafePool, user_tg_id: String, take_
             return Err(anyhow::anyhow!("Failed to get user: {}", e));
         }
     };
-    let user_settings = db::get_or_create_user_settings(pool, &user_tg_id).await?;
-    
+
+    // User settings
+    let user_settings = match db::get_or_create_user_settings(pool, &user_tg_id).await {
+        Ok(settings) => {
+            println!("@execute_swap_take_profit: User settings retrieved successfully");
+            settings
+        },
+        Err(e) => {
+            println!("@execute_swap_take_profit: Error getting or creating user settings: {:?}", e);
+            return Err(anyhow::anyhow!("Failed to get or create user settings: {}", e));
+        }
+    };
+
     println!("@execute_swap_take_profit: Getting token amount in wallet");
     let token_amount_in_wallet = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await?;
     println!("@execute_swap_take_profit: Token amount in wallet: {:?}", token_amount_in_wallet);
@@ -841,9 +852,64 @@ pub async fn execute_swap_take_profit(pool: &SafePool, user_tg_id: String, take_
 
     println!("@execute_swap_take_profit: Sending request");
     let client = reqwest::Client::new();
-    let url = format!("{}/sol/swap", "http://solana_app:3030");
+    let url = "http://solana_app:3030/sol/swap";
     let response = client.post(url).json(&request).send().await?;
     println!("@execute_swap_take_profit: Response received: {:?}", response);
+
+    Ok(())
+}
+
+
+pub async fn execute_swap_stop_loss(pool: &SafePool, user_tg_id: String, stop_loss: (f64, f64), input_token: &str, output_token: &str) -> Result<()> {
+    println!("@execute_swap_stop_loss: Sending request");
+    let user = get_user_by_tg_id(pool, &user_tg_id).await?;
+
+    // User settings
+    let user_settings = match db::get_or_create_user_settings(pool, &user_tg_id).await {
+        Ok(settings) => {
+            println!("@execute_swap: User settings retrieved successfully");
+            settings
+        },
+        Err(e) => {
+            println!("@execute_swap: Error getting or creating user settings: {:?}", e);
+            return Err(anyhow::anyhow!("Failed to get or create user settings: {}", e));
+        }
+    };
+
+    println!("@execute_swap_take_profit: Getting token amount in wallet");
+    let token_amount_in_wallet = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await?;
+    println!("@execute_swap_take_profit: Token amount in wallet: {:?}", token_amount_in_wallet);    
+
+    // Calculate the amount to sell
+    println!("@execute_swap_take_profit: Calculating amount to sell");
+    let amount_to_sell = token_amount_in_wallet * stop_loss.1 / 100.0;
+    println!("@execute_swap_take_profit: Amount to sell: {:?}", amount_to_sell);
+
+    println!("@execute_swap_take_profit: Getting slippage tolerance");
+    let slippage = user_settings.slippage_tolerance.parse::<f64>().unwrap_or(0.5);
+    println!("@execute_swap_take_profit: Slippage: {:?}", slippage);
+
+    println!("@execute_swap_take_profit: Creating turnkey user");
+    let turnkey_user = TurnkeyUser {
+        api_public_key: user.turnkey_info.api_public_key.clone().expect("API public key not found"),
+        api_private_key: user.turnkey_info.api_private_key.clone().expect("API private key not found"),
+        organization_id: user.turnkey_info.suborg_id.clone().expect("Suborg ID not found"),
+        public_key: user.solana_address.clone().expect("Solana address not found").to_string(),
+    };
+    println!("@execute_swap_take_profit: turnkey_user created successfully");
+    let request = SwapSolRequest {
+            user: turnkey_user,
+            user_public_key: user.solana_address.clone().expect("Solana address not found").to_string(),
+            priorization_fee_lamports: user_settings.gas_lamports as u64,
+            output_mint: output_token.to_string(),
+            input_mint: input_token.to_string(),
+            amount: amount_to_sell as u64,
+            slippage,
+        };
+    let client = reqwest::Client::new();
+    let url = "http://solana_app:3030/sol/swap";
+    let response = client.post(url).json(&request).send().await?;
+    println!("@bot/commands/execute_swap_stop_losses/ response: {:?}", response);
 
     Ok(())
 }
