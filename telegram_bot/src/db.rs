@@ -1697,8 +1697,10 @@ pub async fn get_position_stop_losses(pool: &PgPool, token_address:&str, user_tg
     .bind(user_tg_id)
     .fetch_one(pool)
     .await?;
-    Ok(stop_losses)
-
+    match stop_losses {
+        Some(json) => Ok(serde_json::from_value(json).unwrap_or_default()),
+        None => Ok(Vec::new())
+    }
 }
 
 
