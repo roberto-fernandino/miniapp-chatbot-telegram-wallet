@@ -158,7 +158,8 @@ async fn positions_watcher(pool: SafePool) {
                 count += 1;
                 if let Some(current_price) = current_prices.get(&position.token_address) {
                     let current_price_float = current_price.parse::<f64>().unwrap_or_default();
-                    println!("@bot/main/positions_watcher/ Position:{}\n\nposition: {:?}\ncurrent_price: {:?}\nentry_price: {:?}\ntake_profit: {:?}\nstop_loss: {:?}\n\n\n", count, position, current_price_float, position.entry_price, position.take_profits, position.stop_losses);
+                    let percentage_change = ((current_price_float - position.entry_price) / position.entry_price) * 100.0;
+                    println!("@bot/main/positions_watcher/\n\nPosition:{}\n\nposition: {:?}\ncurrent_price: {:?}\nentry_price: {:?}\ntake_profit: {:?}\nstop_loss: {:?}percentage_change: {:?}% \n\n\n\n", count, position, current_price_float, position.entry_price, position.take_profits, position.stop_losses, percentage_change);
                     if position.take_profits.len() > 0 {
                         if current_price_float >= (position.take_profits[0].0 * position.entry_price) {
                             println!("@bot/main/positions_watcher/ Take profit reached for position: {}", count);
