@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { getScanner } from "../../lib/utils";
 import { formatNumber } from "../../lib/utils";
 import { Spinner } from "./spinner";
 
@@ -13,6 +14,8 @@ interface Position {
   entry_price: number;
   created_at: string;
   chat_id: string;
+  currentPrice?: number;
+  pnlPercentage?: number;
 }
 
 interface PositionsProps {
@@ -44,12 +47,47 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
     }
   };
 
+  const updatePositionsWithPrices = async (currentPositions: Position[]) => {
+    try {
+      const updatedPositions = await Promise.all(
+        currentPositions.map(async (position) => {
+          const scannerData = await getScanner(position.token_address);
+          const currentPrice = parseFloat(scannerData.pair.pairPrice1Usd);
+          const pnlPercentage =
+            ((currentPrice - position.entry_price) / position.entry_price) *
+            100;
+
+          return {
+            ...position,
+            currentPrice,
+            pnlPercentage,
+          };
+        })
+      );
+      setPositions(updatedPositions);
+    } catch (err) {
+      console.error("Error updating prices:", err);
+    }
+  };
+
   useEffect(() => {
     fetchPositions();
-    const interval = setInterval(fetchPositions, 10000); // Fetch every 10 seconds
+    const positionsInterval = setInterval(fetchPositions, 10000);
 
-    return () => clearInterval(interval);
+    return () => clearInterval(positionsInterval);
   }, [userTgId]);
+
+  useEffect(() => {
+    if (positions.length > 0) {
+      updatePositionsWithPrices(positions);
+      const priceInterval = setInterval(
+        () => updatePositionsWithPrices(positions),
+        5000
+      );
+
+      return () => clearInterval(priceInterval);
+    }
+  }, [positions.length]);
 
   if (error) {
     return <div className="text-red-500 text-sm">{error}</div>;
@@ -85,8 +123,20 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
                   </p>
                 </div>
               </div>
-              <div className="mt-2 text-sm text-gray-600 flex justify-between">
+              <div className="mt-2 text-sm flex justify-between items-center">
                 <span>Entry: ${formatNumber(position.entry_price)}</span>
+                {position.pnlPercentage !== undefined && (
+                  <span
+                    className={`font-medium ${
+                      position.pnlPercentage >= 0
+                        ? "text-green-500"
+                        : "text-red-500"
+                    }`}
+                  >
+                    {position.pnlPercentage >= 0 ? "+" : ""}
+                    {formatNumber(position.pnlPercentage)}%
+                  </span>
+                )}
               </div>
             </div>
           ))}

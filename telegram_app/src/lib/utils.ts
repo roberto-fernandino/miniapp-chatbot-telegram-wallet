@@ -578,3 +578,51 @@ export function formatTime(isoString: string): string {
     month: "2-digit",
   });
 }
+
+/**
+ * Get pair token and address information
+ * @param {string} address - The token mint address
+ * @returns {Promise<Object>} The pair and token information
+ */
+export async function getPairTokenPairAndTokenAddress(address: string) {
+  const url = `https://api-rs.dexcelerate.com/pair/${address}/pair-and-token`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch data: HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  if (!data) {
+    throw new Error("Received empty response body");
+  }
+
+  return data;
+}
+
+/**
+ * Get scanner search data for a token
+ * @param {string} tokenMintAddress - The token mint address
+ * @returns {Promise<Object>} The scanner search data
+ */
+export async function getScanner(tokenMintAddress: string) {
+  const pairTokenData = await getPairTokenPairAndTokenAddress(tokenMintAddress);
+
+  const pairAddress = pairTokenData.pairAddress || "";
+  const tokenAddress = pairTokenData.tokenAddress || "";
+  const chain = pairTokenData.chainName || "";
+
+  const url = `https://api-rs.dexcelerate.com/scanner/${chain}/${pairAddress}/${tokenAddress}/pair-stats`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch data: HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  if (!data) {
+    throw new Error("Received empty response body");
+  }
+
+  return data;
+}
