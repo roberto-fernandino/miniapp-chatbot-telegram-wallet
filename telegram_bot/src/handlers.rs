@@ -655,7 +655,7 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
     let user_id = q.from.id.to_string();
     println!("@handle_execute_buy_sol_callback/ user_id: {:?}", user_id);
 
-    let response = match execute_swap(pool, "So11111111111111111111111111111111111111112", token_address.as_str(), user_id).await {
+    let response = match execute_swap(pool, "So11111111111111111111111111111111111111112", token_address.as_str(), user_id, q.chat_id().expect("Chat ID not found").to_string().as_str()).await {
         Ok(r) => r,
         Err(e) => {
             println!("@handle_execute_buy_sol_callback/ error executing swap: {:?}", e);
@@ -989,7 +989,7 @@ async fn handle_execute_sell_callback(data: String, bot: &teloxide::Bot, q: &tel
     println!("@handle_execute_sell_callback/ token_address: {:?}", token_address);
     let user_id = q.from.id.to_string();
     println!("@handle_execute_sell_callback/ user_id: {:?}", user_id);
-    let response = match execute_swap(&pool, &token_address, "So11111111111111111111111111111111111111112", user_id).await {
+    let response = match execute_swap(&pool, &token_address, "So11111111111111111111111111111111111111112", user_id, q.chat_id().expect("Chat ID not found").to_string().as_str()).await {
         Ok(r) => r,
         Err(e) => {
             println!("@handle_execute_sell_callback/ error executing swap: {:?}", e);
