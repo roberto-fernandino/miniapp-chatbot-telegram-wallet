@@ -1,7 +1,7 @@
 use anyhow::Result;
 use reqwest::Response;
-use crate::db::{get_user_by_tg_id, get_user_settings_take_profits, Position};
-use crate::handlers::{TurnkeyUser, SwapSolRequest};
+use crate::db::{get_user_by_tg_id, get_user_settings_take_profits};
+use crate::handlers::{TurnkeyUser, SwapSolRequest, get_positions_handler};
 use chrono::{DateTime, Utc};
 use teloxide::types::ChatId;
 use crate::*;
@@ -111,6 +111,10 @@ pub async fn run_axum_server(pool: SafePool) {
        .route(
         "/add_user",
         axum::routing::post(post_add_user_handler),
+       )
+       .route(
+        "/get_positions/:user_tg_id",
+        axum::routing::get(get_positions_handler),
        )
        .with_state(pool);
    
