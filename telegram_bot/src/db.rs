@@ -1800,3 +1800,43 @@ pub async fn get_position(pool: &PgPool, token_address: &str, user_tg_id: &str) 
         }
     )
 }
+
+
+/// Get all positions for a user
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A Vec<Position> representing the positions
+pub async fn get_positions_by_user_tg_id(pool: &PgPool, user_tg_id: &str) -> Result<Vec<Position>> {
+    let positions = sqlx::query("SELECT * FROM positions WHERE tg_user_id = $1")
+        .bind(user_tg_id)
+        .fetch_all(pool)
+        .await?;
+
+    let mut positions_vec = Vec::new();
+    for position in positions {
+        let take_profits: Vec<(f64, f64)> = position.get::<Option<serde_json::Value>, _>("take_profits")
+            .map_or_else(Vec::new, |v| serde_json::from_value(v).unwrap_or_default());
+        let stop_losses: Vec<(f64, f64)> = position.get::<Option<serde_json::Value>, _>("stop_losses")
+            .map_or_else(Vec::new, |v| serde_json::from_value(v).unwrap_or_default());
+
+        positions_vec.push(Position {
+            id: position.get("id"),
+            tg_user_id: position.get("tg_user_id"),
+            token_address: position.get("token_address"),
+            amount: position.get("amount"),
+            mc_entry: position.get("mc_entry"),
+            entry_price: position.get("entry_price"),
+            created_at: position.get("created_at"),
+            chat_id: position.get("chat_id"),
+            take_profits,
+            stop_losses,
+        });
+    }
+    Ok(positions_vec)
+}
