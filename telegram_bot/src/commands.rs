@@ -1,6 +1,6 @@
 use anyhow::Result;
 use reqwest::Response;
-use crate::db::{get_user_by_tg_id, get_user_settings_take_profits};
+use crate::db::{get_user_by_tg_id, get_user_settings_take_profits, Position};
 use crate::handlers::{TurnkeyUser, SwapSolRequest};
 use chrono::{DateTime, Utc};
 use teloxide::types::ChatId;
@@ -686,6 +686,10 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
             Ok(amount) => {
                 println!("@execute_swap/ token_amount: {:?}", amount);
                 input_token_amount = amount * user_settings.sell_percentage.parse::<f64>().expect("Sell percentage is not a number") / 100.0;
+                // If user is selling 100% delete the position
+                if user_settings.sell_percentage.parse::<f64>().expect("Could not parse sell percentage to f64.") == 100.0 {
+                    db::delete_position(&pool, &input_token, &user.tg_id).await?;
+                }
             },
             Err(e) => {
                 println!("@execute_swap: Error getting token amount: {:?}", e);
@@ -706,8 +710,8 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
         public_key: solana_address.clone().expect("Solana address not found").to_string(),
     };
     println!("@execute_swap: turnkey_user created successfully");
-
     println!("@execute_swap: Preparing request");
+    // Buy
     let request: SwapSolRequest = if input_token == "So11111111111111111111111111111111111111112" {
         SwapSolRequest {
             user: turnkey_user,
@@ -719,6 +723,7 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
             slippage: slippage * 100.0,
         }
     } else {
+        // Sell
         SwapSolRequest {
             user: turnkey_user,
             user_public_key: user.solana_address.clone().expect("Solana address not found").to_string(),
@@ -731,7 +736,7 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
     };
 
     let client = reqwest::Client::new();
-    let url = format!("{}/sol/swap", "http://solana_app:3030");
+    let url = "http://solana_app:3030/sol/swap";
     println!("@execute_swap: Sending request to url: {:?}", url);
 
     // response.data = {transaction: "tx_hash"}
@@ -747,7 +752,6 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
     };
     println!("@execute_swap: input_token: {:?}", input_token);
     if response.status().is_success() { 
-        
         // If the input token is SOL = buy
         if input_token == "So11111111111111111111111111111111111111112" {
             println!("@execute_swap: input_token is SOL, creating position");
