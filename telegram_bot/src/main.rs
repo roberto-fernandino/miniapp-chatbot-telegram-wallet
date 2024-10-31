@@ -1,4 +1,4 @@
-use commands::{execute_swap, execute_swap_take_profit, execute_swap_stop_losses};
+use commands::{execute_swap, execute_swap_take_profit, execute_swap_stop_loss};
 use db::get_user_by_tg_id;
 use teloxide::prelude::*;
 use tungstenite::Message as WsMessage;
@@ -195,7 +195,7 @@ async fn positions_watcher(pool: SafePool) {
                     } 
                     if current_price_float <= (position.stop_losses[0].0 * position.entry_price) {
                         println!("@bot/main/positions_watcher/ Stop loss reached for position: {}", count);
-                        if let Err(e) = execute_swap_stop_losses(
+                        if let Err(e) = execute_swap_stop_loss(
                             &pool,
                             position.tg_user_id.clone(),
                             (position.stop_losses[0].0, position.stop_losses[0].1),
