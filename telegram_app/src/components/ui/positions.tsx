@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { getScanner } from "../../lib/utils";
 import { formatNumber } from "../../lib/utils";
 import { Spinner } from "./spinner";
@@ -48,30 +48,43 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
     }
   };
 
-  const updatePositionsWithPrices = async (currentPositions: Position[]) => {
-    try {
-      const updatedPositions = await Promise.all(
-        currentPositions.map(async (position) => {
-          const scannerData = await getScanner(position.token_address);
-          const currentPrice = parseFloat(scannerData.pair.pairPrice1Usd);
-          const pnlPercentage =
-            ((currentPrice - position.entry_price) / position.entry_price) *
-            100;
-          const symbol = scannerData.pair.token0Symbol;
+  const updatePositionsWithPrices = useCallback(
+    async (currentPositions: Position[]) => {
+      try {
+        const updatedPositions = await Promise.all(
+          currentPositions.map(async (position) => {
+            try {
+              const scannerData = await getScanner(position.token_address);
 
-          return {
-            ...position,
-            currentPrice,
-            pnlPercentage,
-            symbol,
-          };
-        })
-      );
-      setPositions(updatedPositions);
-    } catch (err) {
-      console.error("Error updating prices:", err);
-    }
-  };
+              if (!scannerData?.pair?.pairPrice1Usd) {
+                return position; // Keep existing position data if price fetch fails
+              }
+
+              const currentPrice = parseFloat(scannerData.pair.pairPrice1Usd);
+              const pnlPercentage =
+                ((currentPrice - position.entry_price) / position.entry_price) *
+                100;
+              const symbol = scannerData.pair?.token0Symbol || "Unknown";
+
+              return {
+                ...position,
+                currentPrice,
+                pnlPercentage,
+                symbol,
+              };
+            } catch (error) {
+              console.error(`Error updating position ${position.id}:`, error);
+              return position; // Keep existing position data if update fails
+            }
+          })
+        );
+        setPositions(updatedPositions);
+      } catch (err) {
+        console.error("Error updating prices:", err);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     fetchPositions();
@@ -82,15 +95,20 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
 
   useEffect(() => {
     if (positions.length > 0) {
-      updatePositionsWithPrices(positions);
-      const priceInterval = setInterval(
-        () => updatePositionsWithPrices(positions),
-        5000
-      );
+      let mounted = true;
+
+      const updatePrices = async () => {
+        if (mounted) {
+          await updatePositionsWithPrices(positions);
+        }
+      };
+
+      updatePrices();
+      const priceInterval = setInterval(updatePrices, 5000);
 
       return () => clearInterval(priceInterval);
     }
-  }, [positions.length]);
+  }, [positions.length, updatePositionsWithPrices]);
 
   if (error) {
     return <div className="text-red-500 text-sm">{error}</div>;
