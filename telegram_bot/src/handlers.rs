@@ -638,7 +638,6 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
         println!("@handle_execute_buy_sol_callback/ response is success");
         let json_response = response.json::<serde_json::Value>().await?;
         println!("@handle_execute_buy_sol_callback/ json_response: {:?}", json_response);
-
         if let Some(transaction) = json_response["transaction"].as_str() {
             println!("@handle_execute_buy_sol_callback/ transaction signature found on response: {:?}", transaction);
             bot.send_message(q.message.as_ref().unwrap().chat().id, format!("https://solscan.io/tx/{}", transaction)).await?;
@@ -646,7 +645,6 @@ pub async fn handle_execute_buy_sol_callback(data: String, bot: &teloxide::Bot, 
             println!("@handle_execute_buy_sol_callback/ transaction signature not found on response");
             bot.send_message(q.message.as_ref().unwrap().chat().id, "Transaction ID not found in solana app response.".to_string()).await?;
         }
-
     } else {
         println!("@handle_execute_buy_sol_callback/ response is not success");
         bot.send_message(q.message.as_ref().unwrap().chat().id, format!("Failed to buy: {}", response.text().await?)).await?;
