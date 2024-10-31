@@ -430,7 +430,7 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
         InlineKeyboardButton::callback("Add Stop Loss", "add_stop_loss"),
     ]);
 
-// Add a row for take profits
+    // Add a row for take profits
     let take_profits = user_settings.take_profits.clone();
     println!("@create_sol_buy_swap_keyboard/ take_profits: {:?}", take_profits);
     if !take_profits.is_empty() {
@@ -439,6 +439,19 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
                 InlineKeyboardButton::callback(format!("{}x 📈", take_profit.0), "_"),
                 InlineKeyboardButton::callback(format!("sell {}% 💰", take_profit.1), "_"),
                 InlineKeyboardButton::callback("❌", format!("delete_take_profit:{}_{}", take_profit.0, take_profit.1)),
+            ];
+            buttons.push(row);
+        }
+    }
+
+    let stop_losses = user_settings.stop_losses.clone();
+    println!("@bot/helpers/create_sol_buy_swap_keyboard/ stop_losses: {:?}", stop_losses);
+    if !stop_losses.is_empty() {
+        for stop_loss in stop_losses {
+            let row: Vec<InlineKeyboardButton> = vec![
+                InlineKeyboardButton::callback(format!("{}x 📉 ", stop_loss.0), "_"),
+                InlineKeyboardButton::callback(format!("sell {}% 💰", stop_loss.1), "_"),
+                InlineKeyboardButton::callback("❌", format!("delete_stop_loss:{}_{}", stop_loss.0, stop_loss.1)),
             ];
             buttons.push(row);
         }
@@ -1272,6 +1285,29 @@ pub fn parse_take_profit_message(text: &str) -> Result<(f64, f64)> {
     let percentage = parts[1].trim().parse::<f64>()?;
 
     Ok((multiplier, percentage))
+}
+
+/// Parse the stop loss message
+/// 
+/// # Arguments
+/// 
+/// * `text` - The text to parse
+/// 
+/// # Returns
+/// 
+/// A tuple representing the stop loss
+pub fn parse_stop_loss_message(text: &str) -> Result<(f64, f64)> {
+    let parts: Vec<&str> = text.split(',').collect();
+    if parts.len() != 2 {
+        return Err(anyhow::anyhow!("Invalid format"));
+    }
+    // Down is in percentage
+    let down = parts[0].trim().parse::<f64>()?;
+    // Parsing down to multiplier 
+    let down = 1.0 - (down / 100.0); // 30 down -> 0.7 
+
+    let percentage = parts[1].trim().parse::<f64>()?;
+    Ok((down, percentage))
 }
 
 
