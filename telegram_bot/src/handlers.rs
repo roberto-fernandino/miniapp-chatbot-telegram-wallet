@@ -602,6 +602,41 @@ pub async fn post_add_user_handler(
     (StatusCode::OK, "User added/updated in the db.").into_response()
 }
 
+/// Get positions handler
+/// 
+/// # Arguments
+/// 
+/// * `user_tg_id` - The user's Telegram ID
+/// * `pool` - The PostgreSQL connection pool
+/// 
+/// # Returns
+/// 
+/// A JSON response with the positions
+pub async fn get_positions_handler(
+    Path(user_tg_id): Path<String>, 
+    State(pool): State<Arc<Pool<Postgres>>>,
+) -> impl IntoResponse {
+    let positions = get_positions_by_user_tg_id(&pool, &user_tg_id).await.expect("Could not get positions");
+    (StatusCode::OK, Json(positions)).into_response()
+}
+
+/// Handle buy callback
+/// 
+/// # Description
+/// 
+/// Handle the buy callback from the tg bot.
+/// Sends a message to the user with force reply to enter the token address
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
 pub async fn handle_buy_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     println!("@buy_callback/ data: {:?}", data);
     let user_id = q.from.id.to_string();
