@@ -22,6 +22,7 @@ pub struct UserSettings {
     pub anti_mev: bool,
     pub take_profits: Vec<(f64, f64)>,
     pub stop_losses: Vec<(f64, f64)>,
+    pub jito_tip_amount: i32,
 }
 
 /// Struct to hold the call with the ATH after the call
@@ -1110,6 +1111,7 @@ pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSe
         anti_mev: user_settings.get("anti_mev"),
         take_profits,
         stop_losses,
+        jito_tip_amount: user_settings.get("jito_tip_amount"),
     })
 }
 
