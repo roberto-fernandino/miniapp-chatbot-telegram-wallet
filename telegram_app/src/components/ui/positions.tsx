@@ -150,13 +150,13 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
                   >
                     {position.pnlPercentage && position.pnlPercentage >= 0
                       ? "+" +
-                        (position.sol_entry -
-                          (position.sol_entry * (position.pnlPercentage || 0)) /
-                            100)
+                        (
+                          position.sol_entry * (position.pnlPercentage || 0)
+                        ).toFixed(6)
                       : "-" +
-                        (position.sol_entry +
-                          (position.sol_entry * (position.pnlPercentage || 0)) /
-                            100)}
+                        (
+                          position.sol_entry * (position.pnlPercentage || 0)
+                        ).toFixed(6)}
                     SOL
                   </span>
                   <span>[{position.pnlPercentage?.toFixed(2)}% ROI]</span>
