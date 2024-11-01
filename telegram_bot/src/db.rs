@@ -1115,6 +1115,17 @@ pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSe
     })
 }
 
+/// Set user sell percentage
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `tg_id` - The user's Telegram ID
+/// * `sell_percentage` - The sell percentage
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user sell percentage was set
 pub async fn set_user_sell_percentage(pool: &PgPool, tg_id: &str, sell_percentage: &str) -> Result<()> {
     sqlx::query("UPDATE user_settings SET sell_percentage = $1 WHERE tg_id = $2")
     .bind(sell_percentage)
@@ -1124,9 +1135,40 @@ pub async fn set_user_sell_percentage(pool: &PgPool, tg_id: &str, sell_percentag
     Ok(())
 }
 
+/// Set user gas lamports
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `tg_id` - The user's Telegram ID
+/// * `gas_lamports` - The gas lamports
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user gas lamports were set
 pub async fn set_user_gas_lamports(pool: &PgPool, tg_id: &str, gas_lamports: i32) -> Result<()> {
     sqlx::query("UPDATE user_settings SET gas_lamports = $1 WHERE tg_id = $2")
     .bind(gas_lamports)
+    .bind(tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Set user jito tip amount
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `tg_id` - The user's Telegram ID
+/// * `jito_tip_amount` - The jito tip amount
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user jito tip amount was set
+pub async fn set_user_settings_jito_tip_amount(pool: &PgPool, tg_id: &str, jito_tip_amount: i32) -> Result<()> {
+    sqlx::query("UPDATE user_settings SET jito_tip_amount = $1 WHERE tg_id = $2")
+    .bind(jito_tip_amount)
     .bind(tg_id)
     .execute(pool)
     .await?;
