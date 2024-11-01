@@ -10,6 +10,7 @@ interface Position {
   take_profits: [number, number][];
   stop_losses: [number, number][];
   amount: number;
+  ui_amount: string;
   mc_entry: number;
   entry_price: number;
   sol_entry: number;
@@ -131,7 +132,7 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
               key={position.id}
               className="bg-gray-50 rounded-lg p-4 shadow-sm"
             >
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col justify-between items-center">
                 <div className="flex items-start ">
                   <h3 className="font-medium">{position.symbol}/SOL</h3>
                 </div>
@@ -144,13 +145,25 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
                         : "text-red-500"
                     }`}
                   >
-                    {(position.sol_entry * (position.pnlPercentage || 0)) / 100}{" "}
+                    {position.pnlPercentage && position.pnlPercentage >= 0
+                      ? "+" +
+                        (
+                          position.sol_entry -
+                          (position.sol_entry * (position.pnlPercentage || 0)) /
+                            100
+                        ).toFixed(2)
+                      : "-" +
+                        (
+                          position.sol_entry +
+                          (position.sol_entry * (position.pnlPercentage || 0)) /
+                            100
+                        ).toFixed(2)}
                   </span>
                   <span>[{position.pnlPercentage?.toFixed(2)}% ROI]</span>
                 </div>
-                <div className="flex items-start">
+                <div className="flex flex-row items-start">
                   Size: {position.sol_entry} SOL [
-                  {formatNumber(position.amount)}
+                  {formatNumber(parseFloat(position.ui_amount))}
                   {position.symbol}] at {formatNumber(position.mc_entry)}
                 </div>
                 <div className="text-sm text-gray-500">
