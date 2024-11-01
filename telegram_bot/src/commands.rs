@@ -772,11 +772,11 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
             println!("@execute_swap: token_price: {:?}", token_price);
             let fdv = scanner_response["pair"]["fdv"].as_str().unwrap_or("0").parse::<f64>().unwrap_or(0.0);
 
-            let token_amount_in_wallet = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), output_token).await?;
+            let (token_amount_in_wallet, token_ui_amount_in_wallet) = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), output_token).await?;
             println!("@execute_swap: token_amount_in_wallet: {:?}", token_amount_in_wallet);
 
             println!("@execute_swap: inserting position");
-            db::insert_position(pool, &user_tg_id, output_token, take_profits, stop_losses, token_amount_in_wallet, fdv, token_price, chat_id, input_token_amount).await?;
+            db::insert_position(pool, &user_tg_id, output_token, take_profits, stop_losses, token_amount_in_wallet, fdv, token_price, chat_id, input_token_amount, &token_ui_amount_in_wallet).await?;
             println!("@execute_swap: position inserted");
         } 
     }
@@ -828,7 +828,7 @@ pub async fn execute_swap_take_profit(pool: &SafePool, user_tg_id: String, take_
     };
 
     println!("@execute_swap_take_profit: Getting token amount in wallet");
-    let token_amount_in_wallet = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await?;
+    let (token_amount_in_wallet, _) = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await?;
     println!("@execute_swap_take_profit: Token amount in wallet: {:?}", token_amount_in_wallet);
 
     // Calculate the amount to sell
@@ -885,7 +885,7 @@ pub async fn execute_swap_stop_loss(pool: &SafePool, user_tg_id: String, stop_lo
     };
 
     println!("@execute_swap_take_profit: Getting token amount in wallet");
-    let token_amount_in_wallet = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await?;
+    let (token_amount_in_wallet, _) = get_token_amount_in_wallet(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await?;
     println!("@execute_swap_take_profit: Token amount in wallet: {:?}", token_amount_in_wallet);    
 
     // Calculate the amount to sell

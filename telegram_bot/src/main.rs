@@ -180,7 +180,7 @@ async fn positions_watcher(pool: SafePool, bot: &Bot) {
                                     if let Ok(user) = get_user_by_tg_id(&pool, &position.tg_user_id).await {
                                         if let Some(solana_address) = user.solana_address {
                                             match get_token_amount_in_wallet(&solana_address, &position.token_address).await {
-                                                Ok(user_token_amount) => {
+                                                Ok((user_token_amount, _)) => {
                                                     println!("@positions_watcher/ user_token_amount: {:?}", user_token_amount);
                                                     if user_token_amount > 0.0 {
                                                         // If user still has tokens, just remove the take profit
@@ -228,7 +228,7 @@ async fn positions_watcher(pool: SafePool, bot: &Bot) {
                                 println!("@positions_watcher/ deleting position stop loss");
                                 bot.send_message(position.chat_id.clone(), format!("🔴 Stop loss executed sold at {}x 📉 {}% of token balance", &position.stop_losses[0].0, &position.stop_losses[0].1)).await.expect("Could not send message");
                                 let user = get_user_by_tg_id(&pool, &position.tg_user_id).await.expect("Could not get user");
-                                let user_token_amount = get_token_amount_in_wallet(&user.solana_address.unwrap(), &position.token_address).await.expect("Could not get token amount in wallet.");
+                                let (user_token_amount, _) = get_token_amount_in_wallet(&user.solana_address.unwrap(), &position.token_address).await.expect("Could not get token amount in wallet.");
                                 if user_token_amount > 0.0 {
                                     match db::remove_stop_loss_from_position(&pool, &position.token_address, &position.tg_user_id, (position.stop_losses[0].0, position.stop_losses[1].1)).await {
                                         Ok(_) => {}
