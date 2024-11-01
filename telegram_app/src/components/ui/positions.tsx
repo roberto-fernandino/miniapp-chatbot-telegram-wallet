@@ -132,33 +132,30 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
               className="bg-gray-50 rounded-lg p-4 shadow-sm"
             >
               <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-medium"></h3>
-                  <p className="text-sm text-gray-500">
-                    {position.token_address.slice(0, 6)}...
-                    {position.token_address.slice(-4)}
-                  </p>
+                <div className="flex items-start ">
+                  <h3 className="font-medium">{position.symbol}/SOL</h3>
                 </div>
-                <div className="text-right">
-                  <p className="font-medium">
-                    {formatNumber(position.amount)} tokens
-                  </p>
-                </div>
-              </div>
-              <div className="mt-2 text-sm flex justify-between items-center">
-                <span>Entry: ${formatNumber(position.entry_price)}</span>
-                {position.pnlPercentage !== undefined && (
+                <div className="flex flex-row items-start">
+                  PNL:
                   <span
                     className={`font-medium ${
-                      position.pnlPercentage >= 0
+                      position.pnlPercentage && position.pnlPercentage >= 0
                         ? "text-green-500"
                         : "text-red-500"
                     }`}
                   >
-                    {position.pnlPercentage >= 0 ? "+" : ""}
-                    {formatNumber(position.pnlPercentage)}%
+                    {(position.sol_entry * (position.pnlPercentage || 0)) / 100}{" "}
                   </span>
-                )}
+                  <span>[{position.pnlPercentage?.toFixed(2)}% ROI]</span>
+                </div>
+                <div className="flex items-start">
+                  Size: {position.sol_entry} SOL [
+                  {formatNumber(position.amount)}
+                  {position.symbol}] at {formatNumber(position.mc_entry)}
+                </div>
+                <div className="text-sm text-gray-500">
+                  Date: {new Date(position.created_at).toLocaleString()}
+                </div>
               </div>
             </div>
           ))}
