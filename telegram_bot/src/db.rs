@@ -1297,6 +1297,7 @@ pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &st
     .bind(mc_entry)
     .bind(token_price)
     .bind(chat_id)
+    .bind(sol_entry)
     .execute(pool)
     .await?;
     Ok(())
