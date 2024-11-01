@@ -776,7 +776,7 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
             println!("@execute_swap: token_amount_in_wallet: {:?}", token_amount_in_wallet);
 
             println!("@execute_swap: inserting position");
-            db::insert_position(pool, &user_tg_id, output_token, take_profits, stop_losses, token_amount_in_wallet, fdv, token_price, chat_id).await?;
+            db::insert_position(pool, &user_tg_id, output_token, take_profits, stop_losses, token_amount_in_wallet, fdv, token_price, chat_id, input_token_amount).await?;
             println!("@execute_swap: position inserted");
         } 
     }
