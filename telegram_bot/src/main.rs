@@ -154,6 +154,7 @@ async fn positions_watcher(pool: SafePool, bot: &Bot) {
         if let Ok(current_prices) = crate::utils::helpers::check_tokens_prices(
             raydium_tokens.iter().cloned().collect()
         ).await {
+            println!("@positions_watcher/ current_prices: {:?}", current_prices);
             let mut count: usize = 0;
             for position in &raydium_positions {
                 count += 1;
