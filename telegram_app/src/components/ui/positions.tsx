@@ -64,9 +64,12 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
 
               const currentPrice = parseFloat(scannerData.pair.pairPrice1Usd);
               const pnlPercentage =
-                ((currentPrice - position.entry_price) / position.entry_price) *
-                100;
-              const symbol = scannerData.pair?.token0Symbol || "Unknown";
+                position.entry_price > 0
+                  ? ((currentPrice - position.entry_price) /
+                      position.entry_price) *
+                    100
+                  : position.pnlPercentage;
+              const symbol = scannerData.pair?.token1Symbol || position.symbol;
 
               return {
                 ...position,
@@ -147,24 +150,20 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
                   >
                     {position.pnlPercentage && position.pnlPercentage >= 0
                       ? "+" +
-                        (
-                          position.sol_entry -
+                        (position.sol_entry -
                           (position.sol_entry * (position.pnlPercentage || 0)) /
-                            100
-                        ).toFixed(2)
+                            100)
                       : "-" +
-                        (
-                          position.sol_entry +
+                        (position.sol_entry +
                           (position.sol_entry * (position.pnlPercentage || 0)) /
-                            100
-                        ).toFixed(2)}
+                            100)}
+                    SOL
                   </span>
                   <span>[{position.pnlPercentage?.toFixed(2)}% ROI]</span>
                 </div>
                 <div className="flex flex-row items-start">
-                  Size: {position.sol_entry} SOL [
-                  {formatNumber(parseFloat(position.ui_amount))}
-                  {position.symbol}] at {formatNumber(position.mc_entry)}
+                  Size: {position.sol_entry} SOL at{" "}
+                  {formatNumber(position.mc_entry)}
                 </div>
                 <div className="text-sm text-gray-500">
                   Date: {new Date(position.created_at).toLocaleString()}
