@@ -12,6 +12,7 @@ interface Position {
   amount: number;
   mc_entry: number;
   entry_price: number;
+  sol_entry: number;
   created_at: string;
   chat_id: string;
   currentPrice?: number;
@@ -57,7 +58,7 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
               const scannerData = await getScanner(position.token_address);
 
               if (!scannerData?.pair?.pairPrice1Usd) {
-                return position; // Keep existing position data if price fetch fails
+                return position;
               }
 
               const currentPrice = parseFloat(scannerData.pair.pairPrice1Usd);
