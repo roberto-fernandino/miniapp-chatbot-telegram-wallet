@@ -151,7 +151,7 @@ async fn positions_watcher(pool: SafePool, bot: &Bot) {
         // TODO: Remove the tokens that doesnt have take_profit and stop_losses because why track their price if the application is not in realtime.
 
         // Check Raydium prices
-        if let Ok(current_prices) = crate::utils::helpers::check_raydium_tokens_prices(
+        if let Ok(current_prices) = crate::utils::helpers::check_tokens_prices(
             raydium_tokens.iter().cloned().collect()
         ).await {
             let mut count: usize = 0;

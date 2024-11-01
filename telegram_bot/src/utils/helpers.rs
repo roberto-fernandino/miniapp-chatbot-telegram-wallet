@@ -1378,6 +1378,26 @@ pub async fn check_raydium_tokens_prices(token_addresses: Vec<String>) -> Result
     Ok(prices)
 }
 
+
+/// Check the tokens prices using dexcelerate APIS
+/// 
+/// # Arguments
+/// 
+/// * `token_addresses` - The token addresses
+/// 
+/// # Returns
+/// 
+/// A HashMap<String, String> representing the token prices
+pub async fn check_tokens_prices(token_addresses: Vec<String>) -> Result<HashMap<String, String>> {
+    let mut prices = HashMap::new();
+    for token in token_addresses {
+        let scanner_response = get_scanner_search(&token).await?;
+        let price = scanner_response["pair"]["pairPrice1Usd"].to_string();
+        prices.insert(token, price);
+    }
+    Ok(prices)
+}
+
 /// Get the token amount in a wallet
 /// 
 /// # Arguments
