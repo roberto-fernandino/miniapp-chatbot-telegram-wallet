@@ -197,7 +197,7 @@ async fn reconnect_websocket() -> Result<(SplitSink<WebSocketStream<tokio_tungst
 /// 
 /// A `Result` containing a `Response` or a `tide::Error`
 pub async fn get_wallet_sol_balance(
-    AxumState(state): AxumState<State>,
+    AxumState(_state): AxumState<State>,
     Path(address): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     match get_sol_balance(address.as_str()) {
@@ -292,7 +292,7 @@ pub struct SwapRequest {
 /// 
 /// A `Result` containing a `Response` or a `tide::Error`
 pub async fn sol_swap(
-    AxumState(state): AxumState<State>,
+    AxumState(_state): AxumState<State>,
     Json(swap_request): Json<SwapRequest>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, String)> {
     println!("@sol_swap /sol/swap received request");
