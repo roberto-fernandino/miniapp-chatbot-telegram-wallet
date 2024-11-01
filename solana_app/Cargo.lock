@@ -648,6 +648,12 @@ dependencies = [
 
 [[package]]
 name = "bs58"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
+
+[[package]]
+name = "bs58"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
@@ -1989,6 +1995,22 @@ name = "itoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
+
+[[package]]
+name = "jito-sdk-rust"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6db230a3c6c255775431517c1da38760b748490210ba1801a36190349af64c1c"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "bs58 0.4.0",
+ "rand 0.8.5",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
 
 [[package]]
 name = "jobserver"
@@ -3416,7 +3438,7 @@ dependencies = [
  "Inflector",
  "base64 0.22.1",
  "bincode",
- "bs58",
+ "bs58 0.5.1",
  "bv",
  "lazy_static",
  "serde",
@@ -3653,7 +3675,7 @@ dependencies = [
  "blake3",
  "borsh 0.10.4",
  "borsh 1.5.1",
- "bs58",
+ "bs58 0.5.1",
  "bv",
  "bytemuck",
  "bytemuck_derive",
@@ -3801,7 +3823,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "bincode",
- "bs58",
+ "bs58 0.5.1",
  "indicatif",
  "log",
  "reqwest",
@@ -3827,7 +3849,7 @@ checksum = "106965e02ece99186212a4d1c38ce029e0d3f9f4c2500318bb1037dc6c7ad32e"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
- "bs58",
+ "bs58 0.5.1",
  "jsonrpc-core",
  "reqwest",
  "reqwest-middleware",
@@ -3865,7 +3887,7 @@ dependencies = [
  "bincode",
  "bitflags 2.6.0",
  "borsh 1.5.1",
- "bs58",
+ "bs58 0.5.1",
  "bytemuck",
  "bytemuck_derive",
  "byteorder",
@@ -3911,7 +3933,7 @@ version = "2.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "193006436577cb4aa8e52fbb432c3f14c2d4d7b3b00f48f3485225ea9ca45a08"
 dependencies = [
- "bs58",
+ "bs58 0.5.1",
  "proc-macro2",
  "quote",
  "rustversion",
@@ -4023,7 +4045,7 @@ dependencies = [
  "base64 0.22.1",
  "bincode",
  "borsh 1.5.1",
- "bs58",
+ "bs58 0.5.1",
  "lazy_static",
  "log",
  "serde",
@@ -4183,7 +4205,7 @@ dependencies = [
  "base64 0.22.1",
  "base64-url",
  "bincode",
- "bs58",
+ "bs58 0.5.1",
  "byteorder",
  "chrono",
  "dotenv",
@@ -4191,6 +4213,7 @@ dependencies = [
  "futures",
  "futures-util",
  "hex",
+ "jito-sdk-rust",
  "lazy_static",
  "log",
  "p256",
