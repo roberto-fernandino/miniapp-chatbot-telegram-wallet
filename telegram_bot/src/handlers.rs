@@ -508,6 +508,12 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to add stop loss: {:?}", e),
             }
         }
+        else if data.starts_with("set_jito_tip_amount") {
+            match handle_set_jito_tip_amount_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to set jito tip amount: {:?}", e),
+            }
+        }
         else {
             log::info!("Unrecognized callback query data: {}", data);
         }
