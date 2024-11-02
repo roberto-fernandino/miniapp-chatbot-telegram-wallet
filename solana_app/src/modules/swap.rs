@@ -1,4 +1,8 @@
 use base64::Engine;
+use serde_json::json;
+use solana_program::instruction::CompiledInstruction;
+use jito_sdk_rust::JitoJsonRpcSDK;
+use solana_sdk::system_instruction;
 use crate::turnkey::errors::TurnkeyError;
 use {
     super::matis::SwapTransaction, crate::turnkey::{
@@ -16,7 +20,7 @@ pub struct User {
     pub public_key: String,
 }
 
-pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: User) -> TurnkeyResult<Signature> {
+pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: User, jito_tip_amount: u64) -> TurnkeyResult<Signature> {
     // Initialize Turnkey client
     println!("@sign_and_send_swap_transaction/ user: {:?}", user);
 
@@ -49,8 +53,24 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     }).expect("Failed to decode transaction");
     println!("@sign_and_send_swap_transaction/ transaction decoded, length: {}", transaction_data.len());
 
+    let jito_sdk = JitoJsonRpcSDK::new(env::var("JITO_BLOCK_ENGINE_URL").expect("JITO_BLOCK_ENGINE_URL must be set").as_str(), None);
     let mut transaction = match bincode::deserialize::<Transaction>(&transaction_data) {
-        Ok(tx) => {
+        Ok(mut tx) => {
+            // TODO: add jito tip to transaction
+            let random_tip_account = jito_sdk.get_random_tip_account().await.expect("Failed to get random tip account");
+            println!("@solana_app/modules/swap/sign_and_send_swap_transaction/ random_tip_account: {}", random_tip_account);
+            let jito_tip_account = Pubkey::from_str(&random_tip_account).expect("Failed to parse random tip account");
+            let jito_tip_ix = system_instruction::transfer(&pubkey, &jito_tip_account, jito_tip_amount);
+            let compiled_jito_tip_ix = CompiledInstruction {
+                program_id_index: tx.message.account_keys.iter().position(|&key| key == jito_tip_ix.program_id).unwrap() as u8,
+                accounts: jito_tip_ix.accounts.iter().map(|account_meta| {
+                    tx.message.account_keys.iter().position(|&key| key == account_meta.pubkey).unwrap() as u8
+                }).collect(),
+                data: jito_tip_ix.data.clone(),
+            };
+            tx.message.instructions.push(compiled_jito_tip_ix);
+            println!("@solana_app/modules/swap/sign_and_send_swap_transaction/ jito_tip_account: {}", jito_tip_account);
+
             println!("@sign_and_send_swap_transaction/ transaction deserialized successfully");
             println!("@sign_and_send_swap_transaction/ transaction: {:?}", tx);
             Some(tx)
@@ -92,6 +112,18 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                 match rpc_client.send_and_confirm_transaction(&tx) {
                     Ok(tx_sig) => {
                         println!("@sign_and_send_swap_transaction/ transaction confirmed: {:?}", tx_sig);
+                        let jito_params = json!({
+                            "tx": tx_sig.to_string()
+                        });
+                        match jito_sdk.send_txn(Some(jito_params), true).await {
+                            Ok(tx_sig) => {
+                                println!("@sign_and_send_swap_transaction/ transaction sent to jito Engine: {:?}", tx_sig);
+                            },
+                            Err(e) => {
+                                println!("@sign_and_send_swap_transaction/ error sending transaction to jito Engine: {:?}", e);
+                                return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to send transaction to jito Engine: {:?}", e))));
+                            }
+                        }
                         Ok(tx_sig)
                     },
                      Err(e) => {
