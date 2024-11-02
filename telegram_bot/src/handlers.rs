@@ -980,54 +980,6 @@ async fn handle_positions_callback(data: String, bot: &teloxide::Bot, q: &teloxi
 /// # Returns
 /// 
 /// A result indicating the success of the operation
-async fn handle_sell_choose_token_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
-    let user_tg_id = q.from.id.to_string();
-    let user = get_user(&pool, &user_tg_id).await?;
-    let tokens_balance = get_positions_balance(&user.clone().solana_address.expect("Solana address not found").as_str()).await?;
-    let has_any_token = tokens_balance["tokens"].as_array().unwrap_or(&Vec::new()).len() > 0;
-    let sol_balance = get_wallet_sol_balance(&user.solana_address.expect("Solana address not found").as_str()).await?;
-    let sol_balance_usd = sol_to_usd(sol_balance.parse::<f64>().unwrap_or(0.0)).await?;
-    let mut tokens_str = String::new();
-    for token in tokens_balance["tokens"].as_array().unwrap_or(&Vec::new()) {
-        if token["token_ui_amount"].as_f64().unwrap_or(0.0) > 0.0 {
-            tokens_str.push_str(&format!("{} <a href=\"https://t.me/sj_copyTradebot?start=sell_token_{}\">Sell</a>\n", token["mint"].as_str().unwrap_or("N/A"), token["mint"].as_str().unwrap_or("N/A")));
-        }
-    }
-    if has_any_token {
-        bot.send_message(q.message.as_ref().unwrap().chat().id,format!("
-        <b>Select the token to sell</b>\n\
-        SOL BALANCE: <code> {sol_balance:.6} SOL</code> (${sol_balance_usd:.2})\n\
-        {tokens_str}
-        "))
-        .parse_mode(teloxide::types::ParseMode::Html)
-        .await?;
-    } else {
-        bot.send_message(q.message.as_ref().unwrap().chat().id,format!("
-        <b>Select a token to sell:</b>\n\
-        SOL BALANCE: <code> {sol_balance:.6} SOL</code> (${sol_balance_usd:.2})\n\
-        No token holdings found
-        "))
-        .parse_mode(teloxide::types::ParseMode::Html)
-        .await?;
-    }
-
-    println!("@handle_sell_callback/ tokens_balance: {:?}", tokens_balance);
-
-    Ok(())
-}
-
-/// Handle sell callback
-/// 
-/// # Arguments
-/// 
-/// * `data` - The callback data
-/// * `bot` - The Telegram bot
-/// * `q` - The callback query
-/// * `pool` - The database pool
-/// 
-/// # Returns
-/// 
-/// A result indicating the success of the operation
 async fn handle_execute_sell_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     println!("@handle_execute_sell_callback/ data: {:?}", data);
     let token_address = data.split(":").nth(1).unwrap_or("N/A").to_string();
@@ -1240,6 +1192,10 @@ async fn handle_delete_stop_loss_user_settings_callback(data: String, bot: &telo
     let multiplier = multiplier_and_percentage_to_sell.split("_").nth(0).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
     let percentage_to_sell = multiplier_and_percentage_to_sell.split("_").nth(1).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
     db::delete_user_settings_stop_loss(&pool, (multiplier, percentage_to_sell), &user_tg_id).await?;
+        let last_token_address = get_user_last_sent_token(&pool, &user_tg_id).await?;
+    if let Some(teloxide::types::MaybeInaccessibleMessage::Regular(msg)) = q.message.as_ref() {
+        token_address_buy_info_handler(last_token_address.as_str(), bot, msg, pool).await?;
+    }
     Ok(())
 }
 
@@ -1259,5 +1215,53 @@ async fn handle_set_jito_tip_amount_callback(data: String, bot: &teloxide::Bot, 
     bot.send_message(q.message.as_ref().unwrap().chat().id, "Enter the Jito tip amount")
     .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the Jito tip amount in SOL".to_string()), selective: false})
     .await?;
+    Ok(())
+}
+
+/// Handle sell callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_sell_choose_token_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let user_tg_id = q.from.id.to_string();
+    let user = get_user(&pool, &user_tg_id).await?;
+    let tokens_balance = get_positions_balance(&user.clone().solana_address.expect("Solana address not found").as_str()).await?;
+    let has_any_token = tokens_balance["tokens"].as_array().unwrap_or(&Vec::new()).len() > 0;
+    let sol_balance = get_wallet_sol_balance(&user.solana_address.expect("Solana address not found").as_str()).await?;
+    let sol_balance_usd = sol_to_usd(sol_balance.parse::<f64>().unwrap_or(0.0)).await?;
+    let mut tokens_str = String::new();
+    for token in tokens_balance["tokens"].as_array().unwrap_or(&Vec::new()) {
+        if token["token_ui_amount"].as_f64().unwrap_or(0.0) > 0.0 {
+            tokens_str.push_str(&format!("{} <a href=\"https://t.me/sj_copyTradebot?start=sell_token_{}\">Sell</a>\n", token["mint"].as_str().unwrap_or("N/A"), token["mint"].as_str().unwrap_or("N/A")));
+        }
+    }
+    if has_any_token {
+        bot.send_message(q.message.as_ref().unwrap().chat().id,format!("
+        <b>Select the token to sell</b>\n\
+        SOL BALANCE: <code> {sol_balance:.6} SOL</code> (${sol_balance_usd:.2})\n\
+        {tokens_str}
+        "))
+        .parse_mode(teloxide::types::ParseMode::Html)
+        .await?;
+    } else {
+        bot.send_message(q.message.as_ref().unwrap().chat().id,format!("
+        <b>Select a token to sell:</b>\n\
+        SOL BALANCE: <code> {sol_balance:.6} SOL</code> (${sol_balance_usd:.2})\n\
+        No token holdings found
+        "))
+        .parse_mode(teloxide::types::ParseMode::Html)
+        .await?;
+    }
+
+    println!("@handle_sell_callback/ tokens_balance: {:?}", tokens_balance);
+
     Ok(())
 }
