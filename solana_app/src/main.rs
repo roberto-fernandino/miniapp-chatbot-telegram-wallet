@@ -268,6 +268,7 @@ pub async fn resubscribe(AxumState(state): AxumState<State>) -> impl IntoRespons
 pub struct SwapRequest {
     user: crate::modules::swap::User,
     priorization_fee_lamports: u64,
+    jito_tip_amount: u64,
     input_mint: String,
     output_mint: String,
     amount: u64,
@@ -299,6 +300,7 @@ pub async fn sol_swap(
     let SwapRequest {
         user,
         priorization_fee_lamports,
+        jito_tip_amount,
         input_mint,
         output_mint,
         amount,
@@ -313,7 +315,7 @@ pub async fn sol_swap(
     println!("@sol_swap /sol/swap got transaction");
 
     println!("@sol_swap /sol/swap signing and sending transaction");
-    match sign_and_send_swap_transaction(swap_transacation, user).await {
+    match sign_and_send_swap_transaction(swap_transacation, user, jito_tip_amount).await {
         Ok(sig) => {
             println!("@sol_swap /sol/swap transaction sent: {:?}", sig);
             println!("@sol_swap /sol/swap response: {:?}", json!({ "transaction": sig.to_string() }));
