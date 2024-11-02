@@ -228,6 +228,15 @@ pub async fn handle_message(
                 let last_token = get_user_last_sent_token(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await.unwrap();
                 token_address_buy_info_handler(&last_token, &bot, &msg, &pool).await?;
             }
+            else if reply_to_message.text().unwrap_or_default().starts_with("Enter jito tip amount") {
+                if let Ok(jito_tip_amount) = text.parse::<f64>() {
+                    let lamports_amount_jito_tip = utils::helpers::sol_to_lamports_i32(jito_tip_amount);
+                    set_user_jito_tip_amount(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), jito_tip_amount).await.unwrap();
+                    bot.send_message(msg.chat.id, format!("Jito tip amount set to: {} SOL", utils::helpers::lamports_to_sol(lamports_amount_jito_tip))).await?;
+                } else {
+                    bot.send_message(msg.chat.id, "Invalid jito tip amount").await?;
+                }
+            }
             else if reply_to_message.text().unwrap_or_default().starts_with("Enter the sell percentage") {
                 if let Ok(sell_percentage) = text.parse::<f64>() {
                     set_user_sell_percentage(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), sell_percentage.to_string().as_str()).await.unwrap();
@@ -1231,5 +1240,24 @@ async fn handle_delete_stop_loss_user_settings_callback(data: String, bot: &telo
     let multiplier = multiplier_and_percentage_to_sell.split("_").nth(0).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
     let percentage_to_sell = multiplier_and_percentage_to_sell.split("_").nth(1).unwrap_or("N/A").parse::<f64>().unwrap_or(0.0);
     db::delete_user_settings_stop_loss(&pool, (multiplier, percentage_to_sell), &user_tg_id).await?;
+    Ok(())
+}
+
+/// Handle set jito tip amount callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_set_jito_tip_amount_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    bot.send_message(q.message.as_ref().unwrap().chat().id, "Enter the Jito tip amount")
+    .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the Jito tip amount in SOL".to_string()), selective: false})
+    .await?;
     Ok(())
 }
