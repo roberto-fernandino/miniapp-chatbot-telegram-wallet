@@ -662,6 +662,7 @@ pub struct SwapSolRequest {
     pub user: TurnkeyUser,
     pub user_public_key: String,
     pub priorization_fee_lamports: u64,
+    pub jito_tip_amount: u64,
     pub input_mint: String,
     pub output_mint: String,
     pub amount: u64,
