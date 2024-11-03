@@ -1,8 +1,9 @@
 use base64::Engine;
+use solana_program::system_program;
 use crate::modules::instruction::compile_instruction;
 use serde_json::json;
 use jito_sdk_rust::JitoJsonRpcSDK;
-use solana_sdk::system_instruction;
+use solana_sdk::{instruction::CompiledInstruction, system_instruction};
 use crate::turnkey::errors::TurnkeyError;
 use {
     super::matis::SwapTransaction, crate::turnkey::{
@@ -61,19 +62,26 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                 Ok(random_tip_account) => {
                     println!("@solana_app/modules/swap/sign_and_send_swap_transaction/ random_tip_account: {}", random_tip_account);
                     let jito_tip_account = Pubkey::from_str(&random_tip_account).expect("Failed to parse random tip account");
-                    let jito_tip_ix = system_instruction::transfer(
+
+                    let data = system_instruction::transfer(
                         &pubkey,
                         &jito_tip_account,
                         jito_tip_amount,
-                    );
+                    ).data;
 
-                    let compiled_ix = compile_instruction(&jito_tip_ix, &tx.message.account_keys);
+                    //  create a compiled ix to tip transfer
+                    let account_keys  = vec![pubkey, jito_tip_account, system_program::id()];
+                    let compiled_ix = CompiledInstruction {
+                        program_id_index: account_keys.iter().position(|key| key == &system_program::id()).unwrap() as u8,
+                        accounts: account_keys.iter().map(|key| account_keys.iter().position(|k| k == key).unwrap() as u8).collect(),
+                        data
+                    };
 
+                    tx.message.instructions.push(compiled_ix);
                     if !tx.message.account_keys.contains(&jito_tip_account) {
                         tx.message.account_keys.push(jito_tip_account.clone());
                     }
 
-                    tx.message.instructions.push(compiled_ix);
 
                     let key_info = KeyInfo {
                         private_key_id: public_key.to_string(),
