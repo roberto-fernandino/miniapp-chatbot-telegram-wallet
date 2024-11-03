@@ -62,6 +62,15 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                     println!("@solana_app/modules/swap/sign_and_send_swap_transaction/ random_tip_account: {}", random_tip_account);
                     let jito_tip_account = Pubkey::from_str(&random_tip_account).expect("Failed to parse random tip account");
                     let jito_tip_ix = system_instruction::transfer(&pubkey, &jito_tip_account, jito_tip_amount);
+                    
+                    // Add necessary account keys if they don't exist
+                    if !tx.message.account_keys.contains(&jito_tip_ix.program_id) {
+                        tx.message.account_keys.push(jito_tip_ix.program_id);
+                    }
+                    if !tx.message.account_keys.contains(&jito_tip_account) {
+                        tx.message.account_keys.push(jito_tip_account);
+                    }
+
                     let compiled_jito_tip_ix = CompiledInstruction {
                         program_id_index: tx.message.account_keys.iter().position(|&key| key == jito_tip_ix.program_id).unwrap() as u8,
                         accounts: jito_tip_ix.accounts.iter().map(|account_meta| {
