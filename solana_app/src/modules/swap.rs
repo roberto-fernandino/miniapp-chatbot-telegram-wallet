@@ -82,7 +82,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                         tx.message.account_keys.push(jito_tip_account.clone());
                     }
 
-
+                    // Sign transaction once
                     let key_info = KeyInfo {
                         private_key_id: public_key.to_string(),
                         public_key: pubkey
@@ -90,112 +90,39 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
 
                     match turnkey_client.sign_transaction(&mut tx, key_info).await {
                         Ok((signed_tx, _sig)) => {
-                            // Create the tip parameters for Jito
+                            // Send to Jito
                             let serialized_tx = engine.encode(bincode::serialize(&signed_tx).unwrap());
                             let jito_params = json!({
                                 "tx": serialized_tx
                             });
 
-                            // Send transaction to Jito block engine
-                            match jito_sdk.send_txn(Some(jito_params), true).await {
-                                Ok(tx_sig) => {
-                                    println!("@sign_and_send_swap_transaction/ transaction sent to Jito Engine: {:?}", tx_sig);
-                                },
-                                Err(e) => {
-                                    println!("@sign_and_send_swap_transaction/ error sending transaction to Jito Engine: {:?}", e);
-                                }
+                            // Send to both Jito and RPC concurrently
+                            let jito_result = jito_sdk.send_txn(Some(jito_params), true).await;
+                            let rpc_result = rpc_client.send_and_confirm_transaction(&signed_tx);
+
+                            match (jito_result, rpc_result) {
+                                (Ok(_), Ok(sig)) => Ok(sig),
+                                (Err(e), _) => Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+                                    format!("Jito submission failed: {:?}", e)
+                                ))),
+                                (_, Err(e)) => Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+                                    format!("RPC submission failed: {:?}", e)
+                                )))
                             }
                         },
-                        Err(e) => {
-                            println!("Failed to sign transaction: {:?}", e);
-                        }
+                        Err(e) => Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+                            format!("Failed to sign transaction: {:?}", e)
+                        )))
                     }
                 },
-                Err(e) => {
-                    println!("Failed to get random tip account: {:?}", e);
-                    return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to get random tip account: {:?}", e))));
-                }
+                Err(e) => Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+                    format!("Failed to get random tip account: {:?}", e)
+                )))
             }
-
-            println!("@sign_and_send_swap_transaction/ transaction deserialized successfully");
-            println!("@sign_and_send_swap_transaction/ transaction: {:?}", tx);
-            Some(tx)
         },
-        Err(e) => {
-            println!("Failed to deserialize transaction: {:?}", e);
-            println!("Transaction data (base64): {}", transaction.swap_transaction);
-            println!("Transaction data (decoded): {:?}", transaction_data);
-            None
-        }
-    };
-    match rpc_client.get_latest_blockhash() {
-        Ok(recent_blockhash) => {
-            transaction.as_mut().unwrap().message.recent_blockhash = recent_blockhash;
-            println!("@sign_and_send_swap_transaction/ recent_blockhash updated: {}", recent_blockhash);
-        },
-        Err(e) => {
-            println!("Failed to fetch recent blockhash: {:?}", e);
-            return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to fetch recent blockhash: {:?}", e))));
-        }
-    }
-
-    if let Some(mut transaction) = transaction {
-        println!("@sign_and_send_swap_transaction/ transaction deserialized successfully");
-
-        let key_info = KeyInfo {
-           private_key_id: public_key.to_string(), // Ensure this is a String
-           public_key: pubkey // Pubkey OBJ
-        };
-        println!("@sign_and_send_swap_transaction/ key_info created: {:?}", key_info);
-
-        // Sign transaction
-        println!("@sign_and_send_swap_transaction/ signing transaction");
-        match turnkey_client.sign_transaction(&mut transaction, key_info).await {
-            Ok((tx, _sig)) => {
-                println!("@sign_and_send_swap_transaction/ transaction signed");
-
-                println!("@sign_and_send_swap_transaction/ sending transaction");
-                match rpc_client.send_and_confirm_transaction(&tx) {
-                    Ok(tx_sig) => {
-                        println!("@sign_and_send_swap_transaction/ transaction confirmed: {:?}", tx_sig);
-                        let jito_params = json!({
-                            "tx": tx_sig.to_string()
-                        });
-                        match jito_sdk.send_txn(Some(jito_params), true).await {
-                            Ok(tx_sig) => {
-                                println!("@sign_and_send_swap_transaction/ transaction sent to jito Engine: {:?}", tx_sig);
-                            },
-                            Err(e) => {
-                                println!("@sign_and_send_swap_transaction/ error sending transaction to jito Engine: {:?}", e);
-                                return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to send transaction to jito Engine: {:?}", e))));
-                            }
-                        }
-                        Ok(tx_sig)
-                    },
-                     Err(e) => {
-                        println!("@sign_and_send_swap_transaction/ detailed error: {:?}", e);
-            
-                        // Get current blockhash
-                        let recent_blockhash = rpc_client.get_latest_blockhash().map_err(|e| TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to get latest blockhash: {:?}", e)))).unwrap();
-                        println!("@sign_and_send_swap_transaction/ recent blockhash: {:?}", recent_blockhash);
-            
-                        // Get account balance
-                        let balance = rpc_client.get_balance(&pubkey).map_err(|e| TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to get account balance: {:?}", e)))).unwrap();
-                        println!("@sign_and_send_swap_transaction/ account balance: {} SOL", balance as f64 / 1e9);
-            
-                        // Get transaction fee
-                        let fee = rpc_client.get_fee_for_message(&transaction.message).map_err(|e| TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to get transaction fee: {:?}", e)))).unwrap();
-                        println!("@sign_and_send_swap_transaction/ transaction fee: {} SOL", fee as f64 / 1e9);
-                        Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to send transaction: {:?}", e))))
-                    }
-                }
-            }
-            Err(e) => {
-                println!("Failed to sign transaction: {:?}", e);
-                Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(format!("Failed to sign transaction: {:?}", e))))
-            }
-        }
-    } else {
-        Err(TurnkeyError::from(Box::<dyn std::error::Error>::from("Failed to deserialize transaction".to_string())))
-    }
+        Err(e) => Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+            format!("Failed to deserialize transaction: {:?}", e)
+        )))
+    }?;
+    Ok(transaction)
 }
