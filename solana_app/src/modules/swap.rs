@@ -67,15 +67,24 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                         jito_tip_amount,
                     );
 
-                    // Compile the instruction
+                    // Add the Jito tip account to account_keys if it's not already present
+                    if !tx.message.account_keys.contains(&jito_tip_account) {
+                        tx.message.account_keys.push(jito_tip_account.clone());
+                    }
+
+                    // Get the indices for the from and to accounts
+                    let from_index = tx.message.account_keys.iter().position(|key| key == &pubkey)
+                        .expect("From pubkey not found") as u8;
+                    let to_index = tx.message.account_keys.iter().position(|key| key == &jito_tip_account)
+                        .expect("Jito tip account not found") as u8;
+
+                    println!("@sign_and_send_swap_transaction/ from_index: {}, to_index: {}", from_index, to_index);
+
+                    // Compile the instruction with correct indices
                     let compiled_ix = CompiledInstruction::new_from_raw_parts(
-                        tx.message.account_keys.iter().position(|key| key == &pubkey).unwrap() as u8,
-                        jito_tip_ix.data,
-                        tx.message.account_keys.iter()
-                            .enumerate()
-                            .filter(|(_i, key)| jito_tip_ix.accounts.iter().any(|account| account.pubkey == **key))
-                            .map(|(i, _)| i as u8)
-                            .collect()
+                        from_index,
+                        jito_tip_ix.data.clone(),
+                        vec![from_index, to_index],
                     );
 
                     // Add the compiled instruction to the transaction
