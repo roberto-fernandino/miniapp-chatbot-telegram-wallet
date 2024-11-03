@@ -1,14 +1,14 @@
 use base64::Engine;
+use crate::modules::instruction::compile_instruction;
 use serde_json::json;
-use solana_program::instruction::CompiledInstruction;
 use jito_sdk_rust::JitoJsonRpcSDK;
 use solana_sdk::system_instruction;
 use crate::turnkey::errors::TurnkeyError;
 use {
     super::matis::SwapTransaction, crate::turnkey::{
         client::{KeyInfo, Turnkey}, errors::TurnkeyResult
-    }, bincode::deserialize, serde::{Deserialize, Serialize}, solana_client::rpc_client::RpcClient, solana_sdk::{
-        pubkey::Pubkey, signature::Signature, transaction::Transaction, transaction::VersionedTransaction
+    }, serde::{Deserialize, Serialize}, solana_client::rpc_client::RpcClient, solana_sdk::{
+        pubkey::Pubkey, signature::Signature, transaction::Transaction
     }, std::{env, str::FromStr}
 };
 
@@ -67,27 +67,12 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                         jito_tip_amount,
                     );
 
-                    // Add the Jito tip account to account_keys if it's not already present
+                    let compiled_ix = compile_instruction(&jito_tip_ix, &tx.message.account_keys);
+
                     if !tx.message.account_keys.contains(&jito_tip_account) {
                         tx.message.account_keys.push(jito_tip_account.clone());
                     }
 
-                    // Get the indices for the from and to accounts
-                    let from_index = tx.message.account_keys.iter().position(|key| key == &pubkey)
-                        .expect("From pubkey not found") as u8;
-                    let to_index = tx.message.account_keys.iter().position(|key| key == &jito_tip_account)
-                        .expect("Jito tip account not found") as u8;
-
-                    println!("@sign_and_send_swap_transaction/ from_index: {}, to_index: {}", from_index, to_index);
-
-                    // Compile the instruction with correct indices
-                    let compiled_ix = CompiledInstruction::new_from_raw_parts(
-                        from_index,
-                        jito_tip_ix.data.clone(),
-                        vec![from_index, to_index],
-                    );
-
-                    // Add the compiled instruction to the transaction
                     tx.message.instructions.push(compiled_ix);
 
                     let key_info = KeyInfo {
