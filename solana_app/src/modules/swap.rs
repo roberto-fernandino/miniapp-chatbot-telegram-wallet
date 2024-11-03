@@ -61,25 +61,53 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                 Ok(random_tip_account) => {
                     println!("@solana_app/modules/swap/sign_and_send_swap_transaction/ random_tip_account: {}", random_tip_account);
                     let jito_tip_account = Pubkey::from_str(&random_tip_account).expect("Failed to parse random tip account");
-                    let jito_tip_ix = system_instruction::transfer(&pubkey, &jito_tip_account, jito_tip_amount);
-                    
-                    // Add necessary account keys if they don't exist
-                    if !tx.message.account_keys.contains(&jito_tip_ix.program_id) {
-                        tx.message.account_keys.push(jito_tip_ix.program_id);
-                    }
-                    if !tx.message.account_keys.contains(&jito_tip_account) {
-                        tx.message.account_keys.push(jito_tip_account);
-                    }
+                    let jito_tip_ix = system_instruction::transfer(
+                        &pubkey,
+                        &jito_tip_account,
+                        jito_tip_amount,
+                    );
 
-                    let compiled_jito_tip_ix = CompiledInstruction {
-                        program_id_index: tx.message.account_keys.iter().position(|&key| key == jito_tip_ix.program_id).unwrap() as u8,
-                        accounts: jito_tip_ix.accounts.iter().map(|account_meta| {
-                            tx.message.account_keys.iter().position(|&key| key == account_meta.pubkey).unwrap() as u8
-                        }).collect(),
-                        data: jito_tip_ix.data.clone(),
+                    // Compile the instruction
+                    let compiled_ix = CompiledInstruction::new_from_raw_parts(
+                        tx.message.account_keys.iter().position(|key| key == &pubkey).unwrap() as u8,
+                        jito_tip_ix.data,
+                        tx.message.account_keys.iter()
+                            .enumerate()
+                            .filter(|(_i, key)| jito_tip_ix.accounts.iter().any(|account| account.pubkey == **key))
+                            .map(|(i, _)| i as u8)
+                            .collect()
+                    );
+
+                    // Add the compiled instruction to the transaction
+                    tx.message.instructions.push(compiled_ix);
+
+                    let key_info = KeyInfo {
+                        private_key_id: public_key.to_string(),
+                        public_key: pubkey
                     };
-                    tx.message.instructions.push(compiled_jito_tip_ix);
-                    println!("@solana_app/modules/swap/sign_and_send_swap_transaction/ jito_tip_account: {}", jito_tip_account);
+
+                    match turnkey_client.sign_transaction(&mut tx, key_info).await {
+                        Ok((signed_tx, _sig)) => {
+                            // Create the tip parameters for Jito
+                            let serialized_tx = engine.encode(bincode::serialize(&signed_tx).unwrap());
+                            let jito_params = json!({
+                                "tx": serialized_tx
+                            });
+
+                            // Send transaction to Jito block engine
+                            match jito_sdk.send_txn(Some(jito_params), true).await {
+                                Ok(tx_sig) => {
+                                    println!("@sign_and_send_swap_transaction/ transaction sent to Jito Engine: {:?}", tx_sig);
+                                },
+                                Err(e) => {
+                                    println!("@sign_and_send_swap_transaction/ error sending transaction to Jito Engine: {:?}", e);
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            println!("Failed to sign transaction: {:?}", e);
+                        }
+                    }
                 },
                 Err(e) => {
                     println!("Failed to get random tip account: {:?}", e);
