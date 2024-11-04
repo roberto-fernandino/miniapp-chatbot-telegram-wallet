@@ -239,10 +239,10 @@ async fn positions_watcher(pool: SafePool, bot: &Bot) {
                                     }
                                 } else {
                                     println!("@positions_watcher/ user has no token in wallet, deleting position");
-                                    match db::delete_position(&pool, &position.token_address, &position.tg_user_id).await {
+                                    match db::mark_position_completed(&pool, &position.token_address, &position.tg_user_id).await {
                                         Ok(_) => {},
                                         Err(e) => {
-                                            eprintln!("@bot/main/positions_watcher/ error deleting position: {}", e);
+                                            eprintln!("@bot/main/positions_watcher/ error marking position as completed: {}", e);
                                         }
                                     }
                                 }
