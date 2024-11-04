@@ -55,7 +55,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     println!("@sign_and_send_swap_transaction/ transaction decoded, length: {}", transaction_data.len());
 
     let jito_sdk = JitoJsonRpcSDK::new(env::var("JITO_BLOCK_ENGINE_URL").expect("JITO_BLOCK_ENGINE_URL must be set").as_str(), None);
-    let mut transaction = match bincode::deserialize::<Transaction>(&transaction_data) {
+    let transaction = match bincode::deserialize::<Transaction>(&transaction_data) {
         Ok(mut tx) => {
             // Attempt to get a random tip account
             match jito_sdk.get_random_tip_account().await {
@@ -89,40 +89,48 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                     };
 
                     match turnkey_client.sign_transaction(&mut tx, key_info).await {
-                        Ok((signed_tx, _sig)) => {
-                            // Send to Jito
+                        Ok((signed_tx, sig)) => {
                             let serialized_tx = engine.encode(bincode::serialize(&signed_tx).unwrap());
                             let jito_params = json!({
                                 "tx": serialized_tx
                             });
 
-                            // Send to both Jito and RPC concurrently
-                            let jito_result = jito_sdk.send_txn(Some(jito_params), true).await;
-                            let rpc_result = rpc_client.send_and_confirm_transaction(&signed_tx);
+                            // Send to both endpoints and return the signature
+                            let jito_future = jito_sdk.send_txn(Some(jito_params), true);
+                            let rpc_future = tokio::spawn(async move {
+                                rpc_client.send_and_confirm_transaction(&signed_tx)
+                            });
 
-                            match (jito_result, rpc_result) {
-                                (Ok(_), Ok(sig)) => Ok(sig),
-                                (Err(e), _) => Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+                            match tokio::join!(jito_future, rpc_future) {
+                                (Ok(_), Ok(Ok(sig))) => return Ok(sig),
+                                (Err(e), _) => return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
                                     format!("Jito submission failed: {:?}", e)
                                 ))),
-                                (_, Err(e)) => Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+                                (_, Ok(Err(e))) => return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
                                     format!("RPC submission failed: {:?}", e)
+                                ))),
+                                (_, Err(e)) => return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+                                    format!("RPC task failed: {:?}", e)
                                 )))
                             }
                         },
-                        Err(e) => Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+                        Err(e) => return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
                             format!("Failed to sign transaction: {:?}", e)
                         )))
                     }
                 },
-                Err(e) => Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+                Err(e) => return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
                     format!("Failed to get random tip account: {:?}", e)
                 )))
             }
         },
-        Err(e) => Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+        Err(e) => return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
             format!("Failed to deserialize transaction: {:?}", e)
         )))
-    }?;
-    Ok(transaction)
+    };
+
+    // This line should never be reached due to the early returns above
+    Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+        "Unexpected end of function"
+    )))
 }
