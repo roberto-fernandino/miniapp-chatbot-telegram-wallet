@@ -514,6 +514,18 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to set jito tip amount: {:?}", e),
             }
         }
+        else if data.starts_with("set_active_positions") {
+            match handle_set_active_positions_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to set active positions: {:?}", e),
+            }
+        }
+        else if data.starts_with("set_complete_positions") {
+            match handle_set_complete_positions_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to set complete positions: {:?}", e),
+            }
+        }
         else {
             log::info!("Unrecognized callback query data: {}", data);
         }
@@ -1269,5 +1281,44 @@ async fn handle_sell_choose_token_callback(data: String, bot: &teloxide::Bot, q:
 
     println!("@handle_sell_callback/ tokens_balance: {:?}", tokens_balance);
 
+    Ok(())
+}
+
+/// Handle set active positions callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_set_active_positions_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let user_tg_id = q.from.id.to_string();
+    db::set_user_settings_active_complete_positions(pool, &user_tg_id, "active".to_string()).await?;
+    Ok(())
+}
+
+/// Handle set complete positions callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_set_complete_positions_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let user_tg_id = q.from.id.to_string();
+    db::set_user_settings_active_complete_positions(pool, &user_tg_id, "completed".to_string()).await?;
+    let message = create_positions_message(&user_tg_id, pool).await?;
+    let keyboard = create_positions_keyboard(&user_tg_id, pool).await?;
+    bot.send_message(q.message.as_ref().unwrap().chat().id, message).reply_markup(keyboard).await?;
     Ok(())
 }
