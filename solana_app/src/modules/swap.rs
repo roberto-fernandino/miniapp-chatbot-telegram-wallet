@@ -76,6 +76,10 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                         accounts: account_keys.iter().map(|key| account_keys.iter().position(|k| k == key).unwrap() as u8).collect(),
                         data
                     };
+                    println!("@sign_and_send_swap_transaction/ Program ID index: {}", compiled_ix.program_id_index);
+                    println!("@sign_and_send_swap_transaction/ Account indices: {:?}", compiled_ix.accounts);
+                    println!("@sign_and_send_swap_transaction/ Transaction account keys: {:?}", tx.message.account_keys);
+                    println!("@sign_and_send_swap_transaction/ Instructions count: {}", tx.message.instructions.len());
 
                     tx.message.instructions.push(compiled_ix);
                     if !tx.message.account_keys.contains(&jito_tip_account) {
