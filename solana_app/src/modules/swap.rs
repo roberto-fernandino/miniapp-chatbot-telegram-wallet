@@ -73,7 +73,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
 
     // Decode transaction
     println!("@sign_and_send_swap_transaction/ decoding transaction");
-    let engine = base64::engine::general_purpose::STANDARD;
+    let engine: base64::engine::GeneralPurpose = base64::engine::general_purpose::STANDARD;
 
     let transaction_data = engine.decode(&transaction.swap_transaction).map_err(|e| {
         println!("Base64 decoding error: {:?}", e);
@@ -87,9 +87,9 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     let jito_sdk = JitoJsonRpcSDK::new(env::var("JITO_BLOCK_ENGINE_URL").expect("JITO_BLOCK_ENGINE_URL must be set").as_str(), None);
     let jito_tip_ix = system_instruction::transfer(&pubkey, &Pubkey::from_str(&jito_sdk.get_random_tip_account().await.unwrap()).unwrap(), jito_tip_amount);
     let mut transaction = Transaction::new_with_payer(&[jito_tip_ix], Some(&pubkey));
-    let jito_serialized_tx = match turnkey_client.sign_transaction(&mut transaction, key_info.clone()).await {
-        Ok((signed_tx, _sig)) => {
-            engine.encode(bincode::serialize(&signed_tx).unwrap())
+    let (jito_serialized_tx, jito_sig) = match turnkey_client.sign_transaction(&mut transaction, key_info.clone()).await {
+        Ok((signed_tx, sig)) => {
+            (engine.encode(bincode::serialize(&signed_tx).unwrap()), sig)
         }
         Err(e) => {
             return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
@@ -117,8 +117,8 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
         )))
     }?;
     let bundle = json!([
-        jito_serialized_tx,
-        swap_tx
+        jito_sig,
+        swap_sig
     ]);
     let uuid = None;
     let response = jito_sdk.send_bundle(Some(bundle), uuid).await.expect("Failed to send bundle");
