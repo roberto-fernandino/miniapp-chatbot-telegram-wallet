@@ -55,7 +55,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     println!("@sign_and_send_swap_transaction/ transaction decoded, length: {}", transaction_data.len());
 
     let jito_sdk = JitoJsonRpcSDK::new(env::var("JITO_BLOCK_ENGINE_URL").expect("JITO_BLOCK_ENGINE_URL must be set").as_str(), None);
-    let transaction = match bincode::deserialize::<Transaction>(&transaction_data) {
+    match bincode::deserialize::<Transaction>(&transaction_data) {
         Ok(mut tx) => {
             // Attempt to get a random tip account
             match jito_sdk.get_random_tip_account().await {
@@ -69,11 +69,16 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                         jito_tip_amount,
                     ).data;
 
-                    //  create a compiled ix to tip transfer
-                    let account_keys  = vec![pubkey, jito_tip_account, system_program::id()];
+                    if !tx.message.account_keys.contains(&jito_tip_account) {
+                        tx.message.account_keys.push(jito_tip_account.clone());
+                    }
+                    // create a compiled ix to jito tip transfer
                     let compiled_ix = CompiledInstruction {
-                        program_id_index: account_keys.iter().position(|key| key == &system_program::id()).unwrap() as u8,
-                        accounts: account_keys.iter().map(|key| account_keys.iter().position(|k| k == key).unwrap() as u8).collect(),
+                        program_id_index: tx.message.account_keys.iter().position(|key| key == &system_program::id()).unwrap() as u8,
+                        accounts: vec![
+                            tx.message.account_keys.iter().position(|key| key == &pubkey).unwrap() as u8,
+                            tx.message.account_keys.iter().position(|key| key == &jito_tip_account).unwrap() as u8,
+                        ],
                         data
                     };
                     println!("@sign_and_send_swap_transaction/ Program ID index: {}", compiled_ix.program_id_index);
@@ -82,9 +87,6 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                     println!("@sign_and_send_swap_transaction/ Instructions count: {}", tx.message.instructions.len());
 
                     tx.message.instructions.push(compiled_ix);
-                    if !tx.message.account_keys.contains(&jito_tip_account) {
-                        tx.message.account_keys.push(jito_tip_account.clone());
-                    }
 
                     // Sign transaction once
                     let key_info = KeyInfo {
@@ -93,7 +95,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                     };
 
                     match turnkey_client.sign_transaction(&mut tx, key_info).await {
-                        Ok((signed_tx, sig)) => {
+                        Ok((signed_tx, _sig)) => {
                             let serialized_tx = engine.encode(bincode::serialize(&signed_tx).unwrap());
                             let jito_params = json!({
                                 "tx": serialized_tx
@@ -132,9 +134,4 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
             format!("Failed to deserialize transaction: {:?}", e)
         )))
     };
-
-    // This line should never be reached due to the early returns above
-    Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
-        "Unexpected end of function"
-    )))
 }
