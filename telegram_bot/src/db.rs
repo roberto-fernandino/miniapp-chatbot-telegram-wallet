@@ -98,6 +98,7 @@ pub struct Position {
     pub chat_id: String, // Chat ID
     pub sol_entry: f64, // SOL at entry
     pub ui_amount: String, // UI amount
+    pub completed: bool, // Whether the position is completed
 }
 
 #[derive(Debug, Serialize)]
@@ -1334,7 +1335,7 @@ pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &st
         None
     };
 
-    sqlx::query("INSERT INTO positions (tg_user_id, token_address, take_profits, stop_losses, amount, mc_entry, entry_price, chat_id, sol_entry, ui_amount) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)")
+    sqlx::query("INSERT INTO positions (tg_user_id, token_address, take_profits, stop_losses, amount, mc_entry, entry_price, chat_id, sol_entry, ui_amount, completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)")
     .bind(tg_user_id)
     .bind(token_address)
     .bind(take_profits_json)
@@ -1345,6 +1346,7 @@ pub async fn insert_position(pool: &PgPool, tg_user_id: &str, token_address: &st
     .bind(chat_id)
     .bind(sol_entry)
     .bind(ui_amount)
+    .bind(false)
     .execute(pool)
     .await?;
     Ok(())
@@ -1522,6 +1524,7 @@ pub async fn get_all_positions(pool: &PgPool) -> Result<Vec<Position>> {
             ui_amount: position.get("ui_amount"),
             take_profits,
             stop_losses,
+            completed: position.get("completed"),
         });
     }
     Ok(positions_vec)
@@ -1857,7 +1860,8 @@ pub async fn get_position(pool: &PgPool, token_address: &str, user_tg_id: &str) 
     Ok(
         Position { id: query_result.get("id"), tg_user_id: query_result.get("tg_user_id"), token_address: query_result.get("token_address"), amount: query_result.get("amount"), mc_entry: query_result.get("mc_entry"), entry_price: query_result.get("entry_price"), created_at: query_result.get("created_at"), chat_id: query_result.get("chat_id"), sol_entry: query_result.get("sol_entry"), ui_amount: query_result.get("ui_amount"),
         take_profits,
-        stop_losses
+        stop_losses,
+        completed: query_result.get("completed")
         }
     )
 }
@@ -1899,6 +1903,7 @@ pub async fn get_positions_by_user_tg_id(pool: &PgPool, user_tg_id: &str) -> Res
             ui_amount: position.get("ui_amount"),
             take_profits,
             stop_losses,
+            completed: position.get("completed")
         });
     }
     Ok(positions_vec)
