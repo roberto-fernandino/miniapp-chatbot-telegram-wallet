@@ -69,9 +69,13 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                         jito_tip_amount,
                     ).data;
 
-                    if !tx.message.account_keys.contains(&jito_tip_account) {
-                        tx.message.account_keys.push(jito_tip_account.clone());
+                    // Ensure the jito_tip_account is writable
+                    tx.message.account_keys.push(jito_tip_account.clone());
+                    // Adjust the read-only unsigned accounts count
+                    if tx.message.header.num_readonly_unsigned_accounts > 0 {
+                        tx.message.header.num_readonly_unsigned_accounts -= 1;
                     }
+
                     // create a compiled ix to jito tip transfer
                     let compiled_ix = CompiledInstruction {
                         program_id_index: tx.message.account_keys.iter().position(|key| key == &system_program::id()).unwrap() as u8,
