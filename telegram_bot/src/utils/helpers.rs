@@ -619,7 +619,7 @@ pub fn calculate_liquidity(pair0_reserve_usd: f64, pair1_reserve_usd: f64) -> f6
 /// # Returns
 /// 
 /// A string containing the time ago
-fn time_ago(datetime_str: &str) -> String {
+pub fn time_ago(datetime_str: &str) -> String {
     // Parse the input string into a DateTime<Utc> object
     let datetime = match DateTime::parse_from_rfc3339(datetime_str) {
         Ok(dt) => dt.with_timezone(&Utc),
@@ -645,7 +645,7 @@ fn time_ago(datetime_str: &str) -> String {
 /// # Returns
 /// 
 /// A string containing the age
-fn age_token(datetime_str: &str) -> String {
+pub fn age_token(datetime_str: &str) -> String {
     // Parse the input string into a DateTime<Utc> object
     let datetime = match DateTime::parse_from_rfc3339(datetime_str) {
         Ok(dt) => dt.with_timezone(&Utc),
@@ -1170,18 +1170,30 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
         let mut tokens_balance_str = String::new();
         for token in response_json["tokens"].as_array().unwrap_or(&Vec::new()).iter() {
             let mint = token["mint"].as_str().unwrap_or("N/A");
+            let scanner_response = get_scanner_search(mint).await?;
+            let price = scanner_response["pair"]["pairPrice1Usd"].to_string();
+            let position = get_position(pool, mint, user_tg_id).await?;
+            let pnl_usd = price.parse::<f64>().unwrap_or(0.0) - position.entry_price * position.amount;
+            let pnl_percent = pnl_usd / (position.entry_price * position.amount) * 100.0;
+            let symbol = scanner_response["pair"]["symbol"].as_str().unwrap_or("N/A");
+            let usd_entry = position.entry_price * position.amount;
             let token_ui_amount = token["token_ui_amount"].as_f64().unwrap_or(0.0);
+            let position_age = Utc::now().signed_duration_since(DateTime::<Utc>::from_utc(position.created_at, Utc));
             if token_ui_amount > 0.0 {
-                tokens_balance_str.push_str(&format!("<code>{}</code>: {}\n", mint, token_ui_amount));
+                tokens_balance_str.push_str(&format!(
+                "<code>${symbol}/SOL</code>\n\
+                (${pnl_usd:.2}) [{pnl_percent:.2}% ROI]\n\
+                Size: {usd_entry:.2} [{}]\n\
+                Date: {}
+                {}", if position.completed { "✅ Completed" } else { "🟠 In progress" }, format_number(token_ui_amount), format_age(position_age)
+                ));
             }
         }
         Ok(format!(
             "<b>Manage tokens:</b>\n\
             SOL Balance: <b> {:.6} SOL (${:.2})</b>\n\
-            Token balance: <b> {:.6} SOL</b> (${:.2})\n\
             {tokens_balance_str}
-            ", sol_balance, sol_balance_usd, sol_token_balance, sol_token_balance_usd)
-        )
+            ", sol_balance, sol_balance_usd))
     } else {
         Err(anyhow::anyhow!("User not found"))
     }
@@ -1198,7 +1210,7 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
 /// # Returns
 /// 
 /// A InlineKeyboardMarkup struct
-pub async fn create_positions_keyboard(user_tg_id: &str, pool: &SafePool) -> Result<InlineKeyboardMarkup> {
+pub async fn create_positions_keyboard(_user_tg_id: &str, _pool: &SafePool) -> Result<InlineKeyboardMarkup> {
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
     buttons.push(
         vec![InlineKeyboardButton::callback("← Back","back"), InlineKeyboardButton::callback("🔄 Refresh", format!("refresh_positions"))]
