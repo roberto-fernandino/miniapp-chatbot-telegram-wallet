@@ -228,7 +228,7 @@ pub async fn handle_message(
                 let last_token = get_user_last_sent_token(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await.unwrap();
                 token_address_buy_info_handler(&last_token, &bot, &msg, &pool).await?;
             }
-            else if reply_to_message.text().unwrap_or_default().starts_with("Enter jito tip amount") {
+            else if reply_to_message.text().unwrap_or_default().starts_with("Enter the Jito tip amount") {
                 if let Ok(jito_tip_amount) = text.parse::<f64>() {
                     let lamports_amount_jito_tip = utils::helpers::sol_to_lamports_i32(jito_tip_amount);
                     set_user_jito_tip_amount(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), jito_tip_amount).await.unwrap();
