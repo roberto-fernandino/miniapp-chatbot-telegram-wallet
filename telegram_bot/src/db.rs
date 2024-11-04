@@ -1973,9 +1973,66 @@ pub async fn set_user_settings_active_complete_positions(pool: &PgPool, user_tg_
     Ok(())
 }
 
-
+/// Get the active positions
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A Vec<Position> representing the active positions
 pub async fn get_active_positions(pool: &PgPool, user_tg_id: &str) -> Result<Vec<Position>> {
     let positions = sqlx::query("SELECT * FROM POSITIONS WHERE tg_user_id = $1 AND completed = false")
+    .bind(user_tg_id)
+    .fetch_all(pool)
+    .await?;
+    let mut positions_vec = Vec::new();
+    for position in positions {
+        let take_profits_value = position.get::<Option<serde_json::Value>, _>("take_profits");
+        let stop_losses_value = position.get::<Option<serde_json::Value>, _>("stop_losses");
+
+        let take_profits: Vec<(f64, f64)> = match take_profits_value {
+            Some(v) => serde_json::from_value(v).unwrap_or_default(),
+            None => Vec::new(),
+        };
+
+        let stop_losses: Vec<(f64, f64)> = match stop_losses_value {
+            Some(v) => serde_json::from_value(v).unwrap_or_default(),
+            None => Vec::new(),
+        };
+        positions_vec.push(Position {
+            id: position.get("id"),
+            tg_user_id: position.get("tg_user_id"),
+            token_address: position.get("token_address"),
+            amount: position.get("amount"),
+            mc_entry: position.get("mc_entry"),
+            entry_price: position.get("entry_price"),
+            created_at: position.get("created_at"),
+            chat_id: position.get("chat_id"),
+            sol_entry: position.get("sol_entry"),
+            ui_amount: position.get("ui_amount"),
+            take_profits,
+            stop_losses,
+            completed: false
+        });
+    }
+    Ok(positions_vec)
+}
+
+/// Get the complete positions
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A Vec<Position> representing the complete positions
+pub async fn get_complete_positions(pool: &PgPool, user_tg_id: &str) -> Result<Vec<Position>> {
+    let positions = sqlx::query("SELECT * FROM POSITIONS WHERE tg_user_id = $1 AND completed = true")
     .bind(user_tg_id)
     .fetch_all(pool)
     .await?;

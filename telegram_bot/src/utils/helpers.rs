@@ -1148,8 +1148,13 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
         println!("@create_positions_message/ user_tg_id: {:?}", user_tg_id);
         let user = crate::db::get_user(&pool, user_tg_id).await?;
         println!("@create_positions_message/ user: {:?}", user);
+
+        let user_settings = crate::db::get_user_settings(pool, user_tg_id).await?;
+        println!("@create_positions_message/ user_settings: {:?}", user_settings);
+
         let solana_wallet_address = user.solana_address.expect("User has no solana address");
         println!("@create_positions_message/ solana_wallet_address: {:?}", solana_wallet_address);
+
         let client = reqwest::Client::new();
         let response = client.get(
             format!("http://solana_app:3030/get_positions/{solana_wallet_address}")
@@ -1157,36 +1162,65 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
         .send()
         .await?;
         println!("@create_positions_message/ solana_app response: {:?}", response);
+
         let sol_balance = get_wallet_sol_balance(&solana_wallet_address).await?;
         println!("@create_positions_message/ sol_balance: {:?}", sol_balance);
+
         let sol_balance_usd = sol_to_usd(sol_balance.parse::<f64>().unwrap_or(0.0)).await?;
         println!("@create_positions_message/ sol_balance_usd: {:?}", sol_balance_usd);
+
         let response_json = response.json::<serde_json::Value>().await?;
         println!("@create_positions_message/ solana_app response_json: {:?}", response_json);
+
         let sol_token_balance = response_json["total_sol_balance"].as_f64().unwrap_or(0.0);
         println!("@create_positions_message/ sol_token_balance: {:?}", sol_token_balance);
+
         let sol_token_balance_usd = sol_to_usd(sol_token_balance).await?;
         println!("@create_positions_message/ sol_token_balance_usd: {:?}", sol_token_balance_usd);
         let mut tokens_balance_str = String::new();
-        for token in response_json["tokens"].as_array().unwrap_or(&Vec::new()).iter() {
-            let mint = token["mint"].as_str().unwrap_or("N/A");
-            let scanner_response = get_scanner_search(mint).await?;
-            let price = scanner_response["pair"]["pairPrice1Usd"].to_string();
-            let position = get_position(pool, mint, user_tg_id).await?;
-            let pnl_usd = price.parse::<f64>().unwrap_or(0.0) - position.entry_price * position.amount;
-            let pnl_percent = pnl_usd / (position.entry_price * position.amount) * 100.0;
-            let symbol = scanner_response["pair"]["symbol"].as_str().unwrap_or("N/A");
-            let usd_entry = position.entry_price * position.amount;
-            let token_ui_amount = token["token_ui_amount"].as_f64().unwrap_or(0.0);
-            let position_age = Utc::now().signed_duration_since(DateTime::<Utc>::from_utc(position.created_at, Utc));
-            if token_ui_amount > 0.0 {
-                tokens_balance_str.push_str(&format!(
-                "<code>${symbol}/SOL</code>\n\
-                (${pnl_usd:.2}) [{pnl_percent:.2}% ROI]\n\
-                Size: {usd_entry:.2} [{}]\n\
-                Date: {}
-                {}", if position.completed { "✅ Completed" } else { "🟠 In progress" }, format_number(token_ui_amount), format_age(position_age)
-                ));
+        if user_settings.active_complete_positions == "active" {    
+            let positions =  get_active_positions(pool, user_tg_id).await?;
+            for position in positions {
+                let mint = position.token_address;
+                let scanner_response = get_scanner_search(&mint).await?;
+                let price = scanner_response["pair"]["pairPrice1Usd"].to_string();
+                let pnl_usd = price.parse::<f64>().unwrap_or(0.0) - position.entry_price * position.amount;
+                let pnl_percent = pnl_usd / (position.entry_price * position.amount) * 100.0;
+                let symbol = scanner_response["pair"]["symbol"].as_str().unwrap_or("N/A");
+                let usd_entry = position.entry_price * position.amount;
+                let token_ui_amount = position.ui_amount;
+                let position_age = Utc::now().signed_duration_since(DateTime::<Utc>::from_utc(position.created_at, Utc));
+                if token_ui_amount.parse::<f64>().unwrap_or(0.0) > 0.0 {
+                    tokens_balance_str.push_str(&format!(
+                    "<code>${symbol}/SOL</code>\n\
+                    (${pnl_usd:.2}) [{pnl_percent:.2}% ROI]\n\
+                    Size: {usd_entry:.2} [{}]\n\
+                    Date: {}
+                    ", format_number(token_ui_amount.parse::<f64>().unwrap_or(0.0)), format_age(position_age)
+                    ));
+                }
+            }
+        } else {
+            let positions = crate::db::get_complete_positions(pool, user_tg_id).await?;
+            for position in positions {
+                let mint = position.token_address;
+                let scanner_response = get_scanner_search(&mint).await?;
+                let price = scanner_response["pair"]["pairPrice1Usd"].to_string();
+                let pnl_usd = price.parse::<f64>().unwrap_or(0.0) - position.entry_price * position.amount;
+                let pnl_percent = pnl_usd / (position.entry_price * position.amount) * 100.0;
+                let symbol = scanner_response["pair"]["symbol"].as_str().unwrap_or("N/A");
+                let usd_entry = position.entry_price * position.amount;
+                let token_ui_amount = position.ui_amount;
+                let position_age = Utc::now().signed_duration_since(DateTime::<Utc>::from_utc(position.created_at, Utc));
+                if token_ui_amount.parse::<f64>().unwrap_or(0.0) > 0.0 {
+                    tokens_balance_str.push_str(&format!(
+                    "<code>${symbol}/SOL</code>\n\
+                    (${pnl_usd:.2}) [{pnl_percent:.2}% ROI]\n\
+                    Size: {usd_entry:.2} [{}]\n\
+                    Date: {}
+                    ", format_number(token_ui_amount.parse::<f64>().unwrap_or(0.0)), format_age(position_age)
+                    ));
+                }
             }
         }
         Ok(format!(
@@ -1210,10 +1244,22 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
 /// # Returns
 /// 
 /// A InlineKeyboardMarkup struct
-pub async fn create_positions_keyboard(_user_tg_id: &str, _pool: &SafePool) -> Result<InlineKeyboardMarkup> {
+pub async fn create_positions_keyboard(user_tg_id: &str, pool: &SafePool) -> Result<InlineKeyboardMarkup> {
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
+    let user_settings = crate::db::get_user_settings(pool, user_tg_id).await?;
     buttons.push(
         vec![InlineKeyboardButton::callback("← Back","back"), InlineKeyboardButton::callback("🔄 Refresh", format!("refresh_positions"))]
+    );
+    buttons.push(
+        vec![InlineKeyboardButton::callback(
+            format!("{} Active", if user_settings.active_complete_positions == "active" { "✅" } else { "" }), 
+            "set_active_positions"
+            ),
+            InlineKeyboardButton::callback(
+                format!("{} Completed", if user_settings.active_complete_positions == "completed" { "✅" } else { "" }), 
+                "set_complete_positions"
+            )
+        ]
     );
     Ok(InlineKeyboardMarkup::new(buttons))
 }
