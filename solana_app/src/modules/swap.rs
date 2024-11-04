@@ -63,34 +63,34 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                     println!("@solana_app/modules/swap/sign_and_send_swap_transaction/ random_tip_account: {}", random_tip_account);
                     let jito_tip_account = Pubkey::from_str(&random_tip_account).expect("Failed to parse random tip account");
 
-                    let data = system_instruction::transfer(
-                        &pubkey,
-                        &jito_tip_account,
-                        jito_tip_amount,
-                    ).data;
+                    // let data = system_instruction::transfer(
+                    //     &pubkey,
+                    //     &jito_tip_account,
+                    //     jito_tip_amount,
+                    // ).data;
 
-                    // Ensure the jito_tip_account is writable
-                    tx.message.account_keys.push(jito_tip_account.clone());
-                    // Adjust the read-only unsigned accounts count
-                    if tx.message.header.num_readonly_unsigned_accounts > 0 {
-                        tx.message.header.num_readonly_unsigned_accounts -= 1;
-                    }
+                    // // Ensure the jito_tip_account is writable
+                    // tx.message.account_keys.push(jito_tip_account.clone());
+                    // // Adjust the read-only unsigned accounts count
+                    // if tx.message.header.num_readonly_unsigned_accounts > 0 {
+                    //     tx.message.header.num_readonly_unsigned_accounts -= 1;
+                    // }
 
-                    // create a compiled ix to jito tip transfer
-                    let compiled_ix = CompiledInstruction {
-                        program_id_index: tx.message.account_keys.iter().position(|key| key == &system_program::id()).unwrap() as u8,
-                        accounts: vec![
-                            tx.message.account_keys.iter().position(|key| key == &pubkey).unwrap() as u8,
-                            tx.message.account_keys.iter().position(|key| key == &jito_tip_account).unwrap() as u8,
-                        ],
-                        data
-                    };
-                    println!("@sign_and_send_swap_transaction/ Program ID index: {}", compiled_ix.program_id_index);
-                    println!("@sign_and_send_swap_transaction/ Account indices: {:?}", compiled_ix.accounts);
-                    println!("@sign_and_send_swap_transaction/ Transaction account keys: {:?}", tx.message.account_keys);
-                    println!("@sign_and_send_swap_transaction/ Instructions count: {}", tx.message.instructions.len());
+                    // // create a compiled ix to jito tip transfer
+                    // let compiled_ix = CompiledInstruction {
+                    //     program_id_index: tx.message.account_keys.iter().position(|key| key == &system_program::id()).unwrap() as u8,
+                    //     accounts: vec![
+                    //         tx.message.account_keys.iter().position(|key| key == &pubkey).unwrap() as u8,
+                    //         tx.message.account_keys.iter().position(|key| key == &jito_tip_account).unwrap() as u8,
+                    //     ],
+                    //     data
+                    // };
+                    // println!("@sign_and_send_swap_transaction/ Program ID index: {}", compiled_ix.program_id_index);
+                    // println!("@sign_and_send_swap_transaction/ Account indices: {:?}", compiled_ix.accounts);
+                    // println!("@sign_and_send_swap_transaction/ Transaction account keys: {:?}", tx.message.account_keys);
+                    // println!("@sign_and_send_swap_transaction/ Instructions count: {}", tx.message.instructions.len());
 
-                    tx.message.instructions.push(compiled_ix);
+                    // tx.message.instructions.push(compiled_ix);
 
                     // Sign transaction once
                     let key_info = KeyInfo {
@@ -101,33 +101,40 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                     match turnkey_client.sign_transaction(&mut tx, key_info).await {
                         Ok((signed_tx, _sig)) => {
                             let serialized_tx = engine.encode(bincode::serialize(&signed_tx).unwrap());
-                            let jito_params = json!({
-                                "tx": serialized_tx
-                            });
+                            // let jito_params = json!({
+                            //     "tx": serialized_tx
+                            // });
 
-                            // Send to both endpoints and return the signature
-                            let jito_future: tokio::task::JoinHandle<Result<(), TurnkeyError>> = tokio::spawn(async move {
-                                println!("@sign_and_send_swap_transaction/ sending to Jito");
-                                jito_sdk.send_txn(Some(jito_params), true).await.expect("Failed to send to Jito");
-                                Ok(())
-                            });
+                            // // Send to both endpoints and return the signature
+                            // let jito_future: tokio::task::JoinHandle<Result<(), TurnkeyError>> = tokio::spawn(async move {
+                            //     println!("@sign_and_send_swap_transaction/ sending to Jito");
+                            //     jito_sdk.send_txn(Some(jito_params), true).await.expect("Failed to send to Jito");
+                            //     Ok(())
+                            // });
                             let rpc_future: tokio::task::JoinHandle<Result<Signature, TurnkeyError>> = tokio::spawn(async move {
                                 println!("@sign_and_send_swap_transaction/ sending to RPC");
                                 let sig = rpc_client.send_and_confirm_transaction_with_spinner_and_commitment(&signed_tx, CommitmentConfig::confirmed()).expect("Failed to send to RPC");
                                 Ok(sig)
                             });
 
-                            match tokio::join!(jito_future, rpc_future) {
-                                (Ok(_), Ok(Ok(sig))) => return Ok(sig),
-                                (Err(e), _) => return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
-                                    format!("Jito submission failed: {:?}", e)
-                                ))),
-                                (_, Ok(Err(e))) => return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
-                                    format!("RPC submission failed: {:?}", e)
-                                ))),
-                                (_, Err(e)) => return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+                            // match tokio::join!(jito_future, rpc_future) {
+                            //     (Ok(_), Ok(Ok(sig))) => return Ok(sig),
+                            //     (Err(e), _) => return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+                            //         format!("Jito submission failed: {:?}", e)
+                            //     ))),
+                            //     (_, Ok(Err(e))) => return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+                            //         format!("RPC submission failed: {:?}", e)
+                            //     ))),
+                            //     (_, Err(e)) => return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+                            //         format!("RPC task failed: {:?}", e)
+                            //     )))
+                            // }
+                            match rpc_future.await {
+                                Ok(Ok(sig)) => return Ok(sig),
+                                Ok(Err(e)) => return Err(e),
+                                Err(e) => return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
                                     format!("RPC task failed: {:?}", e)
-                                )))
+                                 )))
                             }
                         },
                         Err(e) => return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
