@@ -3,7 +3,7 @@ use solana_program::system_program;
 use crate::modules::instruction::compile_instruction;
 use serde_json::json;
 use jito_sdk_rust::JitoJsonRpcSDK;
-use solana_sdk::{instruction::CompiledInstruction, system_instruction};
+use solana_sdk::{commitment_config::CommitmentConfig, instruction::CompiledInstruction, system_instruction};
 use crate::turnkey::errors::TurnkeyError;
 use {
     super::matis::SwapTransaction, crate::turnkey::{
@@ -102,9 +102,15 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
                             });
 
                             // Send to both endpoints and return the signature
-                            let jito_future = jito_sdk.send_txn(Some(jito_params), true);
-                            let rpc_future = tokio::spawn(async move {
-                                rpc_client.send_and_confirm_transaction(&signed_tx)
+                            let jito_future: tokio::task::JoinHandle<Result<(), TurnkeyError>> = tokio::spawn(async move {
+                                println!("@sign_and_send_swap_transaction/ sending to Jito");
+                                jito_sdk.send_txn(Some(jito_params), true).await.expect("Failed to send to Jito");
+                                Ok(())
+                            });
+                            let rpc_future: tokio::task::JoinHandle<Result<Signature, TurnkeyError>> = tokio::spawn(async move {
+                                println!("@sign_and_send_swap_transaction/ sending to RPC");
+                                let sig = rpc_client.send_and_confirm_transaction_with_spinner_and_commitment(&signed_tx, CommitmentConfig::confirmed()).expect("Failed to send to RPC");
+                                Ok(sig)
                             });
 
                             match tokio::join!(jito_future, rpc_future) {
