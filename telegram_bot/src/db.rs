@@ -1061,10 +1061,10 @@ pub async fn is_user_registered_in_mini_app(pool: &PgPool, user_tg_id: &str, use
 /// # Returns
 /// 
 /// A result indicating whether the user settings were set
-pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str, last_sent_token: &str, sell_percentage: &str, gas_lamports: i32, anti_mev: bool, take_profits: Vec<(f64, f64)>, stop_losses: Vec<(f64, f64)>, jito_tip_amount: i32) -> Result<()> {
+pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str, last_sent_token: &str, sell_percentage: &str, gas_lamports: i32, anti_mev: bool, take_profits: Vec<(f64, f64)>, stop_losses: Vec<(f64, f64)>, jito_tip_amount: i32, active_complete_positions: &str) -> Result<()> {
     let take_profits_json = serde_json::to_value(take_profits).unwrap();
     let stop_losses_json = serde_json::to_value(stop_losses).unwrap();
-    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit, last_sent_token, sell_percentage, gas_lamports, anti_mev, take_profits, stop_losses, jito_tip_amount) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (tg_id) DO UPDATE SET slippage_tolerance = $2, buy_amount = $3, swap_or_limit = $4, last_sent_token = $5, sell_percentage = $6, gas_lamports = $7, anti_mev = $8, take_profits = $9, stop_losses = $10, jito_tip_amount = $11")
+    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit, last_sent_token, sell_percentage, gas_lamports, anti_mev, take_profits, stop_losses, jito_tip_amount, active_complete_positions) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT (tg_id) DO UPDATE SET slippage_tolerance = $2, buy_amount = $3, swap_or_limit = $4, last_sent_token = $5, sell_percentage = $6, gas_lamports = $7, anti_mev = $8, take_profits = $9, stop_losses = $10, jito_tip_amount = $11, active_complete_positions = $12")
     .bind(tg_id)
     .bind(slippage_tolerance)
     .bind(buy_amount)
@@ -1076,6 +1076,7 @@ pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance
     .bind(take_profits_json)
     .bind(stop_losses_json)
     .bind(jito_tip_amount)
+    .bind(active_complete_positions)
     .execute(pool)
     .await?;
     Ok(())
@@ -1267,7 +1268,7 @@ pub async fn user_has_settings(pool: &PgPool, user_tg_id: &str) -> Result<bool> 
 /// 
 /// A result indicating whether the user settings were created
 pub async fn create_user_settings_default(pool: &PgPool, user_tg_id: &str) -> Result<()> {
-    upsert_user_settings(pool, user_tg_id, "0.18", "0.2", "swap", "", "100", 5000, false, vec![], vec![], 5000).await.expect("Failed to create user settings");
+    upsert_user_settings(pool, user_tg_id, "0.18", "0.2", "swap", "", "100", 5000, false, vec![], vec![], 5000, "active").await.expect("Failed to create user settings");
     Ok(())
 }
 
