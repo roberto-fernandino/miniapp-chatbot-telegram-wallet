@@ -103,6 +103,17 @@ pub struct Position {
     pub completed: bool, // Whether the position is completed
 }
 
+
+#[derive(Debug, Serialize)]
+pub struct Refferal {
+    pub id: i32,
+    pub user_tg_id: String,
+    pub uuid: String,
+    pub users_referred: i32,
+    pub referral_rebates: i32,
+    pub total_rewards: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct ResponsePaylod {
     pub calls: Vec<CallWithAth>,
@@ -2128,4 +2139,90 @@ pub async fn get_complete_positions(pool: &PgPool, user_tg_id: &str) -> Result<V
         });
     }
     Ok(positions_vec)
+}
+
+
+/// Get a refferal
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A Refferal struct representing the refferal
+pub async fn get_refferal(pool: &PgPool, user_tg_id: &str) -> Result<Refferal> {
+    let refferal = sqlx::query("SELECT * FROM refferals WHERE user_tg_id = $1")
+    .bind(user_tg_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(Refferal{
+        id: refferal.get("id"),
+        user_tg_id: refferal.get("user_tg_id"),
+        uuid: refferal.get("uuid"),
+        users_referred: refferal.get("users_referred"),
+        referral_rebates: refferal.get("referral_rebates"),
+        total_rewards: refferal.get("total_rewards")
+    })
+}
+
+/// Set the refferal users referred
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// * `users_referred` - The number of users referred
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the refferal users referred was set
+pub async fn set_refferal_users_referred(pool: &PgPool, user_tg_id: &str, users_referred: i32) -> Result<()> {
+    sqlx::query("UPDATE refferals SET users_referred = $1 WHERE user_tg_id = $2")
+    .bind(users_referred)
+    .bind(user_tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Set the refferal referral rebates
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// * `referral_rebates` - The referral rebates
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the refferal referral rebates was set
+pub async fn set_refferal_referral_rebates(pool: &PgPool, user_tg_id: &str, referral_rebates: i32) -> Result<()> {
+    sqlx::query("UPDATE refferals SET referral_rebates = $1 WHERE user_tg_id = $2")
+    .bind(referral_rebates)
+    .bind(user_tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Set the refferal total rewards
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// * `total_rewards` - The total rewards
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the refferal total rewards was set
+pub async fn set_refferal_total_rewards(pool: &PgPool, user_tg_id: &str, total_rewards: String) -> Result<()> {
+    sqlx::query("UPDATE refferals SET total_rewards = $1 WHERE user_tg_id = $2")
+    .bind(total_rewards)
+    .bind(user_tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
 }
