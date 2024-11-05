@@ -1310,7 +1310,10 @@ async fn handle_set_active_positions_callback(data: String, bot: &teloxide::Bot,
     db::set_user_settings_active_complete_positions(pool, &user_tg_id, "active".to_string()).await?;
     let message = create_positions_message(&user_tg_id, pool).await?;
     let keyboard = create_positions_keyboard(&user_tg_id, pool).await?;
-    bot.send_message(q.message.as_ref().unwrap().chat().id, message).reply_markup(keyboard).await?;
+    bot.send_message(q.message.as_ref().unwrap().chat().id, message)
+    .reply_markup(keyboard)
+    .parse_mode(teloxide::types::ParseMode::Html)
+    .await?;
     Ok(())
 }
 
@@ -1331,6 +1334,9 @@ async fn handle_set_complete_positions_callback(data: String, bot: &teloxide::Bo
     db::set_user_settings_active_complete_positions(pool, &user_tg_id, "completed".to_string()).await?;
     let message = create_positions_message(&user_tg_id, pool).await?;
     let keyboard = create_positions_keyboard(&user_tg_id, pool).await?;
-    bot.send_message(q.message.as_ref().unwrap().chat().id, message).reply_markup(keyboard).await?;
+    bot.send_message(q.message.as_ref().unwrap().chat().id, message)
+    .reply_markup(keyboard)
+    .parse_mode(teloxide::types::ParseMode::Html)
+    .await?;
     Ok(())
 }
