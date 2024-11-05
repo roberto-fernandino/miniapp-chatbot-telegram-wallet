@@ -2,8 +2,9 @@ import React, { useEffect, useState, useCallback } from "react";
 import { getScanner } from "../../lib/utils";
 import { formatNumber } from "../../lib/utils";
 import { Spinner } from "./spinner";
+import { SellPercentageModal } from "./sellPercentageModal";
 
-interface Position {
+export interface Position {
   id: string;
   tg_user_id: string;
   token_address: string;
@@ -33,7 +34,6 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(
     null
   );
-  const [sellPercentage, setSellPercentage] = useState(0);
 
   const handleOpenSellPercentageModal = async (position: Position) => {
     setSelectedPosition(position);
@@ -131,6 +131,11 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
 
   return (
     <div className="w-full">
+      <SellPercentageModal
+        isOpen={sellPercentageModalOpen}
+        onClose={() => setSellPercentageModalOpen(false)}
+        selectedPosition={selectedPosition}
+      />
       <h2 className="text-xl font-semibold mb-4">Your Positions</h2>
       {isLoading ? (
         <div className="flex justify-center">
@@ -140,54 +145,61 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
         <p className="text-gray-500 text-center">No active positions</p>
       ) : (
         <div className="space-y-3">
-          {positions.map((position) => (
-            <div
-              key={position.id}
-              className="bg-gray-50 rounded-lg p-4 shadow-sm"
-            >
-              <div className="flex flex-col justify-between items-center">
-                <div className="flex items-start ">
-                  <h3 className="font-medium">{position.symbol}/SOL</h3>
-                </div>
-                <div className="flex flex-row items-start">
-                  PNL:
-                  <span
-                    className={`font-medium ${
-                      position.pnlPercentage && position.pnlPercentage < 0.0
-                        ? "text-red-500"
-                        : "text-green-500"
-                    }`}
-                  >
-                    {position.pnlPercentage && position.pnlPercentage < 0.0
-                      ? "-" +
-                        (
-                          position.sol_entry * (position.pnlPercentage || 0)
-                        ).toFixed(6)
-                      : "+" +
-                        (
-                          position.sol_entry * (position.pnlPercentage || 0)
-                        ).toFixed(6)}
-                    SOL [{position.pnlPercentage?.toFixed(2)}% ROI]
-                  </span>
-                </div>
-                <div className="flex flex-row items-start">
-                  Size: {position.sol_entry} SOL at{" "}
-                  {formatNumber(position.mc_entry)}
-                </div>
-                <div className="text-sm text-gray-500">
-                  Date: {new Date(position.created_at).toLocaleString()}
-                </div>
-                <div>
-                  <button
-                    className="bg-red-500 text-white px-2 py-1 rounded-md"
-                    onClick={() => handleOpenSellPercentageModal(position)}
-                  >
-                    Sell
-                  </button>
+          {positions.map((position) => {
+            const currentPrice = position.currentPrice || 0;
+            const entryPrice = position.entry_price || 0;
+            const solEntry = position.sol_entry || 0;
+
+            // Calculate PNL in SOL
+            const pnlSol = (currentPrice - entryPrice) * solEntry;
+
+            // Calculate ROI percentage
+            const pnlPercentage =
+              entryPrice > 0
+                ? ((currentPrice - entryPrice) / entryPrice) * 100
+                : 0;
+
+            console.log(
+              `Position: ${position.symbol}, Current Price: ${currentPrice}, Entry Price: ${entryPrice}, SOL Entry: ${solEntry}, PNL: ${pnlSol}, ROI: ${pnlPercentage}`
+            );
+
+            return (
+              <div
+                key={position.id}
+                className="bg-gray-50 rounded-lg p-4 shadow-sm"
+              >
+                <div className="flex flex-col justify-between items-center">
+                  <div className="flex items-start ">
+                    <h3 className="font-medium">{position.symbol}/SOL</h3>
+                  </div>
+                  <div className="flex flex-row items-start">
+                    PNL:
+                    <span
+                      className={`font-medium ${
+                        pnlSol < 0 ? "text-red-500" : "text-green-500"
+                      }`}
+                    >
+                      {pnlSol.toFixed(6)} SOL [{pnlPercentage.toFixed(2)}% ROI]
+                    </span>
+                  </div>
+                  <div className="flex flex-row items-start">
+                    Size: {solEntry} SOL at {formatNumber(position.mc_entry)}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Date: {new Date(position.created_at).toLocaleString()}
+                  </div>
+                  <div>
+                    <button
+                      className="bg-red-500 text-white px-2 py-1 rounded-md"
+                      onClick={() => handleOpenSellPercentageModal(position)}
+                    >
+                      Sell
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
