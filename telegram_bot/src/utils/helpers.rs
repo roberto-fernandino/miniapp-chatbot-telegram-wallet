@@ -1313,7 +1313,7 @@ pub async fn get_token_amount(solana_wallet_address: &str, token_address: &str) 
 /// An InlineKeyboardMarkup object
 pub fn create_settings_keyboard(user_settings: UserSettings) -> InlineKeyboardMarkup {
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
-    buttons.push(vec![InlineKeyboardButton::callback(format!("Slippage: {}%", user_settings.slippage_tolerance), "set_custom_slippage"), InlineKeyboardButton::callback(format!("Gas Fee: {} SOL", lamports_to_sol(user_settings.gas_lamports)), "set_custom_gas")]);
+    buttons.push(vec![InlineKeyboardButton::callback(format!("Slippage: {}%", (user_settings.slippage_tolerance.parse::<f64>().unwrap_or(0.0) * 100.0)), "set_custom_slippage"), InlineKeyboardButton::callback(format!("Gas Fee: {} SOL", lamports_to_sol(user_settings.gas_lamports)), "set_custom_gas")]);
     buttons.push(vec![InlineKeyboardButton::callback(format!("Bribe gas: {} SOL", lamports_to_sol(user_settings.jito_tip_amount)), "set_jito_tip_amount")]);
     if user_settings.anti_mev {
         buttons.push(vec![InlineKeyboardButton::callback("✅ Anti-MEV", "toggle_anti_mev")]);
@@ -1484,4 +1484,29 @@ pub async fn get_token_amount_in_wallet(solana_wallet_address: &str, token_addre
         .as_str()
         .unwrap_or("0");
     Ok((token_amount, ui_amount.to_string()))
+}
+
+/// Create the settings message
+/// 
+/// # Arguments
+/// 
+/// * `user_settings` - The user settings
+/// 
+/// # Returns
+/// 
+/// A String representing the settings message
+pub async fn create_settings_message(user_settings: UserSettings, pool: &SafePool) -> Result<String> {
+    let user = get_user(pool, &user_settings.tg_id).await?;
+    Ok(
+        format!(
+        "<b>Settings:</b>\n\
+        <code>{}</code>\n\n\
+        GAS Fee and MEV Tip will affect transaction speed. MEV Tip will only be used when Anti-MEV is turned on. Please set GAS Fee and MEV Tip reasonably.\n\n\
+        RAY Slippage:\n\
+        When you initiate a trade, your purchase amount is fixed, and the number of tokens you receive will decrease if the price rises. (If you set the slippage to 50%, then you will get 50% of the tokens, your cost will be 1/50%=2, and you will buy the token at a maximum of 2 times the price.)\n\n\
+        PUMP Slippage:\n\
+        When you initiate a trade, the number of tokens you receive is fixed, and the amount of SOL you spend will increase if the price rises. (If your slippage is set to 60%, the maximum sol you will spend is 1/(1-60%) = 2.5x SOL)
+        ", user.solana_address.expect("Solana address not found").as_str()
+        )
+    )
 }
