@@ -3,6 +3,7 @@ use solana_sdk::signature::Signature;
 use tokio::time::{sleep, Duration};
 use anyhow::anyhow;
 use serde_json::json;
+use bs58;
 use jito_sdk_rust::JitoJsonRpcSDK;
 use anyhow::Result;
 use solana_sdk::system_instruction;
@@ -89,7 +90,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
     let mut transaction = Transaction::new_with_payer(&[jito_tip_ix], Some(&pubkey));
     let (jito_serialized_tx, jito_sig) = match turnkey_client.sign_transaction(&mut transaction, key_info.clone()).await {
         Ok((signed_tx, sig)) => {
-            (engine.encode(bincode::serialize(&signed_tx).unwrap()), sig)
+            (bs58::encode(bincode::serialize(&signed_tx).unwrap()).into_string(), sig)
         }
         Err(e) => {
             return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
@@ -103,7 +104,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
             match turnkey_client.sign_transaction(&mut tx, key_info).await {
                 Ok((signed_tx, sig)) => {
                     rpc_client.send_transaction(&signed_tx).expect("Failed to send transaction to RPC.");
-                    Ok::<(String, Signature), TurnkeyError>((engine.encode(bincode::serialize(&signed_tx).unwrap()), sig))
+                    Ok::<(String, Signature), TurnkeyError>((bs58::encode(bincode::serialize(&signed_tx).unwrap()).into_string(), sig))
                 }
                 Err(e) => {
                     return Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
