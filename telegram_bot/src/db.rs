@@ -1983,6 +1983,8 @@ pub async fn get_positions_by_user_tg_id(pool: &PgPool, user_tg_id: &str) -> Res
 /// 
 /// A result indicating whether the user jito tip amount was set
 pub async fn set_user_jito_tip_amount(pool: &PgPool, user_tg_id: &str, jito_tip_amount: f64) -> Result<()> {
+    println!("@set_user_jito_tip_amount/ jito_tip_amount: {:?}", jito_tip_amount);
+    println!("@set_user_jito_tip_amount/ user_tg_id: {:?}", user_tg_id);
     sqlx::query("UPDATE user_settings SET jito_tip_amount = $1 WHERE tg_id = $2")
     .bind(jito_tip_amount)
     .bind(user_tg_id)
