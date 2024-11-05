@@ -97,7 +97,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
             )))
         }
     };
-    let (swap_tx, swap_sig) = match bincode::deserialize::<Transaction>(&transaction_data) {
+    let (serialized_swap_tx, swap_sig) = match bincode::deserialize::<Transaction>(&transaction_data) {
         Ok(mut tx) => {
             // Sign transaction once
             match turnkey_client.sign_transaction(&mut tx, key_info).await {
@@ -117,8 +117,8 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
         )))
     }?;
     let bundle = json!([
-        jito_sig,
-        swap_sig
+        jito_serialized_tx,
+        serialized_swap_tx
     ]);
     let uuid = None;
     let response = jito_sdk.send_bundle(Some(bundle), uuid).await.expect("Failed to send bundle");
