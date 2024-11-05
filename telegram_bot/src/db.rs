@@ -2152,19 +2152,19 @@ pub async fn get_complete_positions(pool: &PgPool, user_tg_id: &str) -> Result<V
 /// # Returns
 /// 
 /// A Refferal struct representing the refferal
-pub async fn get_refferal(pool: &PgPool, user_tg_id: &str) -> Result<Refferal> {
+pub async fn get_refferal(pool: &PgPool, user_tg_id: &str) -> Result<Option<Refferal>> {
     let refferal = sqlx::query("SELECT * FROM refferals WHERE user_tg_id = $1")
     .bind(user_tg_id)
     .fetch_one(pool)
     .await?;
-    Ok(Refferal{
+    Ok(Some(Refferal{
         id: refferal.get("id"),
         user_tg_id: refferal.get("user_tg_id"),
         uuid: refferal.get("uuid"),
         users_referred: refferal.get("users_referred"),
         referral_rebates: refferal.get("referral_rebates"),
         total_rewards: refferal.get("total_rewards")
-    })
+    }))
 }
 
 /// Set the refferal users referred
@@ -2225,4 +2225,38 @@ pub async fn set_refferal_total_rewards(pool: &PgPool, user_tg_id: &str, total_r
     .execute(pool)
     .await?;
     Ok(())
+}
+
+/// Create a refferal
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the refferal was created
+pub async fn create_refferal(pool: &PgPool, user_tg_id: &str) -> Result<()> {
+    sqlx::query("INSERT INTO refferals (user_tg_id, uuid) VALUES ($1, $2)")
+    .bind(user_tg_id)
+    .bind(uuid::Uuid::new_v4().to_string())
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Check if a user has a refferal
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A boolean indicating whether the user has a refferal
+pub async fn check_user_has_refferal(pool: &PgPool, user_tg_id: &str) -> Result<bool> {
+    let refferal = get_refferal(pool, user_tg_id).await?;
+    Ok(refferal.is_some())
 }

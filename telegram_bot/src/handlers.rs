@@ -621,12 +621,15 @@ pub async fn post_add_user_handler(
                 return (StatusCode::INTERNAL_SERVER_ERROR, "Could not get user id").into_response();
             }
         };
-        match update_user(&pool, User { id: user_id, username: user.username, tg_id: user.tg_id, turnkey_info: user.turnkey_info, solana_address: Some(user.solana_address), eth_address: Some(user.eth_address) }).await {
+        match update_user(&pool, User { id: user_id, username: user.username, tg_id: user.tg_id.clone(), turnkey_info: user.turnkey_info, solana_address: Some(user.solana_address), eth_address: Some(user.eth_address) }).await {
             Ok(_) => println!("@add_user/ user updated in the db."),
             Err(e) => {
                 println!("@add_user/ error updating user in the db: {:?}", e);
                 return (StatusCode::INTERNAL_SERVER_ERROR, "Could not update user in the db").into_response();
             }
+        }
+        if !check_user_has_refferal(&pool, &user.tg_id).await.expect("Could not check if user has refferal") {
+            create_refferal(&pool, &user.tg_id).await.expect("Could not create refferal");
         }
     } else {
         match add_user_post(&pool, user.clone()).await {
@@ -1334,6 +1337,30 @@ async fn handle_set_complete_positions_callback(data: String, bot: &teloxide::Bo
     db::set_user_settings_active_complete_positions(pool, &user_tg_id, "completed".to_string()).await?;
     let message = create_positions_message(&user_tg_id, pool).await?;
     let keyboard = create_positions_keyboard(&user_tg_id, pool).await?;
+    bot.send_message(q.message.as_ref().unwrap().chat().id, message)
+    .reply_markup(keyboard)
+    .parse_mode(teloxide::types::ParseMode::Html)
+    .await?;
+    Ok(())
+}
+
+
+/// Handle refferal callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn refferal_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let user = get_user(&pool, &q.from.id.to_string()).await?;
+    let message = create_refferal_message(&user.tg_id, pool).await?;
+    let keyboard = create_refferal_keyboard();
     bot.send_message(q.message.as_ref().unwrap().chat().id, message)
     .reply_markup(keyboard)
     .parse_mode(teloxide::types::ParseMode::Html)

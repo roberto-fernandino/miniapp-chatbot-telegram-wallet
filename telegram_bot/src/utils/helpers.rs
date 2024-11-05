@@ -1527,6 +1527,17 @@ pub fn create_refferal_keyboard() -> InlineKeyboardMarkup {
 
 
 pub async fn create_refferal_message(tg_id: &str, pool: &SafePool) -> Result<String> {
-    let user = get_user(pool, tg_id).await?;
-    Ok(format!(""))
+    let refferal = get_refferal(pool, tg_id).await?;
+    if let Some(refferal) = refferal {
+        Ok(format!("
+        Referral and Rewards:\n\
+        💰 The more users you invite, the more referral rebates you will get.\n\
+        Your referrals (updated every 15 minutes)\n\
+        • Users referred: {}\n\
+        • Referral rebates: {}%\n\
+    • Total rewards: {} SOL (${})\n\
+        • Referral link: <code>https://t.me/sj_copyTradebot?start=r-{}</code> (tap to copy)", refferal.users_referred, refferal.referral_rebates, refferal.total_rewards, refferal.total_rewards, refferal.uuid))
+    } else {
+        Ok("You don't have a referral link yet. Launch the mini app to get one.".to_string())
+    }
 }
