@@ -544,7 +544,7 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to set complete positions: {:?}", e),
             }
         }
-        else if data.starts_with("refferals") {
+        else if data.starts_with("referrals") {
             match handle_refferal_callback(data.to_string(), &bot, &query, &pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to handle refferals callback: {:?}", e),

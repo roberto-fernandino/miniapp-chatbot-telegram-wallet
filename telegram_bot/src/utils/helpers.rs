@@ -1526,6 +1526,16 @@ pub fn create_refferal_keyboard() -> InlineKeyboardMarkup {
 }
 
 
+/// Create the refferal message
+/// 
+/// # Arguments
+/// 
+/// * `tg_id` - The Telegram ID
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A String representing the refferal message
 pub async fn create_refferal_message(tg_id: &str, pool: &SafePool) -> Result<String> {
     let refferal = get_refferal(pool, tg_id).await?;
     if let Some(refferal) = refferal {
