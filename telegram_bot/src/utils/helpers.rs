@@ -1535,7 +1535,7 @@ pub async fn create_refferal_message(tg_id: &str, pool: &SafePool) -> Result<Str
         Your referrals (updated every 15 minutes)\n\
         • Users referred: {}\n\
         • Referral rebates: {}%\n\
-    • Total rewards: {} SOL (${})\n\
+        • Total rewards: {} SOL (${})\n\
         • Referral link: <code>https://t.me/sj_copyTradebot?start=r-{}</code> (tap to copy)", refferal.users_referred, refferal.referral_rebates, refferal.total_rewards, refferal.total_rewards, refferal.uuid))
     } else {
         Ok("You don't have a referral link yet. Launch the mini app to get one.".to_string())
