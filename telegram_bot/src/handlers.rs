@@ -1300,6 +1300,9 @@ async fn handle_sell_choose_token_callback(data: String, bot: &teloxide::Bot, q:
 async fn handle_set_active_positions_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     let user_tg_id = q.from.id.to_string();
     db::set_user_settings_active_complete_positions(pool, &user_tg_id, "active".to_string()).await?;
+    let message = create_positions_message(&user_tg_id, pool).await?;
+    let keyboard = create_positions_keyboard(&user_tg_id, pool).await?;
+    bot.send_message(q.message.as_ref().unwrap().chat().id, message).reply_markup(keyboard).await?;
     Ok(())
 }
 
