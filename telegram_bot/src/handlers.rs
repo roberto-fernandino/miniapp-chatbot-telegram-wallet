@@ -225,8 +225,10 @@ pub async fn handle_message(
                 slippage_tolerance = slippage_tolerance / 100.0;
                 set_user_slippage_tolerance(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), slippage_tolerance.to_string().as_str()).await.unwrap();
                 bot.send_message(msg.chat.id, format!("Slippage tolerance set to: {}%", slippage_tolerance * 100.0)).await?;
-                let last_token = get_user_last_sent_token(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await.unwrap();
-                token_address_buy_info_handler(&last_token, &bot, &msg, &pool).await?;
+                let user_settings = get_user_settings(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await?;
+                let keyboard = create_settings_keyboard(user_settings.clone());
+                let message = create_settings_message(user_settings, &pool).await?;
+                bot.send_message(msg.chat.id, message).reply_markup(keyboard).await?;
             }
             else if reply_to_message.text().unwrap_or_default().starts_with("Enter the Jito tip amount") {
                 if let Ok(jito_tip_amount) = text.parse::<f64>() {
@@ -260,6 +262,10 @@ pub async fn handle_message(
                 };
                 set_user_gas_lamports(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), gas_lamports).await?;
                 bot.send_message(msg.chat.id, format!("Gas fee set to: {} SOL", utils::helpers::lamports_to_sol(gas_lamports))).await?;
+                let user_settings = get_user_settings(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await?;
+                let keyboard = create_settings_keyboard(user_settings.clone());
+                let message = create_settings_message(user_settings, &pool).await?;
+                bot.send_message(msg.chat.id, message).reply_markup(keyboard).await?;
             }
             else if reply_to_message.text().unwrap_or_default().starts_with("Send '<multiplier>,<%_token_position_amount_to_sell>' (eg: '1.5,100' that means if the price goes up 1.5x, sell 100% of the position)") {
                 println!("@handle_message/ text: {:?}", text);
