@@ -161,7 +161,8 @@ async fn positions_watcher(pool: SafePool, bot: &Bot) {
             for position in &raydium_positions {
                 count += 1;
                 if let Some(current_price) = current_prices.get(&position.token_address) {
-                    let current_price_float = current_price.parse::<f64>().unwrap_or_default();
+                    let current_price_str = current_price.trim_matches('"');
+                    let current_price_float = current_price_str.parse::<f64>().unwrap_or_default();
                     let percentage_change = ((current_price_float - position.entry_price) / position.entry_price) * 100.0;
                     println!("@bot/main/positions_watcher/\n\nPosition:{}\n\nposition: {:?}\ncurrent_price: {:?}\nentry_price: {:?}\ntake_profit: {:?}\nstop_loss: {:?}\npercentage_change: {:.2}% \n\n\n\n", count, position, current_price_float, position.entry_price, position.take_profits, position.stop_losses, percentage_change);
                     if position.take_profits.len() > 0 {
