@@ -49,8 +49,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const BASE_URL_API = "https://srv617785.hstgr.cloud/api";
-const BOT_API_URL = "https://srv617785.hstgr.cloud/bot_api";
+export const BASE_URL_API = "https://srv617785.hstgr.cloud/api";
+export const BOT_API_URL = "https://srv617785.hstgr.cloud/bot_api";
 
 export interface CopyTradeWalletData {
   user_id: string;
