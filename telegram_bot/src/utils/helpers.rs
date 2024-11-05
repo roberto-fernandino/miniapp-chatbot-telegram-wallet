@@ -1512,3 +1512,21 @@ pub async fn create_settings_message(user_settings: UserSettings, pool: &SafePoo
         )
     )
 }
+
+
+/// Create the refferal keyboard
+/// 
+/// # Returns
+/// 
+/// An InlineKeyboardMarkup object
+pub fn create_refferal_keyboard() -> InlineKeyboardMarkup {
+    let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
+    buttons.push(vec![InlineKeyboardButton::callback("← Back", "back")]);
+    InlineKeyboardMarkup::new(buttons)
+}
+
+
+pub async fn create_refferal_message(tg_id: &str, pool: &SafePool) -> Result<String> {
+    let user = get_user(pool, tg_id).await?;
+    Ok(format!(""))
+}
