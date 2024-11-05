@@ -71,6 +71,8 @@ pub struct PumpPayload {
     keys: Vec<String>,
 }
 
+/// Watch open positions
+/// 
 async fn positions_watcher(pool: SafePool, bot: &Bot) {
     let url = "wss://pumpportal.fun/api/data";
     let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to pumpportal");
@@ -92,7 +94,7 @@ async fn positions_watcher(pool: SafePool, bot: &Bot) {
 
     loop {
         // Fetch all positions from database
-        let all_positions = match db::get_all_positions(&pool).await {
+        let all_positions = match db::get_all_open_positions(&pool).await {
             Ok(positions) => positions,
             Err(e) => {
                 eprintln!("Error fetching positions: {:?}", e);
