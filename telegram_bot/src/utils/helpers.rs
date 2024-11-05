@@ -1180,6 +1180,7 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
         let mut tokens_balance_str = String::new();
         if user_settings.active_complete_positions == "active" {    
             let positions =  get_active_positions(pool, user_tg_id).await?;
+            println!("@create_positions_message/ positions: {:?}", positions);
             for position in positions {
                 let mint = position.token_address;
                 let scanner_response = get_scanner_search(&mint).await?;
@@ -1224,7 +1225,7 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
             }
         }
         Ok(format!(
-            "<b>Manage tokens:</b>\n\
+            "<b>Positions:</b>\n\
             SOL Balance: <b> {:.6} SOL (${:.2})</b>\n\
             {tokens_balance_str}
             ", sol_balance, sol_balance_usd))
