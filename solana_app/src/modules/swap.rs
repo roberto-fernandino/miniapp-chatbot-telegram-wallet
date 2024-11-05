@@ -85,9 +85,13 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
         private_key_id: public_key.to_string(),
         public_key: pubkey
     };
+    // initialize Jito SDK
     let jito_sdk = JitoJsonRpcSDK::new(env::var("JITO_BLOCK_ENGINE_URL").expect("JITO_BLOCK_ENGINE_URL must be set").as_str(), None);
+    // create jito tip instruction
     let jito_tip_ix = system_instruction::transfer(&pubkey, &Pubkey::from_str(&jito_sdk.get_random_tip_account().await.unwrap()).unwrap(), jito_tip_amount);
+    // create jito transaction
     let mut transaction = Transaction::new_with_payer(&[jito_tip_ix], Some(&pubkey));
+    // sign jito transaction
     let (jito_serialized_tx, jito_sig) = match turnkey_client.sign_transaction(&mut transaction, key_info.clone()).await {
         Ok((signed_tx, sig)) => {
             (bs58::encode(bincode::serialize(&signed_tx).unwrap()).into_string(), sig)
