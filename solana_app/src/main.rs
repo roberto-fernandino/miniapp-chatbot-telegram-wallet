@@ -83,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let app = Router::new()
         .route("/resubscribe", get(resubscribe))
         .route("/get_wallet_sol_balance/:address", get(get_wallet_sol_balance))
-        .route("/get_positions/:address", get(get_positions))
+        .route("/get_positions/:address", get(tokens_balance))
         .route("/sol/swap", post(sol_swap))
         .with_state(state);
 
@@ -341,7 +341,7 @@ pub async fn sol_swap(
 /// # Returns
 /// 
 /// A `Result` containing a `Response` or a `tide::Error`
-pub async fn get_positions(
+pub async fn tokens_balance(
     AxumState(state): AxumState<State>,
     Path(address): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
