@@ -1396,6 +1396,9 @@ async fn handle_set_complete_positions_callback(data: String, bot: &teloxide::Bo
 /// 
 /// A result indicating the success of the operation
 async fn handle_refferal_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    if !check_user_has_refferal(&pool, &q.from.id.to_string()).await? {
+        create_refferal(pool, &q.from.id.to_string()).await?;
+    }
     let user = get_user(&pool, &q.from.id.to_string()).await?;
     let message = create_refferal_message(&user.tg_id, pool).await?;
     let keyboard = create_refferal_keyboard();

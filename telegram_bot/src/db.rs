@@ -2157,6 +2157,7 @@ pub async fn get_refferal(pool: &PgPool, user_tg_id: &str) -> Result<Option<Reff
     .bind(user_tg_id)
     .fetch_one(pool)
     .await?;
+
     Ok(Some(Refferal{
         id: refferal.get("id"),
         user_tg_id: refferal.get("user_tg_id"),
