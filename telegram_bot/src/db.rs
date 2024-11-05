@@ -17,6 +17,7 @@ pub struct UserSettings {
     pub slippage_tolerance: String,
     pub buy_amount: String,
     pub swap_or_limit: String,
+    pub tg_id: String,
     pub sell_percentage: String,
     pub gas_lamports: i32,
     pub anti_mev: bool,
@@ -1107,6 +1108,7 @@ pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSe
         _ => vec![],
     };
     Ok(UserSettings {
+        tg_id: user_tg_id.to_string(),
         slippage_tolerance: user_settings.get("slippage_tolerance"),
         buy_amount: user_settings.get("buy_amount"),
         swap_or_limit: user_settings.get("swap_or_limit"),
