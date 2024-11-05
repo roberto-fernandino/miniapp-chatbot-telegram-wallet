@@ -650,6 +650,38 @@ pub async fn post_add_user_handler(
     (StatusCode::OK, "User added/updated in the db.").into_response()
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct SellPositionPayload {
+    pub token_address: String,
+    pub user_tg_id: String,
+    pub sell_percentage: f64,
+}
+
+/// Handle sell position callback
+/// 
+/// # Description
+/// 
+/// Sell a % of a position
+/// 
+/// # Arguments
+/// 
+/// * `payload` - The payload
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+pub async fn sell_position_handler(
+    State(pool): State<Arc<Pool<Postgres>>>,
+    Json(payload): Json<SellPositionPayload>,
+) -> impl IntoResponse {
+    println!("@sell_position_handler/ payload: {:?}", payload);
+
+    execute_swap_no_chat(&pool, &payload.token_address, "So11111111111111111111111111111111111111112", payload.user_tg_id, payload.sell_percentage).await.expect("Could not execute swap");
+
+    (StatusCode::OK, "sold").into_response()
+}   
+
 /// Get positions handler
 /// 
 /// # Arguments

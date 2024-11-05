@@ -1,4 +1,5 @@
 use anyhow::Result;
+use crate::handlers::sell_position_handler;
 use reqwest::Response;
 use crate::db::{get_user_by_tg_id, get_user_settings_take_profits};
 use crate::handlers::{TurnkeyUser, SwapSolRequest, get_positions_handler};
@@ -115,6 +116,10 @@ pub async fn run_axum_server(pool: SafePool) {
        .route(
         "/get_positions/:user_tg_id",
         axum::routing::get(get_positions_handler),
+       )
+       .route(
+        "/sell/position",
+        axum::routing::post(sell_position_handler),
        )
        .with_state(pool);
    
@@ -785,6 +790,121 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
     Ok(response)
 }
 
+/// Execute a swap without chat interaction
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The database pool
+/// * `input_token` - The input token
+/// * `output_token` - The output token
+/// * `user_tg_id` - The user Telegram ID
+/// 
+/// # Returns
+/// 
+/// A Response
+pub async fn execute_swap_no_chat(pool: &SafePool, input_token: &str, output_token: &str, user_tg_id: String, sell_percentage: f64) -> Result<Response> {
+    println!("@execute_swap_no_chat: Starting execution");
+    println!("@execute_swap_no_chat: User Telegram ID: {}", user_tg_id);
+    println!("@execute_swap_no_chat: Input token: {}", input_token);
+    println!("@execute_swap_no_chat: Output token: {}", output_token);
+
+    let user_settings = match db::get_or_create_user_settings(pool, &user_tg_id).await {
+        Ok(settings) => {
+            println!("@execute_swap_no_chat: User settings retrieved successfully");
+            settings
+        },
+        Err(e) => {
+            println!("@execute_swap_no_chat: Error getting or creating user settings: {:?}", e);
+            return Err(anyhow::anyhow!("Failed to get or create user settings: {}", e));
+        }
+    };
+
+    let user = match db::get_user(&pool, &user_tg_id).await {
+        Ok(u) => {
+            println!("@execute_swap_no_chat: User retrieved successfully");
+            u
+        },
+        Err(e) => {
+            println!("@execute_swap_no_chat: Error getting user: {:?}", e);
+            return Err(anyhow::anyhow!("Failed to get user: {}", e));
+        }
+    };
+
+    let input_token_amount: f64;
+    if input_token == "So11111111111111111111111111111111111111112" {
+        input_token_amount = user_settings.buy_amount.parse::<f64>().unwrap_or(0.2);
+    } else {
+        match get_token_amount(&user.solana_address.clone().unwrap_or("".to_string()), input_token).await {
+            Ok(amount) => {
+                println!("@execute_swap_no_chat/ token_amount: {:?}", amount);
+                input_token_amount = amount * sell_percentage / 100.0;
+                if sell_percentage == 100.0 {
+                    db::delete_position(&pool, &input_token, &user.tg_id).await?;
+                }
+            },
+            Err(e) => {
+                println!("@execute_swap_no_chat: Error getting token amount: {:?}", e);
+                return Err(anyhow::anyhow!("Failed to get token amount: {}", e));
+            }
+        }
+    }
+    let slippage = user_settings.slippage_tolerance.parse::<f64>().unwrap_or(0.5);
+    println!("@execute_swap_no_chat: input_token_amount: {:?}, slippage: {:?}", input_token_amount, slippage);
+
+    let solana_address = user.solana_address.clone();
+    println!("@execute_swap_no_chat: solana_address: {:?}", solana_address);
+    
+    let turnkey_user = TurnkeyUser {
+        api_public_key: user.turnkey_info.api_public_key.clone().expect("API public key not found"),
+        api_private_key: user.turnkey_info.api_private_key.clone().expect("API private key not found"),
+        organization_id: user.turnkey_info.suborg_id.clone().expect("Suborg ID not found"),
+        public_key: solana_address.clone().expect("Solana address not found").to_string(),
+    };
+    println!("@execute_swap_no_chat: turnkey_user created successfully");
+    println!("@execute_swap_no_chat: Preparing request");
+
+    let request: SwapSolRequest = if input_token == "So11111111111111111111111111111111111111112" {
+        SwapSolRequest {
+            user: turnkey_user,
+            user_public_key: user.solana_address.clone().expect("Solana address not found").to_string(),
+            priorization_fee_lamports: user_settings.gas_lamports as u64,
+            jito_tip_amount: user_settings.jito_tip_amount as u64,
+            output_mint: output_token.to_string(),
+            input_mint: input_token.to_string(),
+            amount: sol_to_lamports_u64(input_token_amount),
+            slippage: slippage * 100.0,
+        }
+    } else {
+        SwapSolRequest {
+            user: turnkey_user,
+            user_public_key: user.solana_address.clone().expect("Solana address not found").to_string(),
+            priorization_fee_lamports: user_settings.gas_lamports as u64,
+            jito_tip_amount: user_settings.jito_tip_amount as u64,
+            output_mint: output_token.to_string(),
+            input_mint: input_token.to_string(),
+            amount: input_token_amount as u64,
+            slippage,
+        }
+    };
+
+    let client = reqwest::Client::new();
+    let url = "http://solana_app:3030/sol/swap";
+    println!("@execute_swap_no_chat: Sending request to url: {:?}", url);
+
+    let response = match client.post(url).json(&request).send().await {
+        Ok(res) => {
+            println!("@execute_swap_no_chat: Response received successfully");
+            res 
+        },
+        Err(e) => {
+            println!("@execute_swap_no_chat: Error sending request: {:?}", e);
+            return Err(anyhow::anyhow!("Failed to send request: {}", e));
+        }
+    };
+    println!("@execute_swap_no_chat: input_token: {:?}", input_token);
+
+    Ok(response)
+}
 
 /// Execute a swap take profit
 /// 
