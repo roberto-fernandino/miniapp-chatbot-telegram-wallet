@@ -184,7 +184,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
          }
      }
 
-    Ok("sent".to_string())
+    Ok(swap_sig.to_string())
 }
 
 
