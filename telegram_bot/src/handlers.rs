@@ -233,6 +233,8 @@ pub async fn handle_message(
             else if reply_to_message.text().unwrap_or_default().starts_with("Enter the Jito tip amount") {
                 if let Ok(jito_tip_amount) = text.parse::<f64>() {
                     let lamports_amount_jito_tip = utils::helpers::sol_to_lamports_i32(jito_tip_amount);
+                    println!("@handle_message/ lamports_amount_jito_tip: {:?}", lamports_amount_jito_tip);
+                    println!("@handle_message/ jito_tip_amount: {:?}", jito_tip_amount);
                     set_user_jito_tip_amount(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), jito_tip_amount).await.unwrap();
                     bot.send_message(msg.chat.id, format!("Jito tip amount set to: {} SOL", utils::helpers::lamports_to_sol(lamports_amount_jito_tip))).await?;
                     let user_settings = get_user_settings(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await?;

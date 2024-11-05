@@ -1451,6 +1451,7 @@ pub async fn check_tokens_prices(token_addresses: Vec<String>) -> Result<HashMap
     let mut prices = HashMap::new();
     for token in token_addresses {
         let scanner_response = get_scanner_search(&token).await?;
+        println!("@bot/helpers/check_tokens_prices/ scanner_response: {:?}", scanner_response);
         let price = scanner_response["pair"]["pairPrice1Usd"].to_string();
         prices.insert(token, price);
     }
