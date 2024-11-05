@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS refferals (
     uuid VARCHAR(255) NOT NULL UNIQUE,
     users_referred INTEGER DEFAULT 0,
     referral_rebates INTEGER DEFAULT 0,
-    total_rewards NUMERIC DEFAULT 0,
+    total_rewards VARCHAR(255) DEFAULT '0',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
