@@ -544,6 +544,12 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to set complete positions: {:?}", e),
             }
         }
+        else if data.starts_with("refferals") {
+            match handle_refferal_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to handle refferals callback: {:?}", e),
+            }
+        }
         else {
             log::info!("Unrecognized callback query data: {}", data);
         }
@@ -1389,7 +1395,7 @@ async fn handle_set_complete_positions_callback(data: String, bot: &teloxide::Bo
 /// # Returns
 /// 
 /// A result indicating the success of the operation
-async fn refferal_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+async fn handle_refferal_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     let user = get_user(&pool, &q.from.id.to_string()).await?;
     let message = create_refferal_message(&user.tg_id, pool).await?;
     let keyboard = create_refferal_keyboard();
