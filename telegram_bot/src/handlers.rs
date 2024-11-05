@@ -228,7 +228,10 @@ pub async fn handle_message(
                 let user_settings = get_user_settings(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await?;
                 let keyboard = create_settings_keyboard(user_settings.clone());
                 let message = create_settings_message(user_settings, &pool).await?;
-                bot.send_message(msg.chat.id, message).reply_markup(keyboard).await?;
+                bot.send_message(msg.chat.id, message)
+                .reply_markup(keyboard)
+                .parse_mode(teloxide::types::ParseMode::Html)
+                .await?;
             }
             else if reply_to_message.text().unwrap_or_default().starts_with("Enter the Jito tip amount") {
                 if let Ok(jito_tip_amount) = text.parse::<f64>() {
@@ -240,7 +243,10 @@ pub async fn handle_message(
                     let user_settings = get_user_settings(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await?;
                     let keyboard = create_settings_keyboard(user_settings.clone());
                     let message = create_settings_message(user_settings, &pool).await?;
-                    bot.send_message(msg.chat.id, message).reply_markup(keyboard).await?;
+                    bot.send_message(msg.chat.id, message)
+                    .reply_markup(keyboard)
+                    .parse_mode(teloxide::types::ParseMode::Html)
+                    .await?;
                 } else {
                     bot.send_message(msg.chat.id, "Invalid jito tip amount").await?;
                 }
