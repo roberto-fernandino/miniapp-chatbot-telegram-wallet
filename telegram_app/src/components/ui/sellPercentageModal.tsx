@@ -1,18 +1,31 @@
 import React, { useState } from "react";
 import Slider from "rc-slider";
 import "rc-slider/assets/index.css";
+import { Position } from "./positions";
+import axios from "axios";
+import { BOT_API_URL } from "../../lib/utils";
 
-const SellPercentageModal: React.FC<{
+export const SellPercentageModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onSell: (percentage: number) => void;
-}> = ({ isOpen, onClose, onSell }) => {
+  selectedPosition: Position | null;
+}> = ({ isOpen, onClose, selectedPosition }) => {
   const [selectedPercentage, setSelectedPercentage] = useState(0);
 
   const handleButtonClick = (percentage: number) => {
     setSelectedPercentage(percentage);
   };
 
+  const sell = async (position: Position | null, percentage: number) => {
+    if (position) {
+      axios.post(`${BOT_API_URL}/sell/position`, {
+        token_address: position.token_address,
+        user_tg_id: position.tg_user_id,
+        sell_percentage: percentage,
+      });
+      onClose();
+    }
+  };
   const handleSliderChange = (value: number | number[]) => {
     if (Array.isArray(value)) {
       setSelectedPercentage(value[0]);
@@ -70,7 +83,7 @@ const SellPercentageModal: React.FC<{
         <div className="flex justify-end">
           <button
             className="bg-red-500 text-white px-4 py-2 rounded-md mr-2"
-            onClick={() => onSell(selectedPercentage)}
+            onClick={() => sell(selectedPosition, selectedPercentage)}
           >
             Sell
           </button>
