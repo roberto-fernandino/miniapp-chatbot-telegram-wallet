@@ -29,6 +29,16 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
   const [positions, setPositions] = useState<Position[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sellPercentageModalOpen, setSellPercentageModalOpen] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState<Position | null>(
+    null
+  );
+  const [sellPercentage, setSellPercentage] = useState(0);
+
+  const handleOpenSellPercentageModal = async (position: Position) => {
+    setSelectedPosition(position);
+    setSellPercentageModalOpen(true);
+  };
 
   const fetchPositions = async () => {
     try {
@@ -166,6 +176,14 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
                 </div>
                 <div className="text-sm text-gray-500">
                   Date: {new Date(position.created_at).toLocaleString()}
+                </div>
+                <div>
+                  <button
+                    className="bg-red-500 text-white px-2 py-1 rounded-md"
+                    onClick={() => handleOpenSellPercentageModal(position)}
+                  >
+                    Sell
+                  </button>
                 </div>
               </div>
             </div>
