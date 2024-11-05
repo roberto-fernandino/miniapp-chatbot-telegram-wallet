@@ -143,23 +143,22 @@ const Positions: React.FC<PositionsProps> = ({ userTgId }) => {
                   PNL:
                   <span
                     className={`font-medium ${
-                      position.pnlPercentage && position.pnlPercentage >= 0
-                        ? "text-green-500"
-                        : "text-red-500"
+                      position.pnlPercentage && position.pnlPercentage < 0.0
+                        ? "text-red-500"
+                        : "text-green-500"
                     }`}
                   >
-                    {position.pnlPercentage && position.pnlPercentage >= 0
-                      ? "+" +
+                    {position.pnlPercentage && position.pnlPercentage < 0.0
+                      ? "-" +
                         (
                           position.sol_entry * (position.pnlPercentage || 0)
                         ).toFixed(6)
-                      : "-" +
+                      : "+" +
                         (
                           position.sol_entry * (position.pnlPercentage || 0)
                         ).toFixed(6)}
-                    SOL
+                    SOL [{position.pnlPercentage?.toFixed(2)}% ROI]
                   </span>
-                  <span>[{position.pnlPercentage?.toFixed(2)}% ROI]</span>
                 </div>
                 <div className="flex flex-row items-start">
                   Size: {position.sol_entry} SOL at{" "}
