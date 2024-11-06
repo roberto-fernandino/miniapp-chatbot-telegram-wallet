@@ -228,6 +228,12 @@ pub async fn handle_message(
                 if text.len() == 44 && text.chars().all(|c| c.is_ascii_alphanumeric()) {
                     set_user_withdraw_sol_address(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), text).await?;
                     bot.send_message(msg.chat.id, "SOL address set").await?;
+                    let keyboard = create_open_withdraw_sol_keyboard(&pool, &msg.from.as_ref().unwrap().id.to_string()).await?;
+                    let message = create_open_withdraw_sol_message(&msg.from.as_ref().unwrap().id.to_string(), &pool).await?;
+                    bot.send_message(msg.chat.id, message)
+                    .reply_markup(keyboard)
+                    .parse_mode(teloxide::types::ParseMode::Html)
+                    .await?;
                 } else {
                     bot.send_message(msg.chat.id, "Invalid SOL address").await?;
                 }
@@ -236,6 +242,12 @@ pub async fn handle_message(
                 if let Ok(amount) = text.parse::<f64>() {
                     set_user_withdraw_sol_amount(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), amount.to_string().as_str()).await?;
                     bot.send_message(msg.chat.id, format!("Amount set to: {}", amount)).await?;
+                    let message = create_open_withdraw_sol_message(&msg.from.as_ref().unwrap().id.to_string(), &pool).await?;
+                    let keyboard = create_open_withdraw_sol_keyboard(&pool, &msg.from.as_ref().unwrap().id.to_string()).await?;
+                    bot.send_message(msg.chat.id, message)
+                    .reply_markup(keyboard)
+                    .parse_mode(teloxide::types::ParseMode::Html)
+                    .await?;
                 } else {
                     bot.send_message(msg.chat.id, "Invalid amount").await?;
                 }
