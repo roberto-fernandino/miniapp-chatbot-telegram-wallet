@@ -1,4 +1,8 @@
 use anyhow::Result;
+use crate::modules::transfer::sign_and_send_transaction;
+use crate::modules::swap::User;
+use solana_sdk::{message::Message, transaction::Transaction};
+use solana_sdk::system_instruction;
 use serde_json::json;
 use axum::http::StatusCode;
 use crate::modules::swap::sign_and_send_swap_transaction;
@@ -22,7 +26,7 @@ use std::sync::Arc;
 use solana_client::rpc_client::RpcClient;
 use solana_app::{get_copy_trade_wallets, get_redis_connection, get_sol_balance, get_tokens_balance, handle_incoming_messages, init_rpc_client, subscribe_to_account_transaction};
 use tokio_tungstenite::connect_async;
-use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::tungstenite::Message as tungsMessage;
 use std::env;
 use futures_util::stream::StreamExt;
 mod modules;
@@ -150,7 +154,7 @@ async fn handle_connection(stream: TcpStream, tx: Arc<broadcast::Sender<String>>
             // Broadcast messages to the WebSocket
             msg = rx.recv() => {
                  if let Ok(msg) = msg {
-                    if write.send(Message::Text(msg)).await.is_err() {
+                    if write.send(tungsMessage::Text(msg)).await.is_err() {
                         break;
                     }
                 }
@@ -374,4 +378,51 @@ pub async fn tokens_balance(
     });
 
     Ok(Json(response))
+}
+
+/// Transfer payload struct
+/// 
+/// # Fields
+/// 
+/// * `amount` - The amount to transfer
+/// * `sender_pubkey` - The sender's public key
+/// * `receiver_pubkey` - The receiver's public key
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransferPayload {
+    pub amount: u64,
+    pub sender_pubkey: Pubkey,
+    pub receiver_pubkey: Pubkey,
+    pub user: User,
+}
+
+/// Transfer SOL
+/// 
+/// # Arguments
+/// 
+/// * `payload` - The transfer payload
+/// 
+/// # Returns
+/// 
+/// A `Result` indicating the success of the operation
+pub async fn transfer_sol(
+    AxumState(_state): AxumState<State>,
+    Json(payload): Json<TransferPayload>,
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, String)> {
+    // Create the transfer instruction
+    let ix = system_instruction::transfer(
+        &payload.sender_pubkey,
+        &payload.receiver_pubkey,
+        payload.amount
+    );
+
+    // Create unsigned transaction
+    let tx = Transaction::new_unsigned(Message::new(
+        &[ix],
+        Some(&payload.sender_pubkey), // Payer
+    ));
+
+    match sign_and_send_transaction(tx, payload.user).await {
+        Ok(sig) => Ok((StatusCode::OK, Json(json!({ "transaction": sig.to_string() })))),
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+    }
 }
