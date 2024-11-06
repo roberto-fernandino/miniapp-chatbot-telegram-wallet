@@ -1642,9 +1642,13 @@ pub async fn handle_withdraw_callback(data: String, bot: &teloxide::Bot, q: &tel
             public_key: user.solana_address.expect("Solana address not found").to_string(),
         }
     };
+    println!("@handle_withdraw_callback/ payload: {:?}", payload);
     let client = reqwest::Client::new();
     let response = match client.post("http://solana_app:3030/sol/transfer").json(&payload).send().await {
-        Ok(res) => res,
+        Ok(res) => {
+            println!("@handle_withdraw_callback/ response: {:?}", res);
+            res
+        },
         Err(e) => return Err(e.into()),
     };
     if response.status().is_success() {
