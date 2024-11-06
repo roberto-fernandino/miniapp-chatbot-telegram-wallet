@@ -138,7 +138,7 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
         let is_tx_confirmed = rpc_client.confirm_transaction_with_commitment(&swap_sig, CommitmentConfig::confirmed()).expect("Failed to confirm transaction").value;
         if is_tx_confirmed {
             println!("@sign_and_send_swap_transaction/ transaction confirmed");
-            break;
+            return Ok(swap_sig.to_string());
         }
         if let Some(result) = status_response.get("result") {
              if let Some(value) = result.get("value") {
@@ -182,9 +182,10 @@ pub async fn sign_and_send_swap_transaction(transaction: SwapTransaction, user: 
          if attempt < max_retries {
              sleep(retry_delay).await;
          }
-     }
-
-    Ok(swap_sig.to_string())
+    }
+    Err(TurnkeyError::from(Box::<dyn std::error::Error>::from(
+        format!("Failed to get finalized status after {} attempts", max_retries)
+    )))
 }
 
 
