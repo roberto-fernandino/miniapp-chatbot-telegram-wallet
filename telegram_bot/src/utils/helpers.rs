@@ -1686,20 +1686,26 @@ pub async fn create_limit_orders_message(pool: &SafePool, tg_id: &str) -> Result
     for position in active_positions {
         let scanner_response = get_scanner_search(&position.token_address).await?;
         let token_name = scanner_response["pair"]["tokenName"].to_string();
-        let token_price = scanner_response["pair"]["pairPrice1Usd"].to_string();
-        let token_symbol = scanner_response["pair"]["token1Symbol"].to_string();
+        let token_price = scanner_response["pair"]["pairPrice1Usd"].to_string().trim_matches('"').to_string();
+        let token_symbol = scanner_response["pair"]["token1Symbol"].to_string().trim_matches('"').to_string();
         let mut tps_str = String::new();
-        for tp in position.take_profits {
-            tps_str.push_str(&format!("{}x📈 - SELL {}%\n", tp.0, tp.1));
+        if !position.take_profits.is_empty()  {
+            tps_str.push_str("Take profits:\n");
+            for tp in position.take_profits {
+                tps_str.push_str(&format!("{}x📈 - SELL {}%\n", tp.0, tp.1));
+            }
         }
         let mut sls_str = String::new();
-        for sl in position.stop_losses {
-            sls_str.push_str(&format!("{}x📉 - SELL {}%\n", sl.0, sl.1));
+        if !position.stop_losses.is_empty() {
+            sls_str.push_str("Stop losses:\n");
+            for sl in position.stop_losses {
+                sls_str.push_str(&format!("{}x📉 - SELL {}%\n", sl.0, sl.1));
+            }
         }
         limit_orders_str.push_str(&format!(
-            "{token_name} <code>${token_symbol}</code> <code>${token_price}</code>\n
-            TPs: {tps_str}\n
-            SLs: {sls_str}\n
+            "{token_name} <code>${token_symbol}</code> <code>${token_price}</code>\n\
+            {tps_str}\n\
+            {sls_str}
             ",
         ));
     }
