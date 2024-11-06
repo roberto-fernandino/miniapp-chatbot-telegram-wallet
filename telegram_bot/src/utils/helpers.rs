@@ -1221,6 +1221,7 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
                 }
             }
         }
+        println!("@create_positions_message/ tokens_balance_str: {:?}", tokens_balance_str);
         Ok(format!(
             "<b>Positions:</b>\n\
             SOL Balance: <b> {:.6} SOL (${:.2})</b>\n\
