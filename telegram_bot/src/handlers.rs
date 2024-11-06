@@ -1541,6 +1541,7 @@ async fn handle_open_withdraw_sol_callback(data: String, bot: &teloxide::Bot, q:
     let message = create_open_withdraw_sol_message(&q.from.id.to_string(), pool).await?;
     bot.send_message(q.message.as_ref().unwrap().chat().id, message)
     .reply_markup(keyboard)
+    .parse_mode(teloxide::types::ParseMode::Html)
     .await?;
     Ok(())
 }
