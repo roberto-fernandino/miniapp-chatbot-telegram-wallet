@@ -1710,6 +1710,6 @@ pub async fn create_limit_orders_message(pool: &SafePool, tg_id: &str) -> Result
         ));
     }
     Ok(format!("Limit orders:\n\
-    {}
-    ", limit_orders_str))
+    {limit_orders_str}
+    "))
 }
