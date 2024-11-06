@@ -1584,3 +1584,85 @@ pub async fn create_refferal_message(tg_id: &str, pool: &SafePool) -> Result<Str
         Ok("You don't have a referral link yet. Launch the mini app to get one.".to_string())
     }
 }
+
+
+/// Create the wallets message
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The database pool
+/// * `tg_id` - The Telegram ID
+/// 
+/// # Returns
+/// 
+/// A String representing the wallets message
+pub async fn create_wallets_message(pool: &SafePool, tg_id: &str) -> Result<String> {
+    let user = get_user(pool, tg_id).await?;
+    let sol_balance = get_wallet_sol_balance(&user.solana_address.clone().expect("Solana address not found")).await?;
+    Ok(format!("Wallets:\n\
+    <code>{}</code> (Tap to copy)\n\
+    SOL Balance: {} SOL\n\
+    ", user.solana_address.expect("Solana address not found").as_str(), sol_balance))
+}
+
+/// Create the wallets keyboard
+/// 
+/// # Returns
+/// 
+/// An InlineKeyboardMarkup object
+pub async fn create_wallets_keyboard() -> Result<InlineKeyboardMarkup> {
+    let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
+    buttons.push(vec![InlineKeyboardButton::callback("Import wallet", "import_wallet"), InlineKeyboardButton::callback("Withdraw SOL", "withdraw")]);
+    buttons.push(vec![InlineKeyboardButton::callback("← Back", "back")]);
+    Ok(InlineKeyboardMarkup::new(buttons))
+}
+
+
+/// Create the open withdraw sol keyboard
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The database pool
+/// * `tg_id` - The Telegram ID
+/// 
+/// # Returns
+/// 
+/// An InlineKeyboardMarkup object
+pub async fn create_open_withdraw_sol_keyboard(pool: &SafePool, tg_id: &str) -> Result<InlineKeyboardMarkup> {
+    let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
+    let user_settings = get_user_settings(pool, tg_id).await?;
+    if user_settings.withdraw_sol_amount.is_empty() {
+        buttons.push(vec![InlineKeyboardButton::callback("X SOL 🖌", "set_withdraw_sol_amount")]);
+    } else {
+        buttons.push(vec![InlineKeyboardButton::callback(format!("{} SOL 🖌", user_settings.withdraw_sol_amount), "set_withdraw_sol_amount")]);
+    }
+    if user_settings.withdraw_sol_address.is_empty() {
+        buttons.push(vec![InlineKeyboardButton::callback("Set withdraw address 🖌", "set_withdraw_sol_address")]);
+    } else {
+        buttons.push(vec![InlineKeyboardButton::callback(format!("{} 🖌", user_settings.withdraw_sol_address), "set_withdraw_sol_address")]);
+    }
+    buttons.push(vec![InlineKeyboardButton::callback("Withdraw", "withdraw")]);
+    buttons.push(vec![InlineKeyboardButton::callback("← Back", "back")]);
+    Ok(InlineKeyboardMarkup::new(buttons))
+}
+
+/// Create the open withdraw sol message
+/// 
+/// # Arguments
+/// 
+/// * `tg_id` - The Telegram ID
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A String representing the open withdraw sol message
+pub async fn create_open_withdraw_sol_message(tg_id: &str, pool: &SafePool) -> Result<String> {
+    let user_settings = get_user_settings(pool, tg_id).await?;
+    let sol_balance = get_wallet_sol_balance(&user_settings.withdraw_sol_address).await?;
+    Ok(
+        format!("
+            Wallet:\n\
+            <code>{}</code> (Tap to copy)\n\
+            SOL Balance: {} SOL\n\
+        ", user_settings.withdraw_sol_address, sol_balance))
+}
