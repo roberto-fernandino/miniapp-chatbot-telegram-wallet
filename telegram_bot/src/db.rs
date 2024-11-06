@@ -59,6 +59,7 @@ pub struct User {
     pub turnkey_info: TurnkeyInfo,
     pub solana_address: Option<String>,
     pub eth_address: Option<String>,
+    pub referral_id: Option<i32>,
 }
 
 /// Represents a call in the system.
@@ -160,6 +161,7 @@ pub async fn get_user(pool: &PgPool, tg_id: &str) -> Result<User> {
         },
         solana_address: row.get("solana_address"),  
         eth_address: row.get("eth_address"),
+        referral_id: row.get("referral_id"),
     })
 
 }
@@ -733,6 +735,7 @@ pub async fn get_user_from_call(pool: &PgPool, call_id: i64) -> Result<User> {
         },
         solana_address: user.get("solana_address"),
         eth_address: user.get("eth_address"),
+        referral_id: user.try_get("referral_id").ok(),
     })
 }
 
@@ -979,6 +982,7 @@ pub async fn get_user_by_tg_id(pool: &PgPool, tg_id: &str) -> Result<User> {
         },
         solana_address: fetch_response.get("solana_address"),
         eth_address: fetch_response.get("eth_address"),
+        referral_id: fetch_response.try_get("referral_id").ok(),
     })
 }
 
@@ -2264,3 +2268,52 @@ pub async fn check_user_has_referral(pool: &PgPool, user_tg_id: &str) -> Result<
         .await?;
     Ok(count > 0)
 }
+
+/// Get a refferal by UUID
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `uuid` - The UUID
+/// 
+/// # Returns
+/// 
+/// A Refferal struct representing the refferal
+pub async fn get_referral_by_uuid(pool: &PgPool, uuid: &str) -> Result<Option<Refferal>> {
+    let refferal = sqlx::query("SELECT * FROM refferals WHERE uuid = $1")
+    .bind(uuid)
+    .fetch_one(pool)
+    .await?;
+    Ok(Some(Refferal{
+        id: refferal.get("id"),
+        user_tg_id: refferal.get("user_tg_id"),
+        uuid: refferal.get("uuid"),
+        users_referred: refferal.get("users_referred"),
+        referral_rebates: refferal.get("referral_rebates"),
+        total_rewards: refferal.get("total_rewards")
+    }))
+}
+
+/// Insert a refferal
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// * `user_id` - The user's ID
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the refferal was inserted
+pub async fn update_user_referral(pool: &PgPool, user_tg_id: &str, uuid: &str) -> Result<()> {
+    let refferal = get_referral_by_uuid(pool, uuid).await?;
+    if let Some(refferal) = refferal {
+        sqlx::query("UPDATE users set referral_id = $1 WHERE tg_id = $2")
+        .bind(refferal.id)
+        .bind(user_tg_id)
+        .execute(pool)
+        .await?;
+    }
+    Ok(())
+}
+
