@@ -264,9 +264,6 @@ pub fn create_main_menu_keyboard() -> InlineKeyboardMarkup {
         InlineKeyboardButton::callback("🛫 Copy Trade", "copy_trade")
     ]);
     buttons.push(vec![
-        InlineKeyboardButton::callback("💴 Smart Wallet", "smart_wallet")
-    ]);
-    buttons.push(vec![
         InlineKeyboardButton::callback("Limit orders", "limit_orders"), 
         InlineKeyboardButton::callback("Auto sell", "auto_sell")
     ]);
