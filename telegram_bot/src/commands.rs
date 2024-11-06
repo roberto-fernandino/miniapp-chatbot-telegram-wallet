@@ -889,7 +889,7 @@ pub async fn execute_swap_no_chat(pool: &SafePool, input_token: &str, output_tok
     let response = match client.post(url).json(&request).send().await {
         Ok(res) => {
             if sell_percentage == 100.0 {
-                db::set_position
+                db::set_position_completed(pool, input_token, &user_tg_id).await?;
             }
             println!("@execute_swap_no_chat: Response received successfully");
             res 
