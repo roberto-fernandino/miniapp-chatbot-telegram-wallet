@@ -577,7 +577,7 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to handle refferals callback: {:?}", e),
             }
         }
-        else if data.starts_with("withdraw") {
+        else if data.starts_with("withdraw_sol") {
             match handle_open_withdraw_sol_callback(data.to_string(), &bot, &query, &pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to handle withdraw callback: {:?}", e),
