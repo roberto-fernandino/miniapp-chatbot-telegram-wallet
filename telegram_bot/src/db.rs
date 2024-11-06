@@ -2183,10 +2183,9 @@ pub async fn get_refferal(pool: &PgPool, user_tg_id: &str) -> Result<Option<Reff
 /// # Returns
 /// 
 /// A result indicating whether the refferal users referred was set
-pub async fn set_refferal_users_referred(pool: &PgPool, user_tg_id: &str, users_referred: i32) -> Result<()> {
-    sqlx::query("UPDATE refferals SET users_referred = $1 WHERE user_tg_id = $2")
-    .bind(users_referred)
-    .bind(user_tg_id)
+pub async fn set_referral_users_referred(pool: &PgPool, referral_id: &str) -> Result<()> {
+    sqlx::query("UPDATE refferals SET users_referred = users_referred + 1 WHERE id = $1")
+    .bind(referral_id)
     .execute(pool)
     .await?;
     Ok(())

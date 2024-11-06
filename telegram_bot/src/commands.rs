@@ -1060,6 +1060,7 @@ pub async fn add_referral_if_user_is_new(pool: &SafePool, uuid: &str, user_tg_id
     let user = get_user_by_tg_id(pool, user_tg_id).await?;
     if user.referral_id.is_none() {
         db::update_user_referral(pool, user_tg_id, uuid).await?;
+        db::set_referral_users_referred(pool, user.referral_id.unwrap().to_string().as_str()).await?;
     }
     Ok(())
 }
