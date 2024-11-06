@@ -2257,7 +2257,10 @@ pub async fn create_refferal(pool: &PgPool, user_tg_id: &str) -> Result<()> {
 /// # Returns
 /// 
 /// A boolean indicating whether the user has a refferal
-pub async fn check_user_has_refferal(pool: &PgPool, user_tg_id: &str) -> Result<bool> {
-    let refferal = get_refferal(pool, user_tg_id).await?;
-    Ok(refferal.is_some())
+pub async fn check_user_has_referral(pool: &PgPool, user_tg_id: &str) -> Result<bool> {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM refferals WHERE user_tg_id = $1")
+        .bind(user_tg_id)
+        .fetch_one(pool)
+        .await?;
+    Ok(count > 0)
 }

@@ -634,7 +634,7 @@ pub async fn post_add_user_handler(
                 return (StatusCode::INTERNAL_SERVER_ERROR, "Could not update user in the db").into_response();
             }
         }
-        if !check_user_has_refferal(&pool, &user.tg_id).await.expect("Could not check if user has refferal") {
+        if !check_user_has_referral(&pool, &user.tg_id).await.expect("Could not check if user has refferal") {
             create_refferal(&pool, &user.tg_id).await.expect("Could not create refferal");
         }
     } else {
@@ -1396,7 +1396,9 @@ async fn handle_set_complete_positions_callback(data: String, bot: &teloxide::Bo
 /// 
 /// A result indicating the success of the operation
 async fn handle_refferal_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
-    if !check_user_has_refferal(&pool, &q.from.id.to_string()).await? {
+    println!("@handle_refferal_callback/ checking if user has refferal");
+    if !check_user_has_referral(&pool, &q.from.id.to_string()).await? {
+        println!("@handle_refferal_callback/ user does not have refferal, creating refferal");
         create_refferal(pool, &q.from.id.to_string()).await?;
     }
     let user = get_user(&pool, &q.from.id.to_string()).await?;
