@@ -758,6 +758,9 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
             return Err(anyhow::anyhow!("Failed to send request: {}", e));
         }
     };
+    if user_settings.sell_percentage.parse::<f64>().unwrap_or(0.0) == 100.0 {
+        db::set_position_completed(pool, input_token, &user_tg_id).await?;
+    }
     println!("@execute_swap: input_token: {:?}", input_token);
     if response.status().is_success() { 
         // If the input token is SOL = buy
