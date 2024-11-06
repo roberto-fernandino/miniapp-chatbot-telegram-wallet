@@ -1206,13 +1206,21 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
                 for position in positions {
                     let mint = position.token_address;
                     let scanner_response = get_scanner_search(&mint).await?;
+                    println!("@create_positions_message/ scanner_response: {:?}", scanner_response);
                     let price = scanner_response["pair"]["pairPrice1Usd"].to_string();
+                    println!("@create_positions_message/ price: {:?}", price);
                     let pnl_usd = price.parse::<f64>().unwrap_or(0.0) - position.entry_price * position.amount;
+                    println!("@create_positions_message/ pnl_usd: {:?}", pnl_usd);
                     let pnl_percent = pnl_usd / (position.entry_price * position.amount) * 100.0;
+                    println!("@create_positions_message/ pnl_percent: {:?}", pnl_percent);
                     let symbol = scanner_response["pair"]["symbol"].as_str().unwrap_or("N/A");
+                    println!("@create_positions_message/ symbol: {:?}", symbol);
                     let usd_entry = position.entry_price * position.amount;
+                    println!("@create_positions_message/ usd_entry: {:?}", usd_entry);
                     let token_ui_amount = position.ui_amount;
+                    println!("@create_positions_message/ token_ui_amount: {:?}", token_ui_amount);
                     let position_age = Utc::now().signed_duration_since(DateTime::<Utc>::from_utc(position.created_at, Utc));
+                    println!("@create_positions_message/ position_age: {:?}", position_age);
                     positions_str.push_str("Closed positions:\n");
                     positions_str.push_str(&format!(
                         "\n\n<code>${symbol}/SOL</code>\n\
@@ -1453,7 +1461,6 @@ pub async fn check_tokens_prices(token_addresses: Vec<String>) -> Result<HashMap
     let mut prices = HashMap::new();
     for token in token_addresses {
         let scanner_response = get_scanner_search(&token).await?;
-        println!("@bot/helpers/check_tokens_prices/ scanner_response: {:?}", scanner_response);
         let price = scanner_response["pair"]["pairPrice1Usd"].to_string();
         prices.insert(token, price);
     }
