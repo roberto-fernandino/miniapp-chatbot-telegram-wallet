@@ -418,10 +418,14 @@ pub async fn transfer_sol(
         payload.amount
     );
     println!("@transfer_sol/ transfer_sol ix: {:?}", ix);
+    let rpc_client = RpcClient::new(env::var("NODE_HTTP").expect("NODE_HTTP must be set"));
+    let latest_blockhash = rpc_client.get_latest_blockhash().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     // Create unsigned transaction
-    let tx = Transaction::new_unsigned(Message::new(
+
+    let tx = Transaction::new_unsigned(Message::new_with_blockhash(
         &[ix],
         Some(&payload.sender_pubkey), // Payer
+        latest_blockhash
     ));
     println!("@transfer_sol/ transfer_sol tx: {:?}", tx);
 
