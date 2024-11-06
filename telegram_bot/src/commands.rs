@@ -838,9 +838,7 @@ pub async fn execute_swap_no_chat(pool: &SafePool, input_token: &str, output_tok
             Ok(amount) => {
                 println!("@execute_swap_no_chat/ token_amount: {:?}", amount);
                 input_token_amount = amount * sell_percentage / 100.0;
-                if sell_percentage == 100.0 {
-                    db::delete_position(&pool, &input_token, &user.tg_id).await?;
-                }
+                
             },
             Err(e) => {
                 println!("@execute_swap_no_chat: Error getting token amount: {:?}", e);
@@ -894,6 +892,9 @@ pub async fn execute_swap_no_chat(pool: &SafePool, input_token: &str, output_tok
     let response = match client.post(url).json(&request).send().await {
         Ok(res) => {
             println!("@execute_swap_no_chat: Response received successfully");
+            if sell_percentage == 100.0 {
+                db::delete_position(&pool, &input_token, &user.tg_id).await?;
+            }
             res 
         },
         Err(e) => {

@@ -1410,3 +1410,19 @@ async fn handle_refferal_callback(data: String, bot: &teloxide::Bot, q: &teloxid
     .await?;
     Ok(())
 }
+
+/// Handle copy trade callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_copy_trade_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    Ok(())
+}
