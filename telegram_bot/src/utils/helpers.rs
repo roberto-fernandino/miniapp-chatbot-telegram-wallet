@@ -1575,7 +1575,6 @@ pub async fn create_refferal_message(tg_id: &str, pool: &SafePool) -> Result<Str
         Ok(format!("
         Referral and Rewards:\n\
         💰 The more users you invite, the more referral rebates you will get.\n\
-        Your referrals (updated every 15 minutes)\n\
         • Users referred: {}\n\
         • Referral rebates: {}%\n\
         • Total rewards: {} SOL (${})\n\
@@ -1657,7 +1656,8 @@ pub async fn create_open_withdraw_sol_keyboard(pool: &SafePool, tg_id: &str) -> 
 /// A String representing the open withdraw sol message
 pub async fn create_open_withdraw_sol_message(tg_id: &str, pool: &SafePool) -> Result<String> {
     let user_settings = get_user_settings(pool, tg_id).await?;
-    let sol_balance = get_wallet_sol_balance(&user_settings.withdraw_sol_address).await?;
+    let user = get_user(pool, tg_id).await?;
+    let sol_balance = get_wallet_sol_balance(&user.solana_address.clone().expect("Solana address not found")).await?;
     Ok(
         format!("
             Wallet:\n\
@@ -1665,3 +1665,4 @@ pub async fn create_open_withdraw_sol_message(tg_id: &str, pool: &SafePool) -> R
             SOL Balance: {} SOL\n\
         ", user_settings.withdraw_sol_address, sol_balance))
 }
+
