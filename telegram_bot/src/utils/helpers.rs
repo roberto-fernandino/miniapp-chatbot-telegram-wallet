@@ -1190,10 +1190,10 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
                 let position_age = Utc::now().signed_duration_since(DateTime::<Utc>::from_utc(position.created_at, Utc));
                 if token_ui_amount.parse::<f64>().unwrap_or(0.0) > 0.0 {
                     tokens_balance_str.push_str(&format!(
-                    "<code>${symbol}/SOL</code>\n\
+                    "\n\n<code>${symbol}/SOL</code>\n\
                     (${pnl_usd:.2}) [{pnl_percent:.2}% ROI]\n\
                     Size: {usd_entry:.2} [{}]\n\
-                    Date: {}
+                    Date: {}\n\n\
                     ", format_number(token_ui_amount.parse::<f64>().unwrap_or(0.0)), format_age(position_age)
                     ));
                 }
@@ -1212,10 +1212,10 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
                 let position_age = Utc::now().signed_duration_since(DateTime::<Utc>::from_utc(position.created_at, Utc));
                 if token_ui_amount.parse::<f64>().unwrap_or(0.0) > 0.0 {
                     tokens_balance_str.push_str(&format!(
-                    "<code>${symbol}/SOL</code>\n\
+                    "\n\n<code>${symbol}/SOL</code>\n\
                     (${pnl_usd:.2}) [{pnl_percent:.2}% ROI]\n\
                     Size: {usd_entry:.2} [{}]\n\
-                    Date: {}
+                    Date: {}\n\n\
                     ", format_number(token_ui_amount.parse::<f64>().unwrap_or(0.0)), format_age(position_age)
                     ));
                 }
