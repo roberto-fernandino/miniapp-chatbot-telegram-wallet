@@ -710,7 +710,7 @@ pub async fn get_positions_handler(
     Path(user_tg_id): Path<String>, 
     State(pool): State<Arc<Pool<Postgres>>>,
 ) -> impl IntoResponse {
-    let positions = get_positions_by_user_tg_id(&pool, &user_tg_id).await.expect("Could not get positions");
+    let positions = get_active_positions(&pool, &user_tg_id).await.expect("Could not get positions");
     (StatusCode::OK, Json(positions)).into_response()
 }
 
