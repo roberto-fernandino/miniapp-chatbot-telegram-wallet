@@ -1,6 +1,15 @@
+use crate::turnkey::client::Turnkey;
+use std::env;
+use crate::RpcClient;
+use solana_sdk::pubkey::Pubkey;
+use std::str::FromStr;
+use crate::turnkey::client::KeyInfo;
+use crate::turnkey::errors::TurnkeyResult;
+use crate::modules::swap::User;
 use solana_sdk::{
-    native_token::{lamports_to_sol},
+    native_token::lamports_to_sol,
     transaction::Transaction,
+    signature::Signature,
 };
 use solana_transaction_status::{
     EncodedConfirmedTransactionWithStatusMeta, EncodedTransaction, UiMessage,
@@ -120,3 +129,26 @@ pub fn handle_transfer_transaction(
 }
 
 
+
+/// Sign and send a transaction
+/// 
+/// # Arguments
+/// 
+/// * `transaction` - The transaction to send
+/// * `user` - The user to sign the transaction
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+pub async fn sign_and_send_transaction(mut transaction: Transaction, user: User) -> TurnkeyResult<Signature> {
+    let turnkey_client = Turnkey::new_for_user(&user.api_public_key, &user.api_private_key, &user.organization_id, &user.public_key)?;
+    let pubkey = Pubkey::from_str(&user.public_key).unwrap();
+    let key_info = KeyInfo {
+        private_key_id: user.public_key.to_string(),
+        public_key: pubkey
+    };
+    let tx_and_sig = turnkey_client.sign_transaction(&mut transaction, key_info).await?;
+    let rpc_client = RpcClient::new(env::var("NODE_HTTP").expect("NODE_HTTP must be set"));
+    let signature = rpc_client.send_and_confirm_transaction(&tx_and_sig.0).expect("Failed to send and confirm transaction");
+    Ok(signature)
+}
