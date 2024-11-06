@@ -696,9 +696,6 @@ pub async fn execute_swap(pool: &SafePool, input_token: &str, output_token: &str
                 println!("@execute_swap/ token_amount: {:?}", amount);
                 input_token_amount = amount * user_settings.sell_percentage.parse::<f64>().expect("Sell percentage is not a number") / 100.0;
                 // If user is selling 100% delete the position
-                if user_settings.sell_percentage.parse::<f64>().expect("Could not parse sell percentage to f64.") == 100.0 {
-                    db::delete_position(&pool, &input_token, &user.tg_id).await?;
-                }
             },
             Err(e) => {
                 println!("@execute_swap: Error getting token amount: {:?}", e);
@@ -892,9 +889,6 @@ pub async fn execute_swap_no_chat(pool: &SafePool, input_token: &str, output_tok
     let response = match client.post(url).json(&request).send().await {
         Ok(res) => {
             println!("@execute_swap_no_chat: Response received successfully");
-            if sell_percentage == 100.0 {
-                db::delete_position(&pool, &input_token, &user.tg_id).await?;
-            }
             res 
         },
         Err(e) => {
