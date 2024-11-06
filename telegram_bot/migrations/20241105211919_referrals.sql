@@ -13,4 +13,4 @@ CREATE TABLE IF NOT EXISTS refferals (
 );
 
 
-ALTER TABLE users ADD COLUMN refferal_id INTEGER REFERENCES refferals(id);
+ALTER TABLE users ADD COLUMN referral_id INTEGER REFERENCES refferals(id);
