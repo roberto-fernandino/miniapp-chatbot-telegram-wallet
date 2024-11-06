@@ -1663,6 +1663,6 @@ pub async fn create_open_withdraw_sol_message(tg_id: &str, pool: &SafePool) -> R
             Wallet:\n\
             <code>{}</code> (Tap to copy)\n\
             SOL Balance: {} SOL\n\
-        ", user_settings.withdraw_sol_address, sol_balance))
+        ", user.solana_address.expect("Solana address not found").as_str(), sol_balance))
 }
 
