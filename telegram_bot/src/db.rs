@@ -2316,3 +2316,23 @@ pub async fn update_user_referral(pool: &PgPool, user_tg_id: &str, uuid: &str) -
     Ok(())
 }
 
+
+/// Set a position as completed 
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `token_address` - The token address
+/// * `user_tg_id` - The user's Telegram ID
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the position was set as completed
+pub async fn set_position_completed(pool: &PgPool, token_address: &str, user_tg_id: &str) -> Result<()> {
+    sqlx::query("UPDATE positions SET completed = true WHERE token_address = $1 AND tg_user_id = $2")
+    .bind(token_address)
+    .bind(user_tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
