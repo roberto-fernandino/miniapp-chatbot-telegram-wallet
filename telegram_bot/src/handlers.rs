@@ -340,6 +340,13 @@ pub async fn handle_message(
                         }
                     }
                 }
+                else if text.starts_with("/start r-") {
+                    let uuid = text.strip_prefix("/start r-").unwrap();
+                    match add_referral_if_user_is_new(&pool, uuid, msg.from.as_ref().unwrap().id.to_string().as_str(), msg.from.as_ref().unwrap().username.clone().unwrap_or("Unknown username".to_string())).await {
+                        Ok(_) => (),
+                        Err(e) => log::error!("Failed to add new refferal: {:?}", e),
+                    }
+                }
                 else if text.starts_with("/start sell_token_") {
                     match sell_token_page(&msg, &bot, &pool).await {
                         Ok(_) => (),
@@ -627,7 +634,8 @@ pub async fn post_add_user_handler(
                 return (StatusCode::INTERNAL_SERVER_ERROR, "Could not get user id").into_response();
             }
         };
-        match update_user(&pool, User { id: user_id, username: user.username, tg_id: user.tg_id.clone(), turnkey_info: user.turnkey_info, solana_address: Some(user.solana_address), eth_address: Some(user.eth_address) }).await {
+        let db_user = get_user_by_tg_id(&pool, &user.tg_id).await.expect("Could not get user");
+        match update_user(&pool, User { id: user_id, username: user.username, tg_id: user.tg_id.clone(), turnkey_info: user.turnkey_info, solana_address: Some(user.solana_address), eth_address: Some(user.eth_address), referral_id: db_user.referral_id }).await {
             Ok(_) => println!("@add_user/ user updated in the db."),
             Err(e) => {
                 println!("@add_user/ error updating user in the db: {:?}", e);
