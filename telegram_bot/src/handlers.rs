@@ -1579,7 +1579,7 @@ pub async fn handle_withdraw_callback(data: String, bot: &teloxide::Bot, q: &tel
         amount,
         sender_pubkey,
         receiver_pubkey,
-        user: TurnkeyUser {
+        user: UserPayload {
             api_public_key: user.turnkey_info.api_public_key.unwrap().clone(),
             api_private_key: user.turnkey_info.api_private_key.unwrap().clone(),
             organization_id: user.turnkey_info.suborg_id.unwrap().clone(),
