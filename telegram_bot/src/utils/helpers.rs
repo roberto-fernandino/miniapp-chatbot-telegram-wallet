@@ -1666,3 +1666,44 @@ pub async fn create_open_withdraw_sol_message(tg_id: &str, pool: &SafePool) -> R
         ", user.solana_address.expect("Solana address not found").as_str(), sol_balance))
 }
 
+/// Create the limit orders message
+/// 
+/// # Description
+/// 
+/// Fetch all the active positions and create a message with all TPs and SLs
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The database pool
+/// * `tg_id` - The Telegram ID
+/// 
+/// # Returns
+/// 
+/// A String representing the limit orders message
+pub async fn create_limit_orders_message(pool: &SafePool, tg_id: &str) -> Result<String> {
+    let active_positions = get_active_positions(pool, tg_id).await?;
+    let mut limit_orders_str = String::new();
+    for position in active_positions {
+        let scanner_response = get_scanner_search(&position.token_address).await?;
+        let token_name = scanner_response["pair"]["tokenName"].to_string();
+        let token_price = scanner_response["pair"]["pairPrice1Usd"].to_string();
+        let token_symbol = scanner_response["pair"]["token1Symbol"].to_string();
+        let mut tps_str = String::new();
+        for tp in position.take_profits {
+            tps_str.push_str(&format!("{}x📈 - SELL {}%\n", tp.0, tp.1));
+        }
+        let mut sls_str = String::new();
+        for sl in position.stop_losses {
+            sls_str.push_str(&format!("{}x📉 - SELL {}%\n", sl.0, sl.1));
+        }
+        limit_orders_str.push_str(&format!(
+            "{token_name} <code>${token_symbol}</code> <code>${token_price}</code>\n
+            TPs: {tps_str}\n
+            SLs: {sls_str}\n
+            ",
+        ));
+    }
+    Ok(format!("Limit orders:\n\
+    {}
+    ", limit_orders_str))
+}

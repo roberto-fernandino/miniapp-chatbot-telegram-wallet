@@ -494,6 +494,12 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to delete take profit: {:?}", e),
             }
         }
+        else if data.starts_with("limit_orders") {
+            match handle_limit_orders_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to handle limit orders callback: {:?}", e),
+            }
+        }
         else if data.starts_with("delete_stop_loss:") {
             match handle_delete_stop_loss_user_settings_callback(data.to_string(), &bot, &query, &pool).await {
                 Ok(_) => (),
@@ -1665,5 +1671,25 @@ pub async fn handle_withdraw_callback(data: String, bot: &teloxide::Bot, q: &tel
     } else {
         bot.send_message(q.message.as_ref().unwrap().chat().id, "Failed to send transaction to solana app.".to_string()).await?;
     }
+    Ok(())
+ }
+
+ /// Handle limit orders callback
+ /// 
+ /// # Arguments
+ /// 
+ /// * `data` - The callback data
+ /// * `bot` - The Telegram bot
+ /// * `q` - The callback query
+ /// * `pool` - The database pool
+ /// 
+ /// # Returns
+ /// 
+ /// A result indicating the success of the operation
+ pub async fn handle_limit_orders_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let message = create_limit_orders_message(pool, &q.from.id.to_string()).await?;
+    bot.send_message(q.message.as_ref().unwrap().chat().id, message)
+    .parse_mode(teloxide::types::ParseMode::Html)
+    .await?;
     Ok(())
  }
