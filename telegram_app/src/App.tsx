@@ -140,6 +140,7 @@ const App: React.FC = () => {
     defaultOrganizationId: import.meta.env.VITE_TURNKEY_ORGNIZATION!,
   });
   const rootTurnkeyClient = turnkey.apiClient();
+
   async function updateCopyTrades() {
     const getCopyTradesResponse = await getCopyTrades(
       WebApp.initDataUnsafe.user?.id.toString() ?? ""
