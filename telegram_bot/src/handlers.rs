@@ -577,16 +577,34 @@ pub async fn handle_callback_query(
                 Err(e) => log::error!("Failed to handle refferals callback: {:?}", e),
             }
         }
+        else if data.starts_with("withdraw") {
+            match handle_open_withdraw_sol_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to handle withdraw callback: {:?}", e),
+            }
+        }
         else if data.starts_with("set_withdraw_sol_amount") {
             match handle_set_withdraw_sol_amount_callback(data.to_string(), &bot, &query, &pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to set withdraw sol amount: {:?}", e),
             }
         }
+        else if data.starts_with("execute_withdraw_sol") {
+            match handle_withdraw_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to execute withdraw sol: {:?}", e),
+            }
+        }
         else if data.starts_with("set_withdraw_sol_address") {
             match handle_set_withdraw_sol_address_callback(data.to_string(), &bot, &query, &pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to set withdraw sol address: {:?}", e),
+            }
+        }
+        else if data.starts_with("wallet") {
+            match handle_wallet_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to handle wallet callback: {:?}", e),
             }
         }
         else {
@@ -1467,8 +1485,34 @@ async fn handle_copy_trade_callback(data: String, bot: &teloxide::Bot, q: &telox
     Ok(())
 }
 
+/// Handle wallet callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `query` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+pub async fn handle_wallet_callback(data: String, bot: &teloxide::Bot, query: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let keyboard = create_wallets_keyboard().await?;
+    let message = create_wallets_message(pool, &query.from.id.to_string()).await?;
+    bot.send_message(query.message.as_ref().unwrap().chat().id, message)
+    .reply_markup(keyboard)
+    .parse_mode(teloxide::types::ParseMode::Html)
+    .await?;
+    Ok(())
+}
+
 
 /// Handle withdraw sol callback
+/// 
+/// # Description
+/// 
+/// Open the withdraw sol menu
 /// 
 /// # Arguments
 /// 
@@ -1566,7 +1610,6 @@ pub struct TransferPayload {
  /// A result indicating the success of the operation
 pub async fn handle_withdraw_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     let user_settings = get_user_settings(pool, &q.from.id.to_string()).await?;
-    let user = get_user(pool, &q.from.id.to_string()).await?;
     if user_settings.withdraw_sol_amount.is_empty() || user_settings.withdraw_sol_address.is_empty() {
         bot.send_message(q.message.as_ref().unwrap().chat().id, "Please set the withdraw amount and address first").await?;
         return Ok(());

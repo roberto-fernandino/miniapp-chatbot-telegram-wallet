@@ -1612,11 +1612,10 @@ pub async fn create_wallets_message(pool: &SafePool, tg_id: &str) -> Result<Stri
 /// An InlineKeyboardMarkup object
 pub async fn create_wallets_keyboard() -> Result<InlineKeyboardMarkup> {
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
-    buttons.push(vec![InlineKeyboardButton::callback("Import wallet", "import_wallet"), InlineKeyboardButton::callback("Withdraw SOL", "withdraw")]);
+    buttons.push(vec![InlineKeyboardButton::callback("Import wallet", "import_wallet"), InlineKeyboardButton::callback("Withdraw SOL", "withdraw_sol")]);
     buttons.push(vec![InlineKeyboardButton::callback("← Back", "back")]);
     Ok(InlineKeyboardMarkup::new(buttons))
 }
-
 
 /// Create the open withdraw sol keyboard
 /// 
@@ -1641,7 +1640,7 @@ pub async fn create_open_withdraw_sol_keyboard(pool: &SafePool, tg_id: &str) -> 
     } else {
         buttons.push(vec![InlineKeyboardButton::callback(format!("{} 🖌", user_settings.withdraw_sol_address), "set_withdraw_sol_address")]);
     }
-    buttons.push(vec![InlineKeyboardButton::callback("Withdraw", "withdraw")]);
+    buttons.push(vec![InlineKeyboardButton::callback("Withdraw", "execute_withdraw_sol")]);
     buttons.push(vec![InlineKeyboardButton::callback("← Back", "back")]);
     Ok(InlineKeyboardMarkup::new(buttons))
 }
