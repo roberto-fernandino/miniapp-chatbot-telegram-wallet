@@ -89,6 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/get_wallet_sol_balance/:address", get(get_wallet_sol_balance))
         .route("/get_positions/:address", get(tokens_balance))
         .route("/sol/swap", post(sol_swap))
+        .route("/sol/transfer", post(transfer_sol))
         .with_state(state);
 
         let listener = TcpListener::bind("0.0.0.0:3030").await.expect("Failed to bind to address");
