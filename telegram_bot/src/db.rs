@@ -25,6 +25,8 @@ pub struct UserSettings {
     pub stop_losses: Vec<(f64, f64)>,
     pub jito_tip_amount: i32,
     pub active_complete_positions: String,
+    pub withdraw_sol_amount: String,
+    pub withdraw_sol_address: String,
 }
 
 /// Struct to hold the call with the ATH after the call
@@ -1077,10 +1079,10 @@ pub async fn is_user_registered_in_mini_app(pool: &PgPool, user_tg_id: &str, use
 /// # Returns
 /// 
 /// A result indicating whether the user settings were set
-pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str, last_sent_token: &str, sell_percentage: &str, gas_lamports: i32, anti_mev: bool, take_profits: Vec<(f64, f64)>, stop_losses: Vec<(f64, f64)>, jito_tip_amount: i32, active_complete_positions: &str) -> Result<()> {
+pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance: &str, buy_amount: &str, swap_or_limit: &str, last_sent_token: &str, sell_percentage: &str, gas_lamports: i32, anti_mev: bool, take_profits: Vec<(f64, f64)>, stop_losses: Vec<(f64, f64)>, jito_tip_amount: i32, active_complete_positions: &str, withdraw_sol_amount: &str, withdraw_sol_address: &str) -> Result<()> {
     let take_profits_json = serde_json::to_value(take_profits).unwrap();
     let stop_losses_json = serde_json::to_value(stop_losses).unwrap();
-    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit, last_sent_token, sell_percentage, gas_lamports, anti_mev, take_profits, stop_losses, jito_tip_amount, active_complete_positions) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT (tg_id) DO UPDATE SET slippage_tolerance = $2, buy_amount = $3, swap_or_limit = $4, last_sent_token = $5, sell_percentage = $6, gas_lamports = $7, anti_mev = $8, take_profits = $9, stop_losses = $10, jito_tip_amount = $11, active_complete_positions = $12")
+    sqlx::query("INSERT INTO user_settings (tg_id, slippage_tolerance, buy_amount, swap_or_limit, last_sent_token, sell_percentage, gas_lamports, anti_mev, take_profits, stop_losses, jito_tip_amount, active_complete_positions, withdraw_sol_amount, withdraw_sol_address) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (tg_id) DO UPDATE SET slippage_tolerance = $2, buy_amount = $3, swap_or_limit = $4, last_sent_token = $5, sell_percentage = $6, gas_lamports = $7, anti_mev = $8, take_profits = $9, stop_losses = $10, jito_tip_amount = $11, active_complete_positions = $12, withdraw_sol_amount = $13, withdraw_sol_address = $14")
     .bind(tg_id)
     .bind(slippage_tolerance)
     .bind(buy_amount)
@@ -1093,6 +1095,8 @@ pub async fn upsert_user_settings(pool: &PgPool, tg_id: &str, slippage_tolerance
     .bind(stop_losses_json)
     .bind(jito_tip_amount)
     .bind(active_complete_positions)
+    .bind(withdraw_sol_amount)
+    .bind(withdraw_sol_address)
     .execute(pool)
     .await?;
     Ok(())
@@ -1134,6 +1138,8 @@ pub async fn get_user_settings(pool: &PgPool, user_tg_id: &str) -> Result<UserSe
         stop_losses,
         jito_tip_amount: user_settings.get("jito_tip_amount"),
         active_complete_positions: user_settings.get("active_complete_positions"),
+        withdraw_sol_amount: user_settings.get("withdraw_sol_amount"),
+        withdraw_sol_address: user_settings.get("withdraw_sol_address"),
     })
 }
 
@@ -1285,7 +1291,7 @@ pub async fn user_has_settings(pool: &PgPool, user_tg_id: &str) -> Result<bool> 
 /// 
 /// A result indicating whether the user settings were created
 pub async fn create_user_settings_default(pool: &PgPool, user_tg_id: &str) -> Result<()> {
-    upsert_user_settings(pool, user_tg_id, "0.18", "0.2", "swap", "", "100", 5000, false, vec![], vec![], 5000, "active").await.expect("Failed to create user settings");
+    upsert_user_settings(pool, user_tg_id, "0.18", "0.2", "swap", "", "100", 5000, false, vec![], vec![], 5000, "active", "", "").await.expect("Failed to create user settings");
     Ok(())
 }
 
@@ -2331,6 +2337,46 @@ pub async fn update_user_referral(pool: &PgPool, user_tg_id: &str, uuid: &str) -
 pub async fn set_position_completed(pool: &PgPool, token_address: &str, user_tg_id: &str) -> Result<()> {
     sqlx::query("UPDATE positions SET completed = true WHERE token_address = $1 AND tg_user_id = $2")
     .bind(token_address)
+    .bind(user_tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Set the user withdraw sol amount
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// * `amount` - The amount
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user withdraw sol amount was set
+pub async fn set_user_withdraw_sol_amount(pool: &PgPool, user_tg_id: &str, amount: &str) -> Result<()> {
+    sqlx::query("UPDATE user_settings SET withdraw_sol_amount = $1 WHERE tg_id = $2")
+    .bind(amount)
+    .bind(user_tg_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Set the user withdraw sol address
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The PostgreSQL connection pool
+/// * `user_tg_id` - The user's Telegram ID
+/// * `address` - The address
+/// 
+/// # Returns
+/// 
+/// A result indicating whether the user withdraw sol address was set
+pub async fn set_user_withdraw_sol_address(pool: &PgPool, user_tg_id: &str, address: &str) -> Result<()> {
+    sqlx::query("UPDATE user_settings SET withdraw_sol_address = $1 WHERE tg_id = $2")
+    .bind(address)
     .bind(user_tg_id)
     .execute(pool)
     .await?;
