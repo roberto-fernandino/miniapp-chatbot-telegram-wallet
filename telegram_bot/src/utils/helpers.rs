@@ -1176,68 +1176,85 @@ pub async fn create_positions_message(user_tg_id: &str, pool: &SafePool) -> Resu
         println!("@create_positions_message/ sol_token_balance_usd: {:?}", sol_token_balance_usd);
         let mut positions_str = String::new();
         if user_settings.active_complete_positions == "active" {    
-            let positions =  get_active_positions(pool, user_tg_id).await?;
-            println!("@create_positions_message/ positions: {:?}", positions);
+            let positions = get_active_positions(pool, user_tg_id).await?;
             if !positions.is_empty() {
+                positions_str.push_str("Open positions:\n");
                 for position in positions {
                     let mint = position.token_address;
                     let scanner_response = get_scanner_search(&mint).await?;
-                    println!("@create_positions_message/ scanner_response: {:?}", scanner_response);
-                    let price = scanner_response["pair"]["pairPrice1Usd"].to_string();
-                    println!("@create_positions_message/ price: {:?}", price);
-                    let pnl_usd = price.parse::<f64>().unwrap_or(0.0) - position.entry_price * position.amount;
-                    println!("@create_positions_message/ pnl_usd: {:?}", pnl_usd);
-                    let pnl_percent = pnl_usd / (position.entry_price * position.amount) * 100.0;
-                    println!("@create_positions_message/ pnl_percent: {:?}", pnl_percent);
+                    let price = scanner_response["pair"]["pairPrice1Usd"]
+                        .as_str()
+                        .unwrap_or("0")
+                        .parse::<f64>()
+                        .unwrap_or(0.0);
+                    
+                    let entry_value = position.entry_price * position.amount;
+                    let current_value = price * position.amount;
+                    let pnl_usd = current_value - entry_value;
+                    
+                    // Calculate percentage only if entry_value is not zero
+                    let pnl_percent = if entry_value > 0.0 {
+                        (pnl_usd / entry_value) * 100.0
+                    } else {
+                        0.0
+                    };
+
                     let symbol = scanner_response["pair"]["token1Symbol"].as_str().unwrap_or("N/A");
-                    println!("@create_positions_message/ symbol: {:?}", symbol);
-                    let usd_entry = position.entry_price * position.amount;
-                    println!("@create_positions_message/ usd_entry: {:?}", usd_entry);
                     let token_ui_amount = position.ui_amount;
-                    println!("@create_positions_message/ token_ui_amount: {:?}", token_ui_amount);
                     let position_age = Utc::now().signed_duration_since(DateTime::<Utc>::from_utc(position.created_at, Utc));
-                    println!("@create_positions_message/ position_age: {:?}", position_age);
-                    positions_str.push_str("Open positions:\n");
+                    
                     positions_str.push_str(&format!(
                         "\n\n<code>${symbol}</code>/SOL\n\
-                        (${pnl_usd:.2}) [{pnl_percent:.2}% ROI]\n\
-                        Size: {usd_entry:.2} [{}]\n\
-                        Date: {}\n\n\
-                        ", format_number(token_ui_amount.parse::<f64>().unwrap_or(0.0)), format_age(position_age)
+                        (${:.2}) [{:.2}% ROI]\n\
+                        Size: {:.2} [{}]\n\
+                        Date: {}\n\n",
+                        pnl_usd,
+                        pnl_percent,
+                        entry_value,
+                        format_number(token_ui_amount.parse::<f64>().unwrap_or(0.0)),
+                        format_age(position_age)
                     ));
-                    println!("@create_positions_message/ positions_str: {:?}", positions_str);
                 }
             }
         } else {
             let positions = crate::db::get_complete_positions(pool, user_tg_id).await?;
             if !positions.is_empty() {
+                positions_str.push_str("Closed positions:\n");
                 for position in positions {
                     let mint = position.token_address;
                     let scanner_response = get_scanner_search(&mint).await?;
-                    println!("@create_positions_message/ scanner_response: {:?}", scanner_response);
-                    let price = scanner_response["pair"]["pairPrice1Usd"].to_string();
-                    println!("@create_positions_message/ price: {:?}", price);
-                    let pnl_usd = price.parse::<f64>().unwrap_or(0.0) - position.entry_price * position.amount;
-                    println!("@create_positions_message/ pnl_usd: {:?}", pnl_usd);
-                    let pnl_percent = pnl_usd / (position.entry_price * position.amount) * 100.0;
-                    println!("@create_positions_message/ pnl_percent: {:?}", pnl_percent);
-                    let symbol = scanner_response["pair"]["symbol"].as_str().unwrap_or("N/A");
-                    println!("@create_positions_message/ symbol: {:?}", symbol);
-                    let usd_entry = position.entry_price * position.amount;
-                    println!("@create_positions_message/ usd_entry: {:?}", usd_entry);
+                    let price = scanner_response["pair"]["pairPrice1Usd"]
+                        .as_str()
+                        .unwrap_or("0")
+                        .parse::<f64>()
+                        .unwrap_or(0.0);
+                    
+                    let entry_value = position.entry_price * position.amount;
+                    let current_value = price * position.amount;
+                    let pnl_usd = current_value - entry_value;
+                    
+                    // Calculate percentage only if entry_value is not zero
+                    let pnl_percent = if entry_value > 0.0 {
+                        (pnl_usd / entry_value) * 100.0
+                    } else {
+                        0.0
+                    };
+
+                    let symbol = scanner_response["pair"]["token1Symbol"].as_str().unwrap_or("N/A");
                     let token_ui_amount = position.ui_amount;
-                    println!("@create_positions_message/ token_ui_amount: {:?}", token_ui_amount);
                     let position_age = Utc::now().signed_duration_since(DateTime::<Utc>::from_utc(position.created_at, Utc));
-                    println!("@create_positions_message/ position_age: {:?}", position_age);
-                    positions_str.push_str("Closed positions:\n");
+                    
                     positions_str.push_str(&format!(
-                        "\n\n<code>${symbol}/SOL</code>\n\
-                        (${pnl_usd:.2}) [{pnl_percent:.2}% ROI]\n\
-                        Size: {usd_entry:.2} [{}]\n\
-                        Date: {}\n\n\
-                        ", format_number(token_ui_amount.parse::<f64>().unwrap_or(0.0)), format_age(position_age)
+                        "\n\n<code>${symbol}</code>/SOL\n\
+                        (${:.2}) [{:.2}% ROI]\n\
+                        Size: {:.2} [{}]\n\
+                        Date: {}\n\n",
+                        pnl_usd,
+                        pnl_percent,
+                        entry_value,
+                        format_number(token_ui_amount.parse::<f64>().unwrap_or(0.0)),
+                        format_age(position_age)
                     ));
-                    println!("@create_positions_message/ positions_str: {:?}", positions_str);
                 }
             }
         }
