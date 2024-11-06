@@ -425,7 +425,7 @@ pub async fn transfer_sol(
     let tx = Transaction::new_unsigned(Message::new_with_blockhash(
         &[ix],
         Some(&payload.sender_pubkey), // Payer
-        latest_blockhash
+        &latest_blockhash
     ));
     println!("@transfer_sol/ transfer_sol tx: {:?}", tx);
 
