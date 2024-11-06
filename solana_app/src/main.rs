@@ -410,17 +410,20 @@ pub async fn transfer_sol(
     Json(payload): Json<TransferPayload>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, String)> {
     // Create the transfer instruction
+    println!("@transfer_sol/ transfer_sol received request");
+    println!("@transfer_sol/ transfer_sol payload: {:?}", payload);
     let ix = system_instruction::transfer(
         &payload.sender_pubkey,
         &payload.receiver_pubkey,
         payload.amount
     );
-
+    println!("@transfer_sol/ transfer_sol ix: {:?}", ix);
     // Create unsigned transaction
     let tx = Transaction::new_unsigned(Message::new(
         &[ix],
         Some(&payload.sender_pubkey), // Payer
     ));
+    println!("@transfer_sol/ transfer_sol tx: {:?}", tx);
 
     match sign_and_send_transaction(tx, payload.user).await {
         Ok(sig) => Ok((StatusCode::OK, Json(json!({ "transaction": sig.to_string() })))),
