@@ -1,4 +1,8 @@
 use teloxide::dispatching::dialogue::GetChatId;
+use std::str::FromStr;
+use solana_sdk::{
+    pubkey::Pubkey,
+};
 use teloxide::payloads::SendMessageSetters;
 use teloxide::payloads::EditMessageReplyMarkupSetters;
 use anyhow::Result;
@@ -216,6 +220,22 @@ pub async fn handle_message(
                     bot.send_message(msg.chat.id, format!("Amount set to: {}", amount)).await?;
                     let last_token = get_user_last_sent_token(&pool, msg.from.as_ref().unwrap().id.to_string().as_str()).await.unwrap();
                     token_address_buy_info_handler(&last_token, &bot, &msg, &pool).await?;
+                } else {
+                    bot.send_message(msg.chat.id, "Invalid amount").await?;
+                }
+            }
+            else if reply_to_message.text().unwrap_or_default().starts_with("Enter the SOL address to withdraw to") {
+                if text.len() == 44 && text.chars().all(|c| c.is_ascii_alphanumeric()) {
+                    set_user_withdraw_sol_address(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), text).await?;
+                    bot.send_message(msg.chat.id, "SOL address set").await?;
+                } else {
+                    bot.send_message(msg.chat.id, "Invalid SOL address").await?;
+                }
+            }
+            else if reply_to_message.text().unwrap_or_default().starts_with("Enter the amount of SOL to withdraw") {
+                if let Ok(amount) = text.parse::<f64>() {
+                    set_user_withdraw_sol_amount(&pool, msg.from.as_ref().unwrap().id.to_string().as_str(), amount.to_string().as_str()).await?;
+                    bot.send_message(msg.chat.id, format!("Amount set to: {}", amount)).await?;
                 } else {
                     bot.send_message(msg.chat.id, "Invalid amount").await?;
                 }
@@ -555,6 +575,18 @@ pub async fn handle_callback_query(
             match handle_refferal_callback(data.to_string(), &bot, &query, &pool).await {
                 Ok(_) => (),
                 Err(e) => log::error!("Failed to handle refferals callback: {:?}", e),
+            }
+        }
+        else if data.starts_with("set_withdraw_sol_amount") {
+            match handle_set_withdraw_sol_amount_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to set withdraw sol amount: {:?}", e),
+            }
+        }
+        else if data.starts_with("set_withdraw_sol_address") {
+            match handle_set_withdraw_sol_address_callback(data.to_string(), &bot, &query, &pool).await {
+                Ok(_) => (),
+                Err(e) => log::error!("Failed to set withdraw sol address: {:?}", e),
             }
         }
         else {
@@ -1434,3 +1466,144 @@ async fn handle_refferal_callback(data: String, bot: &teloxide::Bot, q: &teloxid
 async fn handle_copy_trade_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
     Ok(())
 }
+
+
+/// Handle withdraw sol callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_open_withdraw_sol_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let keyboard = create_open_withdraw_sol_keyboard(pool, &q.from.id.to_string()).await?;
+    let message = create_open_withdraw_sol_message(&q.from.id.to_string(), pool).await?;
+    bot.send_message(q.message.as_ref().unwrap().chat().id, message)
+    .reply_markup(keyboard)
+    .await?;
+    Ok(())
+}
+
+
+/// Handle set_withdraw_sol_amount callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_set_withdraw_sol_amount_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    bot.send_message(q.message.as_ref().unwrap().chat().id, "Enter the amount of SOL to withdraw")
+    .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the amount of SOL to withdraw".to_string()), selective: false})
+    .await?;
+    Ok(())
+}
+
+
+/// Handle set_withdraw_sol_address callback
+/// 
+/// # Arguments
+/// 
+/// * `data` - The callback data
+/// * `bot` - The Telegram bot
+/// * `q` - The callback query
+/// * `pool` - The database pool
+/// 
+/// # Returns
+/// 
+/// A result indicating the success of the operation
+async fn handle_set_withdraw_sol_address_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    bot.send_message(q.message.as_ref().unwrap().chat().id, "Enter the SOL address to withdraw to")
+    .reply_markup(teloxide::types::ForceReply{force_reply: teloxide::types::True, input_field_placeholder: Some("Enter the SOL address to withdraw to".to_string()), selective: false})
+    .await?;
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UserPayload {
+    pub api_public_key: String,
+    pub api_private_key: String,
+    pub organization_id: String,
+    pub public_key: String,
+}
+
+/// Transfer payload struct
+/// 
+/// # Fields
+/// 
+/// * `amount` - The amount to transfer
+/// * `sender_pubkey` - The sender's public key
+/// * `receiver_pubkey` - The receiver's public key
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransferPayload {
+    pub amount: u64,
+    pub sender_pubkey: Pubkey,
+    pub receiver_pubkey: Pubkey,
+    pub user: UserPayload,
+}
+ 
+ /// Handle withdraw callback
+ /// 
+ /// # Arguments
+ /// 
+ /// * `data` - The callback data   
+ /// * `bot` - The Telegram bot
+ /// * `q` - The callback query
+ /// * `pool` - The database pool
+ /// 
+ /// # Returns
+ /// 
+ /// A result indicating the success of the operation
+pub async fn handle_withdraw_callback(data: String, bot: &teloxide::Bot, q: &teloxide::types::CallbackQuery, pool: &SafePool) -> Result<()> {
+    let user_settings = get_user_settings(pool, &q.from.id.to_string()).await?;
+    let user = get_user(pool, &q.from.id.to_string()).await?;
+    if user_settings.withdraw_sol_amount.is_empty() || user_settings.withdraw_sol_address.is_empty() {
+        bot.send_message(q.message.as_ref().unwrap().chat().id, "Please set the withdraw amount and address first").await?;
+        return Ok(());
+    }
+    let user = get_user(pool, &q.from.id.to_string()).await?;
+    let amount = sol_to_lamports_u64(user_settings.withdraw_sol_amount.parse::<f64>().unwrap_or(0.0));
+    let sender_pubkey = Pubkey::from_str(&user.solana_address.clone().expect("Solana address not found")).unwrap();
+    let receiver_pubkey = Pubkey::from_str(&user_settings.withdraw_sol_address).unwrap();
+    let payload = TransferPayload {
+        amount,
+        sender_pubkey,
+        receiver_pubkey,
+        user: TurnkeyUser {
+            api_public_key: user.turnkey_info.api_public_key.unwrap().clone(),
+            api_private_key: user.turnkey_info.api_private_key.unwrap().clone(),
+            organization_id: user.turnkey_info.suborg_id.unwrap().clone(),
+            public_key: user.solana_address.expect("Solana address not found").to_string(),
+        }
+    };
+    let client = reqwest::Client::new();
+    let response = match client.post("http://solana_app:3030/sol/transfer").json(&payload).send().await {
+        Ok(res) => res,
+        Err(e) => return Err(e.into()),
+    };
+    if response.status().is_success() {
+        println!("@handle_withdraw_callback/ response is success");
+        let json_response = response.json::<serde_json::Value>().await?;
+        println!("@handle_withdraw_callback/ json_response: {:?}", json_response);
+        if let Some(transaction) = json_response["transaction"].as_str() {
+            println!("@handle_withdraw_callback/ transaction signature found on response: {:?}", transaction);
+            bot.send_message(q.message.as_ref().unwrap().chat().id, format!("https://solscan.io/tx/{}", transaction)).await?;
+        } else {
+            println!("@handle_withdraw_callback/ transaction signature not found on response");
+            bot.send_message(q.message.as_ref().unwrap().chat().id, "Transaction Signature not found in solana app response.".to_string()).await?;
+        }
+    } else {
+        bot.send_message(q.message.as_ref().unwrap().chat().id, "Failed to send transaction to solana app.".to_string()).await?;
+    }
+    Ok(())
+ }
