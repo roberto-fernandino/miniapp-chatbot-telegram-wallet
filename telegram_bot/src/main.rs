@@ -196,15 +196,6 @@ async fn positions_watcher(pool: SafePool, bot: &Bot) {
                                                         ).await {
                                                             eprintln!("Error removing take profit: {:?}", e);
                                                         }
-                                                    } else {
-                                                        // If no tokens left, delete the entire position
-                                                        if let Err(e) = db::delete_position(
-                                                            &pool,
-                                                            &position.token_address,
-                                                            &position.tg_user_id
-                                                        ).await {
-                                                            eprintln!("Error deleting position: {:?}", e);
-                                                        }
                                                     }
                                                 }
                                                 Err(e) => eprintln!("Error getting token amount: {:?}", e),
