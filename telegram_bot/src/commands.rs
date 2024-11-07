@@ -1067,11 +1067,9 @@ pub async fn add_referral_if_user_is_new(pool: &SafePool, uuid: &str, user_tg_id
         println!("@add_referral_if_user_is_new/ user does not exist, creating user");
         db::create_user_with_tg_id_and_username(pool, user_tg_id, Some(username.as_str())).await?;
         println!("@add_referral_if_user_is_new/ user created");
-        let user = get_user_by_tg_id(pool, user_tg_id).await?;
-        println!("@add_referral_if_user_is_new/ user retrieved");
         db::update_user_referral(pool, user_tg_id, uuid).await?;
         println!("@add_referral_if_user_is_new/ user referral updated");
-        db::set_referral_users_referred(pool, user.referral_id.unwrap().to_string().as_str()).await?;
+        db::set_referral_users_referred(pool, uuid).await?;
         println!("@add_referral_if_user_is_new/ referral users referred updated");
     }
     Ok(())
