@@ -1062,9 +1062,7 @@ pub async fn execute_swap_stop_loss(pool: &SafePool, user_tg_id: String, stop_lo
 pub async fn add_referral_if_user_is_new(pool: &SafePool, uuid: &str, user_tg_id: &str, username: String) -> Result<()> {
     if !db::user_exists(pool, user_tg_id).await? {
         db::create_user_with_tg_id_and_username(pool, user_tg_id, Some(username.as_str())).await?;
-    }
-    let user = get_user_by_tg_id(pool, user_tg_id).await?;
-    if user.referral_id.is_none() {
+        let user = get_user_by_tg_id(pool, user_tg_id).await?;
         db::update_user_referral(pool, user_tg_id, uuid).await?;
         db::set_referral_users_referred(pool, user.referral_id.unwrap().to_string().as_str()).await?;
     }
