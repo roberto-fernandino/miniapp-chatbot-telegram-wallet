@@ -374,6 +374,7 @@ pub async fn handle_message(
                 }
                 else if text.starts_with("/start r-") {
                     let uuid = text.strip_prefix("/start r-").unwrap();
+                    println!("@handle_message/ uuid: {:?}", uuid);
                     match add_referral_if_user_is_new(&pool, uuid, msg.from.as_ref().unwrap().id.to_string().as_str(), msg.from.as_ref().unwrap().username.clone().unwrap_or("Unknown username".to_string())).await {
                         Ok(_) => (),
                         Err(e) => log::error!("Failed to add new refferal: {:?}", e),
