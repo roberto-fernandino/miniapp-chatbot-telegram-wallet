@@ -1699,3 +1699,26 @@ pub async fn create_limit_orders_message(pool: &SafePool, tg_id: &str) -> Result
     {limit_orders_str}
     "))
 }
+
+
+/// Create the limit orders keyboard
+/// 
+/// # Arguments
+/// 
+/// * `pool` - The database pool
+/// * `tg_id` - The Telegram ID
+/// 
+/// # Returns
+/// 
+/// An InlineKeyboardMarkup object
+pub async fn limit_orders_keyboard(pool: &SafePool, tg_id: &str) -> Result<InlineKeyboardMarkup> {
+    let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
+    let open_positions = get_active_positions(pool, tg_id).await?;
+    buttons.push(vec![InlineKeyboardButton::callback("← Back", "back")]);
+    for position in open_positions {
+        let scanner_response = get_scanner_search(&position.token_address).await?;
+        let token_name = scanner_response["pair"]["token1Name"].to_string().trim_matches('"').to_string();
+        buttons.push(vec![InlineKeyboardButton::callback(format!("{}", token_name), format!("open_position:{}", position.id))]);
+    }
+    Ok(InlineKeyboardMarkup::new(buttons))
+}
