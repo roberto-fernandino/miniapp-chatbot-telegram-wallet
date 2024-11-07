@@ -378,20 +378,6 @@ pub async fn create_sol_buy_swap_keyboard(pool: &PgPool, user_tg_id: &str) -> In
         InlineKeyboardButton::callback("↻ Refresh", "refresh"),
     ]);
 
-
-
-    let swap_or_limit = user_settings.swap_or_limit.as_str();
-    buttons.push(vec![
-        InlineKeyboardButton::callback(
-            if swap_or_limit == "swap" { "✅ Swap" } else { "Swap" },
-            "toggle_swap_limit:swap"
-        ),
-        InlineKeyboardButton::callback(
-            if swap_or_limit == "limit" { "✅ Limit Orders" } else { "Limit Orders" },
-            "toggle_swap_limit:limit"
-        ),
-    ]);
-
     // buys amounts
     let buy_amount = user_settings.buy_amount.as_str();
     let global_amounts = vec!["0.2", "0.5", "1", "2", "5"];
