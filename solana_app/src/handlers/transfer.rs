@@ -1,20 +1,17 @@
-use crate::turnkey::client::Turnkey;
 use std::env;
-use crate::RpcClient;
-use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
-use crate::turnkey::client::KeyInfo;
+
+use crate::turnkey::client::{KeyInfo, Turnkey};
 use crate::turnkey::errors::TurnkeyResult;
-use crate::modules::swap::User;
-use solana_sdk::{
-    native_token::lamports_to_sol,
-    transaction::Transaction,
-    signature::Signature,
-};
+use anyhow::Result;
+use solana_client::rpc_client::RpcClient;
+use solana_sdk::signature::Signature;
+use solana_sdk::{native_token::lamports_to_sol, pubkey::Pubkey, transaction::Transaction};
 use solana_transaction_status::{
     EncodedConfirmedTransactionWithStatusMeta, EncodedTransaction, UiMessage,
 };
-use anyhow::Result;
+
+use super::swap::User;
 
 #[derive(Debug)]
 pub struct Transfer {
@@ -33,8 +30,6 @@ impl Transfer {
         }
     }
 }
-
-
 
 pub fn handle_transfer_transaction(
     encoded_confirmed_transaction_with_status_meta: &EncodedConfirmedTransactionWithStatusMeta,
@@ -128,33 +123,46 @@ pub fn handle_transfer_transaction(
     }
 }
 
-
-
 /// Sign and send a transaction
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `transaction` - The transaction to send
 /// * `user` - The user to sign the transaction
-/// 
+///
 /// # Returns
-/// 
+///
 /// A result indicating the success of the operation
-pub async fn sign_and_send_transaction(mut transaction: Transaction, user: User) -> TurnkeyResult<Signature> {
-    let turnkey_client = Turnkey::new_for_user(&user.api_public_key, &user.api_private_key, &user.organization_id, &user.public_key)?;
-    println!("@sign_and_send_transaction/ turnkey_client: {:?}", turnkey_client);
+pub async fn sign_and_send_transaction(
+    mut transaction: Transaction,
+    user: User,
+) -> TurnkeyResult<Signature> {
+    let turnkey_client = Turnkey::new_for_user(
+        &user.api_public_key,
+        &user.api_private_key,
+        &user.organization_id,
+        &user.public_key,
+    )?;
+    println!(
+        "@sign_and_send_transaction/ turnkey_client: {:?}",
+        turnkey_client
+    );
 
     let pubkey = Pubkey::from_str(&user.public_key).unwrap();
     let key_info = KeyInfo {
         private_key_id: user.public_key.to_string(),
-        public_key: pubkey
+        public_key: pubkey,
     };
     println!("@sign_and_send_transaction/ signing transaction");
-    let tx_and_sig = turnkey_client.sign_transaction(&mut transaction, key_info).await?;
+    let tx_and_sig = turnkey_client
+        .sign_transaction(&mut transaction, key_info)
+        .await?;
     println!("@sign_and_send_transaction/ tx_and_sig: {:?}", tx_and_sig);
     let rpc_client = RpcClient::new(env::var("NODE_HTTP").expect("NODE_HTTP must be set"));
     println!("@sign_and_send_transaction/ sending and confirming transaction");
-    let signature = rpc_client.send_and_confirm_transaction(&tx_and_sig.0).expect("Failed to send and confirm transaction");
+    let signature = rpc_client
+        .send_and_confirm_transaction(&tx_and_sig.0)
+        .expect("Failed to send and confirm transaction");
     println!("@sign_and_send_transaction/ signature: {:?}", signature);
     Ok(signature)
 }
