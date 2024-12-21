@@ -464,6 +464,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleGetTokenData = async (tokenCa: string) => {
+    log(`tokenCa: ${tokenCa}`, "info");
     const data = await getTokenData(tokenCa);
     log(`tokenData: ${JSON.stringify(data)}`, "info");
     setTokenData(data);
