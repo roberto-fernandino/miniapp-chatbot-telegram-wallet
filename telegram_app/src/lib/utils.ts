@@ -523,9 +523,7 @@ export async function getTokenInfo(tokenMint: string) {
 
 export async function getTokenData(tokenMint: string) {
   try {
-    console.log("Fetching token data for: ", tokenMint);
     const scannerResponse = await fetchDexcelerateScanner(tokenMint);
-    console.log("Scanner response: ", scannerResponse);
     return {
       scannerResponse,
     };
@@ -536,11 +534,12 @@ export async function getTokenData(tokenMint: string) {
 }
 export async function fetchDexcelerateScanner(tokenMint: string) {
   try {
+    console.log("Fetching token data for: ", tokenMint);
     const response = await axios.get(
       `https://api-rs.dexcelerate.com/pair/${tokenMint}/pair-and-token`
     );
     const response_data = response.data;
-    log(
+    console.log(
       `Fetching info for ${tokenMint}: ${JSON.stringify(response_data)}`,
       "info"
     );
@@ -548,11 +547,14 @@ export async function fetchDexcelerateScanner(tokenMint: string) {
       const response = await axios.get(
         `https://api-rs.dexcelerate.com/scanner/${response_data.chainName}/${response_data.pairAddress}/${response_data.tokenAddress}/pair-stats`
       );
+      console.log("Response: ", response.data);
       return response.data;
     } catch (error) {
+      console.error("Error fetching token data: ", error);
       throw error;
     }
   } catch (error) {
+    console.error("Error fetching token data: ", error);
     throw error;
   }
 }
