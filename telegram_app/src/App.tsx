@@ -129,6 +129,9 @@ const App: React.FC = () => {
   const [historySheetOpen, setHistorySheetOpen] = useState(false);
   const [history, setHistory] = useState<any>({});
 
+  // Add user state
+  const [userData, setUserData] = useState<any>(null);
+
   useEffect(() => {
     initializeApp();
   }, []);
@@ -329,21 +332,13 @@ const App: React.FC = () => {
    */
   const handleCreateSession = async (sessionDuration: string) => {
     setIsLoading(true);
-    const user = await TelegramApi.getItem(
-      `user_${WebApp.initDataUnsafe.user?.id}`
-    );
-    let json_user;
-    try {
-      json_user = JSON.parse(user);
-    } catch (error) {
-      log("User not found in TelegramApi", "error");
-      return;
-    }
+    if (!userData) return;
+
     const turnkey = new Turnkey({
       apiBaseUrl: "https://api.turnkey.com",
-      apiPublicKey: json_user.publicKey,
-      apiPrivateKey: json_user.privateKey,
-      defaultOrganizationId: json_user.subOrgId,
+      apiPublicKey: userData.publicKey,
+      apiPrivateKey: userData.privateKey,
+      defaultOrganizationId: userData.subOrgId,
     });
     const turnkeyClient = turnkey.apiClient();
     const { publicKey, privateKey } = generateKeyPair();
@@ -357,11 +352,11 @@ const App: React.FC = () => {
             expirationSeconds: (parseInt(sessionDuration) * 60).toString(),
           },
         ],
-        userId: json_user.userId,
-        organizationId: json_user.subOrgId,
+        userId: userData.userId,
+        organizationId: userData.subOrgId,
       });
 
-      json_user.sessionApiKeys = {
+      userData.sessionApiKeys = {
         expirationDate: new Date(
           Date.now() + parseInt(sessionDuration) * 60 * 1000
         ).toISOString(),
@@ -371,12 +366,12 @@ const App: React.FC = () => {
 
       await TelegramApi.setItem(
         `user_${WebApp.initDataUnsafe.user?.id}`,
-        JSON.stringify(json_user)
+        JSON.stringify(userData)
       );
 
       setCreateSessionButtonActive(false);
       setSessionActive(true);
-      await setUserSession(json_user.tgUserId);
+      await setUserSession(userData.tgUserId);
     } catch (error) {
       log(`Failed to create session: ${error}`, "error");
     } finally {
@@ -391,56 +386,44 @@ const App: React.FC = () => {
    * @returns void
    */
   const checkSessionApiKeys = async () => {
-    const user = await TelegramApi.getItem(
-      `user_${WebApp.initDataUnsafe.user?.id}`
-    );
-    let json_user;
-    try {
-      json_user = JSON.parse(user);
-      if (json_user.sessionApiKeys && json_user.sessionApiKeys !== "") {
-        const expirationDate = new Date(
-          json_user.sessionApiKeys.expirationDate
-        );
-        const now = new Date();
-        const timeLeft = expirationDate.getTime() - now.getTime();
-
-        if (timeLeft > 0) {
-          setSessionActive(true);
-          const months = Math.floor(timeLeft / 2592000000);
-          const days = Math.floor((timeLeft % 2592000000) / 86400000);
-          const hours = Math.floor(
-            ((timeLeft % 2592000000) % 86400000) / 3600000
-          );
-          const minutes = Math.floor(
-            (((timeLeft % 2592000000) % 86400000) % 3600000) / 60000
-          );
-          const seconds = Math.floor(
-            ((((timeLeft % 2592000000) % 86400000) % 3600000) % 60000) / 1000
-          );
-          if (months > 0) {
-            setRemainingTime(
-              `${months}m ${days}d ${hours}h ${minutes}m ${seconds}s`
-            );
-          } else if (days > 0) {
-            setRemainingTime(`${days}d ${hours}h ${minutes}m ${seconds}s`);
-          } else if (hours > 0) {
-            setRemainingTime(`${hours}h ${minutes}m ${seconds}s`);
-          } else if (minutes > 0) {
-            setRemainingTime(`${minutes}m ${seconds}s`);
-          } else {
-            setRemainingTime(`${seconds}s`);
-          }
-        } else {
-          // Session has expired
-          await handleSessionExpiration(json_user);
-        }
-      } else {
-        setSessionActive(false);
-        setRemainingTime("");
-      }
-    } catch (error) {
-      log("User not found in TelegramApi", "error");
+    if (!userData?.sessionApiKeys) {
+      setSessionActive(false);
+      setRemainingTime("");
       return;
+    }
+
+    const expirationDate = new Date(userData.sessionApiKeys.expirationDate);
+    const now = new Date();
+    const timeLeft = expirationDate.getTime() - now.getTime();
+
+    if (timeLeft > 0) {
+      setSessionActive(true);
+      const months = Math.floor(timeLeft / 2592000000);
+      const days = Math.floor((timeLeft % 2592000000) / 86400000);
+      const hours = Math.floor(((timeLeft % 2592000000) % 86400000) / 3600000);
+      const minutes = Math.floor(
+        (((timeLeft % 2592000000) % 86400000) % 3600000) / 60000
+      );
+      const seconds = Math.floor(
+        ((((timeLeft % 2592000000) % 86400000) % 3600000) % 60000) / 1000
+      );
+
+      if (months > 0) {
+        setRemainingTime(
+          `${months}m ${days}d ${hours}h ${minutes}m ${seconds}s`
+        );
+      } else if (days > 0) {
+        setRemainingTime(`${days}d ${hours}h ${minutes}m ${seconds}s`);
+      } else if (hours > 0) {
+        setRemainingTime(`${hours}h ${minutes}m ${seconds}s`);
+      } else if (minutes > 0) {
+        setRemainingTime(`${minutes}m ${seconds}s`);
+      } else {
+        setRemainingTime(`${seconds}s`);
+      }
+    } else {
+      // Session has expired
+      await handleSessionExpiration(userData);
     }
   };
 
@@ -516,6 +499,7 @@ const App: React.FC = () => {
     let json_user;
     try {
       json_user = JSON.parse(user);
+      setUserData(json_user); // Store user data in state
       const { has_solana, has_evm, has_sui } = await checkUserAccounts(
         json_user
       );
