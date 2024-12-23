@@ -523,11 +523,14 @@ export async function getTokenInfo(tokenMint: string) {
 
 export async function getTokenData(tokenMint: string) {
   try {
+    console.log("Fetching token data for: ", tokenMint);
     const scannerResponse = await fetchDexcelerateScanner(tokenMint);
+    console.log("Scanner response: ", scannerResponse);
     return {
       scannerResponse,
     };
   } catch (error) {
+    console.error("Error fetching token data: ", error);
     throw error;
   }
 }
